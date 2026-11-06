@@ -150,9 +150,7 @@ window.__ModuleLoader__.load({
       'window.title.unknown': '当前额度',
       'window.usedOfTotal': '{used} / {total}',
       'window.usedPercent': '{percent}% 已使用',
-      'window.resetIn': '{duration} 后重置',
-      'window.resetAtLabel': '重置时间 {time}',
-      'countdown.days': '{days} 天 {clock}',
+      'window.reset': '{duration} 后({time})重置',
       'duration.daysHours': '{days} 天 {hours} 小时',
       'duration.hoursMinutes': '{hours} 小时 {minutes} 分',
       'duration.minutes': '{minutes} 分钟',
@@ -191,9 +189,7 @@ window.__ModuleLoader__.load({
       'window.title.unknown': 'Current quota',
       'window.usedOfTotal': '{used} / {total}',
       'window.usedPercent': '{percent}% used',
-      'window.resetIn': 'resets in {duration}',
-      'window.resetAtLabel': 'resets {time}',
-      'countdown.days': '{days}d {clock}',
+      'window.reset': 'resets in {duration} ({time})',
       'duration.daysHours': '{days}d {hours}h',
       'duration.hoursMinutes': '{hours}h {minutes}m',
       'duration.minutes': '{minutes}m',
@@ -262,9 +258,8 @@ window.__ModuleLoader__.load({
       'background:var(--dsw-alias-state-warn-primary)}',
       '.dsh-model-balance-bar-fill[data-tone="error"]{',
       'background:var(--dsw-alias-state-error-primary)}',
-      '.dsh-model-balance-foot{display:flex;justify-content:space-between;gap:10px;',
-      'flex-wrap:wrap;margin-top:5px;color:var(--dsw-alias-label-secondary);',
-      'font-size:11px;font-variant-numeric:tabular-nums}',
+      '.dsh-model-balance-foot{margin-top:5px;color:var(--dsw-alias-label-secondary);',
+      'font-size:11px;font-variant-numeric:tabular-nums;word-break:break-word}',
       '.dsh-model-balance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-balance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
       'font-size:11px;word-break:break-word}',
@@ -476,26 +471,24 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Format a countdown as a clock, so it visibly ticks.
+     * Format a countdown as `dd.HH:MM:SS`.
      *
-     * A window hours away reads best as `HH:MM:SS`; a multi-day window keeps
-     * its days in front rather than turning into a 96-hour clock.
+     * Days are always present and zero-padded, so the field never changes
+     * width as a window crosses a day boundary and the digits stay aligned
+     * while the clock ticks.
      *
      * @param {number} ms Remaining milliseconds.
-     * @param {(key: string, params?: object) => string} t Translator.
      * @returns {string} The countdown.
      */
-    function formatCountdown(ms, t) {
-      if (!Number.isFinite(ms) || ms <= 0) return '00:00:00'
+    function formatCountdown(ms) {
+      if (!Number.isFinite(ms) || ms <= 0) return '00.00:00:00'
       const totalSeconds = Math.floor(ms / 1000)
       const days = Math.floor(totalSeconds / 86_400)
       const hours = Math.floor((totalSeconds % 86_400) / 3600)
       const minutes = Math.floor((totalSeconds % 3600) / 60)
       const seconds = totalSeconds % 60
-      const clock = [hours, minutes, seconds]
-        .map((part) => String(part).padStart(2, '0'))
-        .join(':')
-      return days > 0 ? t('countdown.days', { days, clock }) : clock
+      const pad = (value) => String(value).padStart(2, '0')
+      return `${pad(days)}.${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
     }
 
     /**
@@ -856,14 +849,10 @@ window.__ModuleLoader__.load({
                             h(
                               'span',
                               null,
-                              t('window.resetIn', {
-                                duration: formatCountdown(window.resetAt - now, t),
+                              t('window.reset', {
+                                duration: formatCountdown(window.resetAt - now),
+                                time: formatResetAt(window.resetAt),
                               }),
-                            ),
-                            h(
-                              'span',
-                              null,
-                              t('window.resetAtLabel', { time: formatResetAt(window.resetAt) }),
                             ),
                           )
                         : null,

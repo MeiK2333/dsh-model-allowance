@@ -541,8 +541,6 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     '每月额度',             // long window title
     '10,071 / 10,000',      // long window units, digits grouped
     '100% 已使用',          // long window consumed share
-    '后重置',               // countdown wording
-    '重置时间 2026-',       // absolute reset instant
   ]) {
     if (!body.includes(expected)) throw new Error(`plan card is missing ${JSON.stringify(expected)}`)
   }
@@ -555,9 +553,13 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   if (!body.includes('class="dsh-model-balance-bar-fill" style="width:100%" data-tone="error"')) {
     throw new Error('the exhausted window should render a full error bar')
   }
-  // The countdown is a clock, so it has HH:MM:SS shape, not prose.
-  if (!/\d{2}:\d{2}:\d{2} 后重置/.test(body)) {
-    throw new Error('the countdown should render as a ticking clock')
+  // One line: a `dd.HH:MM:SS` countdown, then the absolute reset in brackets.
+  const resetLine = /(\d{2})\.(\d{2}):(\d{2}):(\d{2}) 后\((\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\)重置/
+  const match = resetLine.exec(body)
+  if (!match) throw new Error('the reset line does not match dd.HH:MM:SS 后(YYYY-mm-dd HH:MM:SS)重置')
+  // The window resets four days out, so the day field must say so.
+  if (match[1] !== '04' && match[1] !== '03') {
+    throw new Error(`countdown day field should be 4 (or 3 mid-second), got ${match[1]}`)
   }
 
   // --- a window with no reset shows no reset line at all -------------------
