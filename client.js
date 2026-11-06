@@ -1501,11 +1501,10 @@ function BalanceBadge(props) {
               style: { width: `${String(filled)}%` }
             })
           ),
-          // A window the account has not started spending yet has no
-          // reset to report, and saying so would be a line of noise.
-          // Otherwise the countdown holds the left edge and the
-          // target instant the right, so the eye can compare them.
-          typeof window.resetAt === "number" ? (0, import_react3.createElement)(
+          // A window with zero usage has not started its rolling timer
+          // yet, so the countdown would be misleading. Hide it until
+          // consumption begins.
+          typeof window.resetAt === "number" && (typeof window.remainingPercent !== "number" || window.remainingPercent < 100) ? (0, import_react3.createElement)(
             "div",
             { className: "dsh-model-allowance-foot" },
             (0, import_react3.createElement)(
