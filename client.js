@@ -258,9 +258,14 @@ window.__ModuleLoader__.load({
       // The selected mark recolours the one border it already has. An extra
       // inset ring would stack a second line on top of that border and read as
       // a thick frame.
+      //
+      // It must not use the brand colour: in this theme that is #0f1115, so a
+      // selected chip wore a near-black frame on a white card. Selection is
+      // carried by the fill and the un-dimmed glyph instead, with a border one
+      // step stronger than the others so it still reads as a frame.
       '.dsh-model-balance-tab[data-active="true"]{opacity:1;',
       'background:var(--dsw-alias-bg-layer-2);',
-      'border-color:var(--dsw-alias-brand-primary)}',
+      'border-color:var(--dsw-alias-border-l2)}',
       '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:-1px}',
       '.dsh-model-balance-tab svg{display:block}',
