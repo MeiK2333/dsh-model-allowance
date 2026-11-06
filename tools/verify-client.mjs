@@ -154,6 +154,13 @@ await new Promise((resolve) => setTimeout(resolve, 20))
 
 console.log('locale namespaces:', localeDictionaries.map((entry) => entry.ns).join(', '))
 console.log('slot registrations:', JSON.stringify(registeredSlots.map((entry) => entry.options)))
+// The badge must sit immediately left of the model seat, which is what the
+// `right` list group renders before; the `left` group is past the permission
+// and plan controls.
+const slotName = registeredSlots[0]?.options?.name
+if (slotName !== 'conversation.input.right') {
+  throw new Error(`badge registered in ${slotName}, expected conversation.input.right`)
+}
 
 if (!remoteMount) throw new Error('remote contribution was not mounted')
 console.log('remote package:', remoteMount.package)

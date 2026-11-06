@@ -171,7 +171,10 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-root[data-tone="failed"] .dsh-model-balance-dot{',
       'background:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-balance-root[data-loading="true"] .dsh-model-balance-dot{opacity:.5}',
-      '.dsh-model-balance-panel{position:absolute;bottom:calc(100% + 6px);left:0;z-index:20;',
+      // Anchored to its own right edge: the badge sits next to the model seat
+      // near the trailing edge, so the panel opens leftwards instead of
+      // running off the side of the composer.
+      '.dsh-model-balance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
       'min-width:210px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);',
       'border-radius:10px;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);',
       'box-shadow:0 8px 24px rgb(0 0 0 / 18%);font-size:12px}',
@@ -601,10 +604,15 @@ window.__ModuleLoader__.load({
           }
         }, 'model-balance: balance namespace')
 
-        ctx.slots.inject('conversation.input.left', () =>
+        // `conversation.input.right` renders immediately before the composer's
+        // model seat, so the badge sits directly left of the model name. The
+        // left group sits behind the permission and plan controls, far enough
+        // away that the two stopped reading as related.
+        const SLOT = 'conversation.input.right'
+        ctx.slots.inject(SLOT, () =>
           ctx.slots.register(
             {
-              name: 'conversation.input.left',
+              name: SLOT,
               id: 'model-balance',
               order: 10,
             },

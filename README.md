@@ -60,9 +60,21 @@ Host 是唯一持有 Key 的地方：微浏览器的数据里没有凭证，只�
 projection（源自日志的 `request/header` 事件），客户端用标准 slot prop
 `useProjection('modelSelection')` 订阅，不解析日志、不 import DSH 内部包。
 
-**插槽选 `conversation.input.left`。** 它是增量 `list` 插槽（`replaceRisk: none`），
-紧邻模型控件；`conversation.input.model.label` 虽然更贴合，但已被内置占用且
-`shadows-shipped-ui`，注册会顶掉内置模型名。
+**插槽选 `conversation.input.right`。** 它是增量 `list` 插槽（`replaceRisk: none`），
+在同一组里**紧接在模型选择器之前**渲染，所以徽章正好落在模型名左边：
+
+```
+左侧组:  [权限] [计划]
+右侧组:  [余额徽章] [模型▾] [activity]
+```
+
+早先放在 `conversation.input.left`（左侧组末尾），但那里在权限、计划控件之后，
+离模型名隔了两个控件，看不出关联。`conversation.input.model.label` 虽然直接嵌在
+模型按钮内部，但它是 `single` 且已被内置占用（`shadows-shipped-ui`），注册会顶掉
+内置模型名渲染。
+
+详情浮层锚定徽章自身的**右边缘**（`right: 0`）向左展开——徽章靠近 composer 右边，
+若锚定左边缘会溢出屏幕。
 
 **代理不需要写代码。** DSH 启动时就装好了进程级代理 dispatcher，普通 `fetch()`
 自动走 `http_proxy` / `https_proxy` / `all_proxy`。想走本地 clash 代理，
