@@ -630,8 +630,16 @@ window.__ModuleLoader__.load({
         return h('span', { className: 'dsh-model-balance-tab-letter' }, mark.letter)
       }
       const geo = ICON_GEOMETRY[mark.icon]
-      const boxH = (inkHeight * geo.vbH) / geo.inkH
-      const boxW = (boxH * geo.vbW) / geo.vbH
+      // Both dimensions must land on whole, even pixels.
+      //
+      // A fractional box is placed by flooring it against the chip's centre:
+      // Zhipu's 12.28px box was laid out at 6 instead of the ideal 6.86, so
+      // the mark sat a pixel left of centre while the vertical axis, whose box
+      // happened to be exactly 14px, stayed perfect. Rounding to even makes
+      // (chip - box) / 2 a whole number for the 26px and 20px chips.
+      const even = (value) => Math.max(2, Math.round(value / 2) * 2)
+      const boxH = even((inkHeight * geo.vbH) / geo.inkH)
+      const boxW = even((inkHeight * geo.vbW) / geo.inkH)
       const paths =
         mark.icon === 'zhipu'
           ? ZHIPU_PATHS.map((path, index) =>

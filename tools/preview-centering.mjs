@@ -48,11 +48,16 @@ if (Object.keys(GEOMETRY).length !== 3) {
   throw new Error(`expected three icon geometries, parsed ${Object.keys(GEOMETRY).length}`)
 }
 
-/** Box dimensions that make this mark's ink exactly `inkHeight` tall. */
+/**
+ * Box dimensions for this mark, rounded to whole even pixels the way the
+ * component does it. A fractional box is floored into the chip's centre, which
+ * is what made the marks sit a pixel left of centre on screen.
+ */
 function body(provider) {
   const geo = GEOMETRY[provider]
-  const h = (inkPx * geo.vbH) / geo.inkH
-  const w = (h * geo.vbW) / geo.vbH
+  const even = (value) => Math.max(2, Math.round(value / 2) * 2)
+  const h = even((inkPx * geo.vbH) / geo.inkH)
+  const w = even((inkPx * geo.vbW) / geo.inkH)
   const inner =
     provider === 'zhipu'
       ? zhipu.map((p) => `<path d="${p.d}" fill="${p.fill}"/>`).join('')

@@ -239,6 +239,12 @@ function render(node) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
   if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
+  // An icon's box size decides whether it lands on a whole pixel inside its
+  // chip, so the assertions need to see it.
+  if (type === 'svg') {
+    if (props.width !== undefined) extra.push(`w="${String(props.width)}"`)
+    if (props.height !== undefined) extra.push(`h="${String(props.height)}"`)
+  }
   const suffix = extra.length > 0 ? ` ${extra.join(' ')}` : ''
   return `<${type} class="${props.className ?? ''}"${suffix}>${rendered}</${type}>`
 }
@@ -657,6 +663,25 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   // The marks are letters; the full name rides in the accessible name.
   for (const name of ['DeepSeek 账号', 'MiniMax', '智谱 GLM']) {
     if (!body.includes(`title="${name}"`)) throw new Error(`switcher is missing ${name}`)
+  }
+  // --- every icon box is a whole, even pixel count --------------------------
+  // A fractional box is floored into the chip's centre, which put Zhipu's mark
+  // a pixel left of centre while the others leaned left too, by different
+  // amounts. Whole even boxes make (chip - box) / 2 exact.
+  {
+    const boxes = [...body.matchAll(/w="([^"]+)" h="([^"]+)"/g)]
+    if (boxes.length < 2) throw new Error('no icon boxes found to check')
+    for (const [, w, h] of boxes) {
+      for (const value of [w, h]) {
+        if (!/^\d+$/.test(value)) {
+          throw new Error(`icon box ${value} is not a whole number of pixels`)
+        }
+        if (Number(value) % 2 !== 0) {
+          throw new Error(`icon box ${value} is odd, so its offset lands mid-pixel`)
+        }
+      }
+    }
+    console.log(`icon boxes: ${boxes.map(([, w, h]) => `${w}x${h}`).join(' ')} — all whole and even`)
   }
   // `deepseek` has no key configured here, so it must not be offered.
   if (body.includes('title="DeepSeek API"')) {
