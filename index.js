@@ -125,7 +125,18 @@ class ModelBalanceService extends Service {
         const baseline = report
           ? (this.baselines.get(route) ?? this.balance.peek(route))
           : undefined
-        return this.balance.read(route, { force: true, baseline })
+        return this.balance.read(route, { force: true, baseline }).then((view) => {
+          if (report && this.config.debug === true) {
+            const consumption = view.consumption
+            void logDebug(
+              `turn cost route=${route} status=${view.status}` +
+                (consumption === undefined
+                  ? ' consumption=-'
+                  : ` consumption=${consumption.kind}:${String(consumption.delta)}`),
+            )
+          }
+          return view
+        })
       }),
     )
     if (report) this.baselines.clear()
@@ -160,21 +171,39 @@ class ModelBalanceService extends Service {
   [Service.init]() {
     const ctx = this.ctx
 
+    // Both listeners are `global`. `session/event` is emitted from the
+    // session's own scope, so a plugin context that is not an ancestor of that
+    // scope never sees it — the turn-end refresh was silently dead for that
+    // reason, and the badge only ever moved on the periodic sweep. The harness
+    // registers its own cross-session listeners the same way.
+    const GLOBAL = { global: true }
+
     // A turn beginning is the only reliable "before" instant: the provider is
     // not asked, so this costs nothing, and the value is the last reading taken.
-    ctx.on('agent/status', (payload) => {
-      if (payload.status !== 'running') return
-      this.armBaselines()
-    })
+    ctx.on(
+      'agent/status',
+      (payload) => {
+        if (payload.status !== 'running') return
+        this.armBaselines()
+      },
+      GLOBAL,
+    )
 
     // A finished turn consumed provider quota, so the reading it belongs to is
     // stale. This is also the moment to report what the turn cost.
-    ctx.on('session/event', (_session, event) => {
-      if (event.type !== 'turn/end') return
-      this.refreshAll({ withConsumption: true }).catch((error) => {
-        console.error('[model-balance] turn refresh failed', { error })
-      })
-    })
+    ctx.on(
+      'session/event',
+      (_session, event) => {
+        if (event.type !== 'turn/end') return
+        if (this.config.debug === true) {
+          void logDebug(`turn end: refreshing ${String(this.activeRoutes.size)} route(s)`)
+        }
+        this.refreshAll({ withConsumption: true }).catch((error) => {
+          console.error('[model-balance] turn refresh failed', { error })
+        })
+      },
+      GLOBAL,
+    )
 
     // A periodic sweep keeps a long-lived session's reading current. It never
     // reports a difference: a sweep is not a turn.

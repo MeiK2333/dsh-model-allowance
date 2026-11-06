@@ -473,8 +473,12 @@ window.__ModuleLoader__.load({
     function formatDelta(consumption) {
       const magnitude = Math.abs(consumption.delta)
       if (consumption.kind === 'percent') {
-        const points = Math.round(magnitude)
-        return points === 0 ? '' : `${String(points)}%`
+        // A plan window moves in whole points at most turns, so a whole number
+        // is right — but a turn that moves a fifth of a point is still a real
+        // cost, and rounding it to 0% would hide it.
+        if (magnitude >= 0.95) return `${String(Math.round(magnitude))}%`
+        if (magnitude >= 0.05) return `${magnitude.toFixed(1)}%`
+        return ''
       }
       // Matches how the balance itself is rendered: two decimals once they mean
       // something, four while the amounts are fractional cents.
