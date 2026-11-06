@@ -672,11 +672,12 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   planBadge()
   await new Promise((resolve) => setTimeout(resolve, 20))
 
-  // The badge speaks for the window closest to its limit.
+  // Every window has allowance except the weekly one, which is exhausted; a
+  // zero window decides the badge whatever the shorter window says.
   hookCursor = 0
   const planClosed = planBadge()
   if (!planClosed.includes('剩余 0%')) {
-    throw new Error('badge should report the binding window')
+    throw new Error('badge should report the exhausted window')
   }
   // The platform is degraded in this scenario, so the badge dot is red.
   if (!planClosed.includes('data-service="degraded"')) {
@@ -1055,6 +1056,78 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     throw new Error('a route without a status source should leave the badge dot grey')
   }
   console.log('client: a vendor without artwork reads as its initial')
+}
+
+// --- With nothing exhausted the badge speaks for the shortest window ------
+// A coding plan's 5-hour window is the allowance a turn spends first, so the
+// badge shows it rather than the most-constrained weekly window; a window that
+// has run out still decides the badge, which the plan fixture above proves.
+{
+  const readPlan = (route) => ({
+    ok: true,
+    value: {
+      provider: route,
+      status: 'ready',
+      kind: 'quota',
+      percent: 66,
+      updatedAt: Date.now(),
+      windows: [
+        { id: 'session', unit: 'hour', count: 5, remainingPercent: 82 },
+        { id: 'weekly', unit: 'week', remainingPercent: 66 },
+      ],
+    },
+  })
+  let shortestSlot
+  const shortestCtx = {
+    effect: (fn) => fn(),
+    locale: ctx.locale,
+    remote: { $mount: async () => () => {}, $stream: undefined },
+    get: (key) =>
+      key === 'remote.balance'
+        ? {
+            balance: async (route) => readPlan(route),
+            refresh: async (route) => readPlan(route),
+            list: async () => ({ ok: true, value: [] }),
+            status: async (route) => ({
+              ok: true,
+              value: { provider: route, state: 'operational' },
+            }),
+            defaultProvider: async () => ({ ok: true, value: { provider: 'minimax-cn' } }),
+          }
+        : undefined,
+    slots: {
+      inject: (_key, callback) => callback(),
+      register: (options, Component) => {
+        shortestSlot = { options, Component }
+        return () => {}
+      },
+    },
+  }
+  plugin.apply(shortestCtx)
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  hookState = []
+  hookCursor = 0
+  const planProjection = {
+    lastUsed: { provider: 'minimax-cn', model: 'MiniMax-M3' },
+    next: null,
+  }
+  const renderPlan = () => {
+    hookCursor = 0
+    return render(
+      shortestSlot.Component({
+        useProjection: (key) => (key === 'modelSelection' ? planProjection : undefined),
+      }),
+    )
+  }
+  renderPlan()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  const shortestBadge = renderPlan()
+  if (!shortestBadge.includes('剩余 82%')) {
+    throw new Error(
+      `the badge should speak for the five-hour window, rendered ${JSON.stringify(shortestBadge)}`,
+    )
+  }
+  console.log('badge: the shortest window speaks when nothing is exhausted')
 }
 
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')

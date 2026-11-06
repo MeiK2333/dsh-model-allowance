@@ -938,6 +938,43 @@ window.__ModuleLoader__.load({
       return undefined
     }
 
+    /** Milliseconds per window unit, for ordering windows by their length. */
+    const UNIT_MS = {
+      hour: 3_600_000,
+      day: 86_400_000,
+      week: 7 * 86_400_000,
+      month: 30 * 86_400_000,
+    }
+
+    /**
+     * The window a plan meters most finely: the shortest one it reports.
+     *
+     * A coding plan meters a short rolling window and a long one, and the
+     * short window is the allowance a turn spends first — so it is the number
+     * that moves, and the one the badge speaks for. A window whose length the
+     * plan does not state cannot be ordered against the others and is skipped;
+     * the caller falls back to the reading's own percentage for those.
+     *
+     * @param {Array<object>} windows Reported windows.
+     * @returns {object | undefined} The shortest window reporting a percentage.
+     */
+    function shortestWindow(windows) {
+      let shortest
+      let shortestMs = Number.POSITIVE_INFINITY
+      for (const window of windows) {
+        if (typeof window.remainingPercent !== 'number') continue
+        const unit = UNIT_MS[window.unit]
+        if (unit === undefined) continue
+        const count = typeof window.count === 'number' && window.count > 0 ? window.count : 1
+        const lengthMs = unit * count
+        if (lengthMs < shortestMs) {
+          shortest = window
+          shortestMs = lengthMs
+        }
+      }
+      return shortest
+    }
+
     /**
      * The "used / total" label, when the provider meters in countable units.
      * @param {object} window The window.
@@ -1325,15 +1362,20 @@ window.__ModuleLoader__.load({
           if (view.kind === 'amount' && typeof view.amount === 'number') {
             return t('badge.amount', { amount: formatAmount(view.amount, view.currency) })
           }
-          // With several windows the badge speaks for the one closest to its
-          // limit; the panel breaks the rest down.
+          // A window at zero means the account is out of allowance right now,
+          // whichever window ran out; saying "0%" is the fact a user needs at
+          // a glance.
           const windows = Array.isArray(view.windows) ? view.windows : []
-          const binding = windows.reduce((current, candidate) => {
-            const a = current?.remainingPercent ?? Number.POSITIVE_INFINITY
-            const b = candidate.remainingPercent ?? Number.POSITIVE_INFINITY
-            return b < a ? candidate : current
-          }, null)
-          const percent = binding?.remainingPercent ?? view.percent
+          const exhausted = windows.some(
+            (window) => typeof window.remainingPercent === 'number' && window.remainingPercent <= 0,
+          )
+          // Otherwise the badge speaks for the shortest window — the 5-hour
+          // one on a coding plan — because that is the allowance a turn spends
+          // first, so it is the number that moves. The panel breaks every
+          // window down.
+          const percent = exhausted
+            ? 0
+            : (shortestWindow(windows)?.remainingPercent ?? view.percent)
           if (typeof percent === 'number') {
             return t('badge.quotaPercent', { percent: Math.round(percent) })
           }

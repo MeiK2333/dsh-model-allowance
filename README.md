@@ -16,7 +16,9 @@ plan allowance.
 ## Features
 
 - A badge beside the model selector follows the session's model: a money
-  balance (e.g. `¥46.71`) for DeepSeek, remaining percent or time for coding plans
+  balance (e.g. `¥46.71`) for DeepSeek, remaining percent or time for coding plans.
+  A plan with several windows speaks through the shortest one (the 5-hour
+  window on coding plans), and shows `0%` as soon as any window runs out
 - Refreshes automatically after every turn, briefly showing the change
   (e.g. `↓0.90`)
 - Click the badge for details: per-window progress bars, reset countdowns,
