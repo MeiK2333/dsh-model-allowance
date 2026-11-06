@@ -227,16 +227,18 @@ window.__ModuleLoader__.load({
       // near the trailing edge, so the panel opens leftwards instead of
       // running off the side of the composer.
       '.dsh-model-balance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
-      'min-width:250px;padding:8px 12px 10px;border:1px solid var(--dsw-alias-border-l1);',
+      'min-width:250px;padding:8px 10px 10px;border:1px solid var(--dsw-alias-border-l1);',
       'border-radius:10px;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);',
       'box-shadow:0 8px 24px rgb(0 0 0 / 18%);font-size:12px}',
       '.dsh-model-balance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
       '.dsh-model-balance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
       '.dsh-model-balance-usage{font-variant-numeric:tabular-nums}',
-      // The row bleeds past the content padding so the marks sit closer to the
-      // card edge, and the divider under them runs the full width.
-      '.dsh-model-balance-switcher-wrap{position:relative;margin:-2px -12px 6px;',
-      'padding:0 8px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+      // The row cancels the panel's own horizontal padding so the divider under
+      // it runs edge to edge, then puts the same padding back so the first mark
+      // lines up with the labels below. Without this the marks sit further from
+      // the edge than every other row and the whole strip reads as shifted left.
+      '.dsh-model-balance-switcher-wrap{position:relative;margin:-2px -10px 6px;',
+      'padding:0 10px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
       'gap:4px;overflow:hidden}',
       // Each mark is the vendor's own artwork in its own colour on a neutral
