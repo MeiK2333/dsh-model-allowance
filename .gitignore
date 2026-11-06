@@ -6,3 +6,4 @@ node_modules/
 .sharp2/
 .sharp3/
 .preview/
+.tmp*/
