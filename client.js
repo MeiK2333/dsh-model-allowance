@@ -246,10 +246,25 @@ window.__ModuleLoader__.load({
         let cancelled = false
         setLoading(true)
 
+        /** One unary read, used when the stream is unavailable or fails. */
+        const readOnce = async () => {
+          try {
+            const result = await ctx.remote.balance.balance(provider)
+            if (cancelled) return
+            if (!result.ok) throw new Error('balance reading failed')
+            setView(result.value)
+          } catch (error) {
+            console.error('[model-balance] reading failed', { provider, error })
+            if (!cancelled) setView({ provider, status: 'failed', kind: 'quota' })
+          } finally {
+            if (!cancelled) setLoading(false)
+          }
+        }
+
         // The Host pushes a new reading when a turn ends or the periodic sweep
         // runs, so the badge stays current without polling from the browser.
-        // The generated stream API is absent in a few hosts, so a unary read
-        // remains the fallback.
+        // A host without the stream API, or a stream that fails before its
+        // first frame, falls back to one unary read.
         const streamFactory = ctx.remote.$stream
         const watch = ctx.remote.balance?.watch
         if (typeof streamFactory === 'function' && typeof watch === 'function') {
@@ -265,9 +280,11 @@ window.__ModuleLoader__.load({
           }
           if (handle) {
             ;(async () => {
+              let received = false
               try {
                 for await (const frame of handle) {
                   if (cancelled) return
+                  received = true
                   setView(frame)
                   setLoading(false)
                 }
@@ -276,7 +293,9 @@ window.__ModuleLoader__.load({
                   console.error('[model-balance] reading stream failed', { provider, error })
                 }
               } finally {
-                if (!cancelled) setLoading(false)
+                // A stream that produced nothing leaves the badge loading
+                // forever, so answer the same question the unary call would.
+                if (!cancelled && !received) await readOnce()
               }
             })()
             return () => {
@@ -286,19 +305,7 @@ window.__ModuleLoader__.load({
           }
         }
 
-        ;(async () => {
-          try {
-            const result = await ctx.remote.balance.balance(provider)
-            if (cancelled) return
-            if (!result.ok) throw new Error('balance reading failed')
-            setView(result.value)
-          } catch (error) {
-            console.error('[model-balance] reading failed', { provider, error })
-            if (!cancelled) setView({ provider, status: 'failed', kind: 'quota' })
-          } finally {
-            if (!cancelled) setLoading(false)
-          }
-        })()
+        void readOnce()
         return () => {
           cancelled = true
         }

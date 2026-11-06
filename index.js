@@ -77,6 +77,16 @@ class ModelBalanceService extends Service {
   }
 
   /**
+   * Subscribe to new readings for one provider.
+   * @param {string} provider Provider route.
+   * @param {(view: import('./lib/providers.js').BalanceView) => void} listener Receives every reading.
+   * @returns {() => void} Unsubscribe.
+   */
+  subscribe(provider, listener) {
+    return this.balance.subscribe(provider, listener)
+  }
+
+  /**
    * Refresh every tracked provider.
    * @returns {Promise<void>} Resolves when the refreshes settle.
    */
