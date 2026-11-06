@@ -218,13 +218,13 @@ window.__ModuleLoader__.load({
       'status.majorOutage': '大面积中断',
       'status.maintenance': '维护中',
       'status.unknown': '状态未知',
-      'schedule.title': '时段价格',
-      'schedule.peak': '高峰',
-      'schedule.offPeak': '低谷',
+      'schedule.peakTitle': '高峰时段',
+      'schedule.offPeakTitle': '低谷时段',
       'schedule.daysWeekdays': '工作日',
       'schedule.daysDaily': '每天',
       'schedule.daysOther': '指定日期',
       'schedule.ranges': '{days} {windows}（{timezone}）',
+      'schedule.holidays': '法定节假日全天低谷',
       'schedule.toPeak': '距高峰开始 {duration}',
       'schedule.toOffPeak': '距低谷开始 {duration}',
       'badge.consumption': '相对上次读数的变化',
@@ -270,13 +270,13 @@ window.__ModuleLoader__.load({
       'status.majorOutage': 'Major outage',
       'status.maintenance': 'Maintenance',
       'status.unknown': 'Status unknown',
-      'schedule.title': 'Time-based pricing',
-      'schedule.peak': 'Peak',
-      'schedule.offPeak': 'Off-peak',
+      'schedule.peakTitle': 'Peak hours',
+      'schedule.offPeakTitle': 'Off-peak',
       'schedule.daysWeekdays': 'Weekdays',
       'schedule.daysDaily': 'Every day',
       'schedule.daysOther': 'Selected days',
       'schedule.ranges': '{days} {windows} ({timezone})',
+      'schedule.holidays': 'Statutory holidays are off-peak all day',
       'schedule.toPeak': '{duration} until peak',
       'schedule.toOffPeak': '{duration} until off-peak',
       'badge.consumption': 'Change since the last reading',
@@ -466,25 +466,55 @@ window.__ModuleLoader__.load({
       'background:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-allowance-status-arrow{font-size:10px;flex:none;',
       'color:var(--dsw-alias-label-secondary)}',
-      // The time-of-day pricing block: the schedule, the phase the clock is
-      // in, and how long until it flips.
+      // The time-of-day pricing block: the phase the clock is in, how far
+      // through that stretch of time it is, and the countdown. The rule itself
+      // hides behind the help mark, so the card stays readable.
       '.dsh-model-allowance-schedule{margin-top:10px;padding-top:10px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-allowance-schedule-head{display:flex;justify-content:space-between;',
-      'align-items:baseline;gap:12px}',
+      'align-items:center;gap:12px}',
       '.dsh-model-allowance-schedule-title{font-weight:500;color:var(--dsw-alias-label-primary)}',
-      '.dsh-model-allowance-schedule-state{display:inline-flex;align-items:center;gap:5px;',
-      'font-size:11px;color:var(--dsw-alias-label-secondary)}',
-      '.dsh-model-allowance-schedule-dot{width:6px;height:6px;border-radius:50%;flex:none;',
-      'background:var(--dsw-alias-state-success-primary)}',
-      '.dsh-model-allowance-schedule[data-phase="peak"] .dsh-model-allowance-schedule-dot{',
-      'background:var(--dsw-alias-state-warn-primary)}',
-      '.dsh-model-allowance-schedule-ranges{margin-top:4px;font-size:11px;',
-      'color:var(--dsw-alias-label-secondary);word-break:break-word}',
-      '.dsh-model-allowance-schedule-countdown{margin-top:2px;font-size:11px;',
+      '.dsh-model-allowance-schedule-help{position:relative;display:inline-flex;',
+      'align-items:center;justify-content:center;box-sizing:border-box;width:16px;height:16px;',
+      'flex:none;border:1px solid var(--dsw-alias-border-l2);border-radius:50%;',
+      'color:var(--dsw-alias-label-secondary);font-size:10px;font-weight:600;line-height:1;',
+      'cursor:help}',
+      '.dsh-model-allowance-schedule-help:hover,',
+      '.dsh-model-allowance-schedule-help:focus-visible{color:var(--dsw-alias-label-primary);',
+      'border-color:var(--dsw-alias-label-secondary);outline:none}',
+      // Opens upwards: the block sits just above the footer, so a tooltip
+      // hanging below it would leave the panel.
+      '.dsh-model-allowance-schedule-tip{display:none;position:absolute;right:0;',
+      'bottom:calc(100% + 8px);z-index:40;width:max-content;max-width:240px;padding:6px 8px;',
+      'border:1px solid var(--dsw-alias-border-l1);border-radius:8px;',
+      'background:var(--dsw-alias-bg-overlay);box-shadow:0 8px 24px rgb(0 0 0 / 18%);',
+      'font-size:11px;font-weight:400;line-height:1.5;color:var(--dsw-alias-label-secondary);',
+      'white-space:normal;text-align:left}',
+      '.dsh-model-allowance-schedule-help:hover .dsh-model-allowance-schedule-tip,',
+      '.dsh-model-allowance-schedule-help:focus-visible .dsh-model-allowance-schedule-tip{',
+      'display:block}',
+      '.dsh-model-allowance-schedule-tip-line{display:block}',
+      // One 24-hour strip for the vendor's day: its peak windows tinted red
+      // and the off-peak day tinted green, both at low saturation so the
+      // strip reads at a glance without glaring, and a cursor where the
+      // clock stands.
+      '.dsh-model-allowance-schedule-timeline{position:relative;margin-top:8px;height:8px;',
+      'border-radius:4px;overflow:hidden;background:var(--dsw-alias-bg-layer-2);',
+      'background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%,',
+      'var(--dsw-alias-bg-layer-2));',
+      'box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l1)}',
+      '.dsh-model-allowance-schedule-timeline-peak{position:absolute;top:0;bottom:0;',
+      // A translucent tint rather than a solid block: the peak still reads at
+      // a glance, without the glare a saturated red gives on every open.
+      'background:var(--dsw-alias-state-error-primary);opacity:.4}',
+      '.dsh-model-allowance-schedule-timeline-now{position:absolute;top:0;bottom:0;width:2px;',
+      'margin-left:-1px;border-radius:1px;background:var(--dsw-alias-label-primary);',
+      'box-shadow:0 0 0 1px rgb(0 0 0 / 12%)}',
+      '.dsh-model-allowance-schedule-ticks{display:flex;justify-content:space-between;',
+      'margin-top:2px;font-size:9px;line-height:1;color:var(--dsw-alias-label-secondary);',
+      'font-variant-numeric:tabular-nums}',
+      '.dsh-model-allowance-schedule-countdown{margin-top:4px;text-align:right;font-size:11px;',
       'color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
-      '.dsh-model-allowance-schedule-note{margin-top:2px;font-size:11px;',
-      'color:var(--dsw-alias-label-secondary);word-break:break-word}',
     ].join('')
 
     /**
@@ -1174,6 +1204,25 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Minutes since midnight for one `HH:MM` wall time.
+     * @param {string} time Wall-clock time.
+     * @returns {number} Minutes since midnight.
+     */
+    function wallMinutes(time) {
+      const [hour, minute] = time.split(':').map(Number)
+      return hour * 60 + minute
+    }
+
+    /**
+     * A position within a day, as the percentage string a timeline needs.
+     * @param {number} minutes Minutes since midnight.
+     * @returns {string} The percentage, two decimals at most.
+     */
+    function dayPercent(minutes) {
+      return `${String(Number(((minutes / 1440) * 100).toFixed(2)))}%`
+    }
+
+    /**
      * The schedule's phase at one instant.
      * @param {object} schedule The schedule.
      * @param {number} now The instant.
@@ -1186,9 +1235,7 @@ window.__ModuleLoader__.load({
       if (!schedule.days.includes(parts.weekday)) return 'off-peak'
       const minutes = parts.hour * 60 + parts.minute
       for (const window of schedule.windows) {
-        const [fromHour, fromMinute] = window.from.split(':').map(Number)
-        const [toHour, toMinute] = window.to.split(':').map(Number)
-        if (minutes >= fromHour * 60 + fromMinute && minutes < toHour * 60 + toMinute) return 'peak'
+        if (minutes >= wallMinutes(window.from) && minutes < wallMinutes(window.to)) return 'peak'
       }
       return 'off-peak'
     }
@@ -1228,6 +1275,12 @@ window.__ModuleLoader__.load({
 
     /**
      * The time-of-day pricing block.
+     *
+     * A 24-hour strip for the vendor's day: the peak windows are drawn on it,
+     * and a cursor marks where the clock is, so the schedule, the current
+     * position, and the countdown read as one picture. The rule itself sits
+     * behind the help mark.
+     *
      * @param {object} schedule The schedule.
      * @param {number} now The instant the card is showing.
      * @param {(key: string, params?: object) => string} t Translator.
@@ -1248,24 +1301,85 @@ window.__ModuleLoader__.load({
       const timezone =
         schedule.timezoneLabel?.[language] ?? schedule.timezoneLabel?.en ?? schedule.timezone
       const note = schedule.note?.[language] ?? schedule.note?.en ?? schedule.note?.zh
+      const rules = [t('schedule.ranges', { days, windows, timezone })]
+      if ((schedule.holidays ?? []).length > 0) rules.push(t('schedule.holidays'))
+      if (note !== undefined) rules.push(note)
+
+      // The strip describes the vendor's own day, so a window sits where its
+      // wall-clock time says it does. A day that is off-peak all along — a
+      // weekend or a statutory holiday — draws no blocks at all.
+      const parts = zoneParts(now, schedule.timezone)
+      const date = `${String(parts.year)}-${pad2(parts.month)}-${pad2(parts.day)}`
+      const offToday =
+        (schedule.holidays ?? []).includes(date) || !schedule.days.includes(parts.weekday)
+      const segments = offToday
+        ? []
+        : schedule.windows.map((window) => ({
+            left: dayPercent(wallMinutes(window.from)),
+            width: dayPercent(wallMinutes(window.to) - wallMinutes(window.from)),
+          }))
+      const cursor = dayPercent(parts.hour * 60 + parts.minute + parts.second / 60)
+
       return h(
         'div',
         { className: 'dsh-model-allowance-schedule', 'data-phase': phase },
         h(
           'div',
           { className: 'dsh-model-allowance-schedule-head' },
-          h('span', { className: 'dsh-model-allowance-schedule-title' }, t('schedule.title')),
           h(
             'span',
-            { className: 'dsh-model-allowance-schedule-state' },
-            h('span', { className: 'dsh-model-allowance-schedule-dot', 'aria-hidden': true }),
-            phase === 'peak' ? t('schedule.peak') : t('schedule.offPeak'),
+            { className: 'dsh-model-allowance-schedule-title' },
+            phase === 'peak' ? t('schedule.peakTitle') : t('schedule.offPeakTitle'),
+          ),
+          // The rule itself is one hover — or one keyboard focus — away.
+          h(
+            'span',
+            {
+              className: 'dsh-model-allowance-schedule-help',
+              tabIndex: 0,
+              role: 'note',
+              'aria-label': rules.join(' '),
+            },
+            h('span', { className: 'dsh-model-allowance-schedule-question', 'aria-hidden': true }, '?'),
+            h(
+              'span',
+              { className: 'dsh-model-allowance-schedule-tip', role: 'tooltip' },
+              ...rules.map((line, index) =>
+                h(
+                  'span',
+                  {
+                    key: `rule-${String(index)}`,
+                    className: 'dsh-model-allowance-schedule-tip-line',
+                  },
+                  line,
+                ),
+              ),
+            ),
           ),
         ),
         h(
           'div',
-          { className: 'dsh-model-allowance-schedule-ranges' },
-          t('schedule.ranges', { days, windows, timezone }),
+          { className: 'dsh-model-allowance-schedule-timeline', role: 'img', 'aria-label': rules[0] },
+          ...segments.map((segment, index) =>
+            h('span', {
+              key: `peak-${String(index)}`,
+              className: 'dsh-model-allowance-schedule-timeline-peak',
+              style: { left: segment.left, width: segment.width },
+            }),
+          ),
+          h('span', {
+            className: 'dsh-model-allowance-schedule-timeline-now',
+            style: { left: cursor },
+          }),
+        ),
+        // Quarter ticks: the strip is the vendor's day, so the scale is its
+        // wall clock, matching the windows drawn on it.
+        h(
+          'div',
+          { className: 'dsh-model-allowance-schedule-ticks' },
+          ...['00:00', '06:00', '12:00', '18:00', '24:00'].map((tick) =>
+            h('span', { key: tick, className: 'dsh-model-allowance-schedule-tick' }, tick),
+          ),
         ),
         change === undefined
           ? null
@@ -1276,7 +1390,6 @@ window.__ModuleLoader__.load({
                 duration: formatCountdown(change - now),
               }),
             ),
-        note === undefined ? null : h('div', { className: 'dsh-model-allowance-schedule-note' }, note),
       )
     }
 

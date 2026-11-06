@@ -257,9 +257,15 @@ function render(node) {
   const rendered = (children ?? []).map(render).join('')
   if (typeof type === 'function') return render(type({ ...props, children }))
   // Surface the attributes the assertions read: the bar's fill width and tone,
-  // the switcher's selection, and the accessible name a mark carries.
+  // the timeline's segment and cursor positions, the switcher's selection, and
+  // the accessible name a mark carries.
   const extra = []
-  if (props.style?.width) extra.push(`style="width:${String(props.style.width)}"`)
+  if (props.style && (props.style.left || props.style.width)) {
+    const style = []
+    if (props.style.left) style.push(`left:${String(props.style.left)}`)
+    if (props.style.width) style.push(`width:${String(props.style.width)}`)
+    extra.push(`style="${style.join(';')}"`)
+  }
   for (const name of ['data-tone', 'data-service', 'data-phase', 'data-first', 'data-active', 'aria-selected', 'aria-expanded']) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
@@ -1235,26 +1241,49 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     const peakCard = renderClock()
     for (const expected of [
       'data-phase="peak"',
-      '时段价格',
+      '高峰时段',
       '工作日 09:00–12:00、14:00–18:00（北京时间）',
+      '法定节假日全天低谷',
       '距低谷开始 01:30:00',
       '低谷时段 API 价格减半',
+      // The day strip carries the two peak windows, and the cursor sits at
+      // 10:30 — 43.75% of the way through the vendor's day.
+      'style="left:37.5%;width:12.5%"',
+      'style="left:58.33%;width:16.67%"',
+      'style="left:43.75%"',
     ]) {
       if (!peakCard.includes(expected)) {
         throw new Error(`the pricing block is missing ${JSON.stringify(expected)}`)
       }
     }
 
-    // A statutory holiday stays off-peak on a weekday morning, and the next
-    // peak window is a week away.
+    // The day scale runs 00:00–24:00 in quarter ticks.
+    if (!peakCard.includes('class="dsh-model-allowance-schedule-ticks"')) {
+      throw new Error('the day strip is missing its scale')
+    }
+    if (peakCard.split('class="dsh-model-allowance-schedule-tick"').length - 1 !== 5) {
+      throw new Error('the day strip should carry five quarter ticks')
+    }
+    if (!peakCard.includes('24:00')) throw new Error('the day scale should reach 24:00')
+
+    // A statutory holiday stays off-peak on a weekday morning, so the strip
+    // carries no peak blocks, while the cursor and the countdown remain.
     Date.now = () => Date.parse('2026-10-01T02:30:00Z')
     renderClock()
     await new Promise((resolve) => setTimeout(resolve, 20))
     const holidayCard = renderClock()
-    for (const expected of ['data-phase="off-peak"', '距高峰开始 06.22:30:00']) {
+    for (const expected of [
+      'data-phase="off-peak"',
+      '低谷时段',
+      '距高峰开始 06.22:30:00',
+      'style="left:43.75%"',
+    ]) {
       if (!holidayCard.includes(expected)) {
         throw new Error(`the holiday pricing block is missing ${JSON.stringify(expected)}`)
       }
+    }
+    if (holidayCard.includes('class="dsh-model-allowance-schedule-timeline-peak"')) {
+      throw new Error('a holiday should draw no peak blocks on the day strip')
     }
     console.log('schedule: the card states the windows, the phase, and the countdown')
   } finally {
