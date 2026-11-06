@@ -297,15 +297,28 @@ window.__ModuleLoader__.load({
     /**
      * Component styles. Every colour is a theme token, so light and dark
      * palettes both follow the host without a second declaration.
+     *
+     * The token choice matters as much as the value. A surface reads as a
+     * surface only when it wears the token the harness uses for surfaces of
+     * that kind: the menu surface for anything floating over the page, the
+     * hover tint for anything that reacts to the pointer, the tooltip surface
+     * for a hint. The overlay token is a mask over the page behind, so on it
+     * this card came out a flat grey slab.
      */
     const STYLES = [
       '.dsh-model-allowance-root{position:relative;display:inline-flex;align-items:center}',
+      // The badge is a trigger, the way the harness's own composer triggers
+      // are: no frame of its own, a transparent surface, and the hover tint
+      // only while the pointer is on it or the card is open. A bordered pill
+      // read as a field rather than a control.
       '.dsh-model-allowance-badge{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;',
-      'border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;',
-      'color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1;cursor:pointer;',
+      'border:0;border-radius:var(--dsw-radius-sm);background:0 0;',
+      'color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:1;cursor:pointer;',
       'font-variant-numeric:tabular-nums;white-space:nowrap}',
-      '.dsh-model-allowance-badge:hover{color:var(--dsw-alias-label-primary);',
-      'border-color:var(--dsw-alias-border-l2)}',
+      '.dsh-model-allowance-badge:hover{color:var(--dsw-alias-label-secondary);',
+      'background:var(--dsw-alias-interactive-bg-hover)}',
+      '.dsh-model-allowance-badge[aria-expanded="true"]{color:var(--dsw-alias-label-secondary);',
+      'background:var(--dsw-alias-interactive-bg-hover)}',
       '.dsh-model-allowance-badge:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:1px}',
       '.dsh-model-allowance-dot{width:6px;height:6px;border-radius:50%;flex:none;',
@@ -332,10 +345,17 @@ window.__ModuleLoader__.load({
       // Anchored to its own right edge: the badge sits next to the model seat
       // near the trailing edge, so the panel opens leftwards instead of
       // running off the side of the composer.
+      //
+      // The surface is the harness's own menu surface — a translucent white
+      // behind a heavy blur — and the shadow is its own elevation scale. The
+      // overlay token reads as a mask over the page behind, not as a panel
+      // surface: on it this card came out a flat grey slab.
       '.dsh-model-allowance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
-      'min-width:250px;padding:8px 10px 10px;border:1px solid var(--dsw-alias-border-l1);',
-      'border-radius:10px;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);',
-      'box-shadow:0 8px 24px rgb(0 0 0 / 18%);font-size:12px}',
+      'box-sizing:border-box;min-width:250px;padding:8px 10px 10px;border:0;',
+      'border-radius:var(--dsw-radius-lg);background:var(--dsw-specific-menu);',
+      'backdrop-filter:var(--dsw-menu-backdrop-filter);',
+      'box-shadow:var(--dsw-elevation-prominent);color:var(--dsw-alias-label-primary);',
+      'font-size:12px}',
       '.dsh-model-allowance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
       // Label first, value second, matching every other pair in the card
       // (schedule title/state, status/reading time): the label carries the
@@ -354,23 +374,21 @@ window.__ModuleLoader__.load({
       '.dsh-model-allowance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
       'gap:4px;overflow:hidden}',
       // The mark sits straight on the panel; the chip draws no surface of its
-      // own. It used to be filled, which in this theme meant a pure white tile
-      // (bg-layer-2 is #ffffff) on a #e9ecf2 panel and read as a white
-      // background behind the logo.
+      // own, so the panel's own surface shows through behind the logo.
       //
       // A frame means one thing here: this is the provider being read. It is
       // not used to say anything else about a route, because a second meaning
       // makes an unselected mark look selected.
       '.dsh-model-allowance-tab{display:inline-flex;align-items:center;justify-content:center;',
       'box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
-      'border:1px solid transparent;border-radius:7px;',
-      'background:transparent;line-height:1;cursor:pointer;',
+      'border:1px solid transparent;border-radius:var(--dsw-radius-sm);',
+      'background:0 0;line-height:1;cursor:pointer;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.66}',
       '.dsh-model-allowance-tab:hover{opacity:.9}',
       // The selected mark gains the one frame the chip already has, and stops
       // being dimmed. It must not use the brand colour: in this theme that is
       // #0f1115, so a selected chip wore a near-black frame. It also gains no
-      // background, since any fill here reintroduces the white tile.
+      // background, since any fill here reintroduces a tile on the panel.
       '.dsh-model-allowance-tab[data-active="true"]{opacity:1;',
       'border-color:var(--dsw-alias-border-l2)}',
       '.dsh-model-allowance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
@@ -379,24 +397,27 @@ window.__ModuleLoader__.load({
       '.dsh-model-allowance-tab-letter{font-size:11px;font-weight:600;line-height:1}',
       '.dsh-model-allowance-more{display:inline-flex;align-items:center;justify-content:center;',
       'box-sizing:border-box;width:26px;height:26px;flex:none;margin-left:auto;padding:0;',
-      'border-radius:7px;',
-      'border:1px solid var(--dsw-alias-border-l1);background:transparent;cursor:pointer;',
-      'color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1}',
-      '.dsh-model-allowance-more:hover{color:var(--dsw-alias-label-primary);',
+      'border-radius:var(--dsw-radius-sm);',
+      'border:1px solid var(--dsw-alias-border-l1);background:0 0;cursor:pointer;',
+      'color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:1}',
+      '.dsh-model-allowance-more:hover{color:var(--dsw-alias-label-secondary);',
       'border-color:var(--dsw-alias-border-l2)}',
+      // The overflow menu is a second floating surface, so it carries the same
+      // menu surface and elevation as the card it belongs to.
       '.dsh-model-allowance-menu{position:absolute;top:calc(100% + 2px);right:0;z-index:30;',
-      'min-width:150px;padding:4px;border:1px solid var(--dsw-alias-border-l1);',
-      'border-radius:8px;background:var(--dsw-alias-bg-overlay);',
-      'box-shadow:0 8px 24px rgb(0 0 0 / 18%)}',
+      'min-width:150px;padding:4px;border:0;',
+      'border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);',
+      'backdrop-filter:var(--dsw-menu-backdrop-filter);',
+      'box-shadow:var(--dsw-elevation-prominent)}',
       '.dsh-model-allowance-menu-item{display:flex;align-items:center;gap:8px;width:100%;',
-      'padding:4px 6px;border:0;border-radius:6px;background:transparent;',
+      'padding:4px 6px;border:0;border-radius:var(--dsw-radius-xs);background:0 0;',
       'color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}',
-      '.dsh-model-allowance-menu-item:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-model-allowance-menu-item:hover{background:var(--dsw-alias-interactive-bg-hover)}',
       // Same rule as the strip chips: no surface of its own, so the mark sits
-      // on the menu instead of on a white tile.
+      // on the menu instead of on a tile.
       '.dsh-model-allowance-menu-mark{display:inline-flex;align-items:center;',
-      'justify-content:center;width:20px;height:20px;flex:none;border-radius:5px;',
-      'line-height:1;background:transparent;',
+      'justify-content:center;width:20px;height:20px;flex:none;border-radius:var(--dsw-radius-xs);',
+      'line-height:1;background:0 0;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary))}',
       '.dsh-model-allowance-menu-mark svg{display:block}',
       '.dsh-model-allowance-window{margin-top:10px;padding-top:10px;',
@@ -410,9 +431,11 @@ window.__ModuleLoader__.load({
       '.dsh-model-allowance-window-title{font-weight:500;color:var(--dsw-alias-label-primary)}',
       '.dsh-model-allowance-percent{margin-top:2px;color:var(--dsw-alias-label-secondary);',
       'font-size:11px;font-variant-numeric:tabular-nums}',
+      // The bar's track is the harness's own hover tint, not a white well: on
+      // a white card a white track was invisible, and the inset frame around
+      // it drew the eye to the groove instead of to the fill.
       '.dsh-model-allowance-bar{margin-top:6px;height:6px;border-radius:999px;overflow:hidden;',
-      'background:var(--dsw-alias-bg-layer-2);',
-      'box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l1)}',
+      'background:var(--dsw-alias-interactive-bg-hover)}',
       '.dsh-model-allowance-bar-fill{height:100%;border-radius:999px;',
       'background:var(--dsw-alias-state-success-primary);transition:width 300ms ease}',
       '.dsh-model-allowance-bar-fill[data-tone="warn"]{',
@@ -435,10 +458,10 @@ window.__ModuleLoader__.load({
       'font-variant-numeric:tabular-nums;white-space:nowrap;margin-right:2px}',
       '.dsh-model-allowance-icon-button{display:inline-flex;align-items:center;',
       'justify-content:center;box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
-      'border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:transparent;',
-      'color:var(--dsw-alias-label-secondary);cursor:pointer;text-decoration:none}',
-      '.dsh-model-allowance-icon-button:hover{color:var(--dsw-alias-label-primary);',
-      'border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
+      'border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);background:0 0;',
+      'color:var(--dsw-alias-label-tertiary);cursor:pointer;text-decoration:none}',
+      '.dsh-model-allowance-icon-button:hover{color:var(--dsw-alias-label-secondary);',
+      'border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-interactive-bg-hover)}',
       '.dsh-model-allowance-icon-button:focus-visible{',
       'outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
       '.dsh-model-allowance-icon-button[disabled]{opacity:.5;cursor:default}',
@@ -463,12 +486,15 @@ window.__ModuleLoader__.load({
       'cursor:help}',
       '.dsh-model-allowance-status-help:hover,',
       '.dsh-model-allowance-status-help:focus-visible{background:var(--dsw-alias-state-error-primary);',
-      'color:var(--dsw-alias-bg-overlay);outline:none}',
+      'color:var(--dsw-alias-label-primary-foreground);outline:none}',
       '.dsh-model-allowance-status-tip{display:none;position:absolute;left:0;',
       'bottom:calc(100% + 8px);z-index:40;width:max-content;max-width:240px;padding:6px 8px;',
-      'border:1px solid var(--dsw-alias-border-l1);border-radius:8px;',
-      'background:var(--dsw-alias-bg-overlay);box-shadow:0 8px 24px rgb(0 0 0 / 18%);',
-      'font-size:11px;font-weight:400;line-height:1.5;color:var(--dsw-alias-label-secondary);',
+      'border:0;border-radius:var(--dsw-radius-sm);',
+      'background:var(--dsw-alias-tooltip-bg);box-shadow:var(--dsw-elevation-prominent);',
+      'font-size:11px;font-weight:400;line-height:1.5;',
+      // The hint sits on the harness's own tooltip surface, so it takes the
+      // text colour that surface is read with: white on the dark tooltip.
+      'color:var(--dsw-static-neutral-bluish-00);',
       'white-space:normal;text-align:left}',
       '.dsh-model-allowance-status-help:hover .dsh-model-allowance-status-tip,',
       '.dsh-model-allowance-status-help:focus-visible .dsh-model-allowance-status-tip{display:block}',
@@ -481,7 +507,7 @@ window.__ModuleLoader__.load({
       '.dsh-model-allowance-status[data-state="major-outage"] .dsh-model-allowance-status-dot{',
       'background:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-allowance-status-arrow{font-size:10px;flex:none;',
-      'color:var(--dsw-alias-label-secondary)}',
+      'color:var(--dsw-alias-label-tertiary)}',
       // The time-of-day pricing block: the phase the clock is in, how far
       // through that stretch of time it is, and the countdown. The rule itself
       // hides behind the help mark, so the card stays readable.
@@ -493,7 +519,7 @@ window.__ModuleLoader__.load({
       '.dsh-model-allowance-schedule-help{position:relative;display:inline-flex;',
       'align-items:center;justify-content:center;box-sizing:border-box;width:16px;height:16px;',
       'flex:none;border:1px solid var(--dsw-alias-border-l2);border-radius:50%;',
-      'color:var(--dsw-alias-label-secondary);font-size:10px;font-weight:600;line-height:1;',
+      'color:var(--dsw-alias-label-tertiary);font-size:10px;font-weight:600;line-height:1;',
       'cursor:help}',
       '.dsh-model-allowance-schedule-help:hover,',
       '.dsh-model-allowance-schedule-help:focus-visible{color:var(--dsw-alias-label-primary);',
@@ -502,9 +528,10 @@ window.__ModuleLoader__.load({
       // hanging below it would leave the panel.
       '.dsh-model-allowance-schedule-tip{display:none;position:absolute;right:0;',
       'bottom:calc(100% + 8px);z-index:40;width:max-content;max-width:240px;padding:6px 8px;',
-      'border:1px solid var(--dsw-alias-border-l1);border-radius:8px;',
-      'background:var(--dsw-alias-bg-overlay);box-shadow:0 8px 24px rgb(0 0 0 / 18%);',
-      'font-size:11px;font-weight:400;line-height:1.5;color:var(--dsw-alias-label-secondary);',
+      'border:0;border-radius:var(--dsw-radius-sm);',
+      'background:var(--dsw-alias-tooltip-bg);box-shadow:var(--dsw-elevation-prominent);',
+      'font-size:11px;font-weight:400;line-height:1.5;',
+      'color:var(--dsw-static-neutral-bluish-00);',
       'white-space:normal;text-align:left}',
       '.dsh-model-allowance-schedule-help:hover .dsh-model-allowance-schedule-tip,',
       '.dsh-model-allowance-schedule-help:focus-visible .dsh-model-allowance-schedule-tip{',
@@ -515,17 +542,16 @@ window.__ModuleLoader__.load({
       // strip reads at a glance without glaring, and a cursor where the
       // clock stands.
       '.dsh-model-allowance-schedule-timeline{position:relative;margin-top:8px;height:8px;',
-      'border-radius:4px;overflow:hidden;background:var(--dsw-alias-bg-layer-2);',
+      'border-radius:4px;overflow:hidden;',
       'background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%,',
-      'var(--dsw-alias-bg-layer-2));',
-      'box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l1)}',
+      'var(--dsw-alias-interactive-bg-hover));}',
       '.dsh-model-allowance-schedule-timeline-peak{position:absolute;top:0;bottom:0;',
       // The same hue the exhausted allowance uses, so "peak" and "spent" read
       // as one family of warnings rather than two unrelated colours.
       'background:var(--dsw-alias-state-error-primary);opacity:.4}',
       '.dsh-model-allowance-schedule-timeline-now{position:absolute;top:0;bottom:0;width:2px;',
       'margin-left:-1px;border-radius:1px;background:var(--dsw-alias-label-primary);',
-      'box-shadow:0 0 0 1px rgb(0 0 0 / 12%)}',
+      'box-shadow:0 0 0 1px var(--dsw-alias-bg-layer-1)}',
       '.dsh-model-allowance-schedule-ticks{display:flex;justify-content:space-between;',
       'margin-top:2px;font-size:9px;line-height:1;color:var(--dsw-alias-label-secondary);',
       'font-variant-numeric:tabular-nums}',
