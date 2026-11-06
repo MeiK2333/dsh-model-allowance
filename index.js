@@ -122,6 +122,20 @@ class ModelAllowanceService extends Service {
   }
 
   /**
+   * The pricing schedule a provider meters by, when it publishes one.
+   *
+   * The schedule is declared data, not a reading: the browser evaluates it
+   * against its own clock, so the countdown never needs another round trip.
+   *
+   * @param {string} provider Provider route.
+   * @returns {object | null} The schedule, or null when the vendor prices flat.
+   */
+  schedule(provider) {
+    const schedule = findAdapter(provider)?.schedule
+    return schedule === undefined ? null : { provider, ...schedule }
+  }
+
+  /**
    * The provider a session with no model selection would use.
    *
    * A session that has not taken a turn yet carries no `modelSelection`

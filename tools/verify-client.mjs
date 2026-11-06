@@ -260,7 +260,7 @@ function render(node) {
   // the switcher's selection, and the accessible name a mark carries.
   const extra = []
   if (props.style?.width) extra.push(`style="width:${String(props.style.width)}"`)
-  for (const name of ['data-tone', 'data-service', 'data-active', 'aria-selected', 'aria-expanded']) {
+  for (const name of ['data-tone', 'data-service', 'data-phase', 'data-active', 'aria-selected', 'aria-expanded']) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
   if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
@@ -1128,6 +1128,125 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     )
   }
   console.log('badge: the shortest window speaks when nothing is exhausted')
+}
+
+// --- A vendor that prices by the wall clock gets its own block ------------
+// DeepSeek's peak windows are weekdays 09:00–12:00 and 14:00–18:00 Beijing
+// time, with statutory holidays off-peak all day. The card states the
+// schedule, the phase the clock is in, and the countdown to the flip.
+{
+  const schedule = {
+    provider: 'deepseek-account',
+    timezone: 'Asia/Shanghai',
+    timezoneLabel: { zh: '北京时间', en: 'Beijing time' },
+    days: [1, 2, 3, 4, 5],
+    windows: [
+      { from: '09:00', to: '12:00' },
+      { from: '14:00', to: '18:00' },
+    ],
+    holidays: [
+      '2026-10-01',
+      '2026-10-02',
+      '2026-10-03',
+      '2026-10-04',
+      '2026-10-05',
+      '2026-10-06',
+      '2026-10-07',
+    ],
+    note: { zh: '低谷时段 API 价格减半', en: 'API prices are halved off-peak' },
+  }
+  let clockSlot
+  const clockCtx = {
+    effect: (fn) => fn(),
+    locale: ctx.locale,
+    remote: { $mount: async () => () => {}, $stream: undefined },
+    get: (key) =>
+      key === 'remote.balance'
+        ? {
+            balance: async (route) => ({
+              ok: true,
+              value: {
+                provider: route,
+                status: 'ready',
+                kind: 'amount',
+                amount: 46.71,
+                currency: 'CNY',
+                updatedAt: Date.now(),
+                consoleUrl: 'https://platform.deepseek.com/top_up',
+              },
+            }),
+            refresh: async (route) => ({ ok: true, value: {} }),
+            list: async () => ({ ok: true, value: [] }),
+            status: async (route) => ({
+              ok: true,
+              value: { provider: route, state: 'operational' },
+            }),
+            schedule: async (route) => ({ ok: true, value: { ...schedule, provider: route } }),
+            defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
+          }
+        : undefined,
+    slots: {
+      inject: (_key, callback) => callback(),
+      register: (options, Component) => {
+        clockSlot = { options, Component }
+        return () => {}
+      },
+    },
+  }
+  plugin.apply(clockCtx)
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  hookState = []
+  hookCursor = 0
+  const clockProjection = {
+    lastUsed: { provider: 'deepseek-account', model: 'deepseek-flash' },
+    next: null,
+  }
+  const renderClock = () => {
+    hookCursor = 0
+    return render(
+      clockSlot.Component({
+        useProjection: (key) => (key === 'modelSelection' ? clockProjection : undefined),
+      }),
+    )
+  }
+  const realNow = Date.now
+  try {
+    // Friday 10:30 in Beijing: inside the morning peak window, 90 minutes
+    // before the off-peak switch.
+    Date.now = () => Date.parse('2026-11-06T02:30:00Z')
+    renderClock()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    hookState[2] = true
+    renderClock()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const peakCard = renderClock()
+    for (const expected of [
+      'data-phase="peak"',
+      '时段价格',
+      '工作日 09:00–12:00、14:00–18:00（北京时间）',
+      '距低谷开始 01:30:00',
+      '低谷时段 API 价格减半',
+    ]) {
+      if (!peakCard.includes(expected)) {
+        throw new Error(`the pricing block is missing ${JSON.stringify(expected)}`)
+      }
+    }
+
+    // A statutory holiday stays off-peak on a weekday morning, and the next
+    // peak window is a week away.
+    Date.now = () => Date.parse('2026-10-01T02:30:00Z')
+    renderClock()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const holidayCard = renderClock()
+    for (const expected of ['data-phase="off-peak"', '距高峰开始 06.22:30:00']) {
+      if (!holidayCard.includes(expected)) {
+        throw new Error(`the holiday pricing block is missing ${JSON.stringify(expected)}`)
+      }
+    }
+    console.log('schedule: the card states the windows, the phase, and the countdown')
+  } finally {
+    Date.now = realNow
+  }
 }
 
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')

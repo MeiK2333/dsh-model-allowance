@@ -76,6 +76,17 @@ window.__ModuleLoader__.load({
         updatedAt: z.number().optional(),
         error: z.string().optional(),
       })
+      const scheduleSchema = z
+        .object({
+          provider: z.string(),
+          timezone: z.string(),
+          timezoneLabel: z.object({ zh: z.string().optional(), en: z.string().optional() }),
+          days: z.array(z.number()),
+          windows: z.array(z.object({ from: z.string(), to: z.string() })),
+          holidays: z.array(z.string()).optional(),
+          note: z.object({ zh: z.string().optional(), en: z.string().optional() }).optional(),
+        })
+        .nullable()
       /** A strict codec carries the Zod factory the gateway validates with. */
       const strict = (schema, description, typeSymbol) => ({
         mode: 'strict',
@@ -168,6 +179,13 @@ window.__ModuleLoader__.load({
               'dsh-model-allowance#balanceStatus',
             ),
           },
+          'balance/schedule': {
+            service: 'balanceController',
+            description: 'The time-of-day pricing schedule for one provider, when it has one.',
+            invocation: { kind: 'direct' },
+            parameters: [providerParameter],
+            result: strict(scheduleSchema, 'The schedule, or null.', 'dsh-model-allowance#schedule'),
+          },
         },
       }
     }
@@ -200,6 +218,15 @@ window.__ModuleLoader__.load({
       'status.majorOutage': '大面积中断',
       'status.maintenance': '维护中',
       'status.unknown': '状态未知',
+      'schedule.title': '时段价格',
+      'schedule.peak': '高峰',
+      'schedule.offPeak': '低谷',
+      'schedule.daysWeekdays': '工作日',
+      'schedule.daysDaily': '每天',
+      'schedule.daysOther': '指定日期',
+      'schedule.ranges': '{days} {windows}（{timezone}）',
+      'schedule.toPeak': '距高峰开始 {duration}',
+      'schedule.toOffPeak': '距低谷开始 {duration}',
       'badge.consumption': '相对上次读数的变化',
       'window.title.hour': '{count} 小时额度',
       'window.title.day': '{count} 天额度',
@@ -243,6 +270,15 @@ window.__ModuleLoader__.load({
       'status.majorOutage': 'Major outage',
       'status.maintenance': 'Maintenance',
       'status.unknown': 'Status unknown',
+      'schedule.title': 'Time-based pricing',
+      'schedule.peak': 'Peak',
+      'schedule.offPeak': 'Off-peak',
+      'schedule.daysWeekdays': 'Weekdays',
+      'schedule.daysDaily': 'Every day',
+      'schedule.daysOther': 'Selected days',
+      'schedule.ranges': '{days} {windows} ({timezone})',
+      'schedule.toPeak': '{duration} until peak',
+      'schedule.toOffPeak': '{duration} until off-peak',
       'badge.consumption': 'Change since the last reading',
       'window.title.hour': '{count}-hour quota',
       'window.title.day': '{count}-day quota',
@@ -420,6 +456,25 @@ window.__ModuleLoader__.load({
       'background:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-allowance-status-arrow{font-size:10px;flex:none;',
       'color:var(--dsw-alias-label-secondary)}',
+      // The time-of-day pricing block: the schedule, the phase the clock is
+      // in, and how long until it flips.
+      '.dsh-model-allowance-schedule{margin-top:10px;padding-top:10px;',
+      'border-top:1px solid var(--dsw-alias-border-l1)}',
+      '.dsh-model-allowance-schedule-head{display:flex;justify-content:space-between;',
+      'align-items:baseline;gap:12px}',
+      '.dsh-model-allowance-schedule-title{font-weight:500;color:var(--dsw-alias-label-primary)}',
+      '.dsh-model-allowance-schedule-state{display:inline-flex;align-items:center;gap:5px;',
+      'font-size:11px;color:var(--dsw-alias-label-secondary)}',
+      '.dsh-model-allowance-schedule-dot{width:6px;height:6px;border-radius:50%;flex:none;',
+      'background:var(--dsw-alias-state-success-primary)}',
+      '.dsh-model-allowance-schedule[data-phase="peak"] .dsh-model-allowance-schedule-dot{',
+      'background:var(--dsw-alias-state-warn-primary)}',
+      '.dsh-model-allowance-schedule-ranges{margin-top:4px;font-size:11px;',
+      'color:var(--dsw-alias-label-secondary);word-break:break-word}',
+      '.dsh-model-allowance-schedule-countdown{margin-top:2px;font-size:11px;',
+      'color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
+      '.dsh-model-allowance-schedule-note{margin-top:2px;font-size:11px;',
+      'color:var(--dsw-alias-label-secondary);word-break:break-word}',
     ].join('')
 
     /**
@@ -1024,6 +1079,197 @@ window.__ModuleLoader__.load({
       return days > 0 ? `${pad(days)}.${clock}` : clock
     }
 
+    /** Two-digit clock segment. */
+    const pad2 = (value) => String(value).padStart(2, '0')
+
+    /** Zone formatters, built once: constructing one is not free. */
+    const ZONE_FORMATTERS = new Map()
+
+    /**
+     * The formatter for one zone, built once.
+     * @param {string} timeZone IANA zone.
+     * @returns {Intl.DateTimeFormat} The formatter.
+     */
+    function zoneFormatter(timeZone) {
+      let formatter = ZONE_FORMATTERS.get(timeZone)
+      if (formatter === undefined) {
+        formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+          weekday: 'short',
+        })
+        ZONE_FORMATTERS.set(timeZone, formatter)
+      }
+      return formatter
+    }
+
+    /**
+     * The wall-clock parts of one instant in a named zone.
+     * @param {number} ms The instant.
+     * @param {string} timeZone IANA zone.
+     * @returns {{year: number, month: number, day: number, hour: number, minute: number, second: number, weekday: number}}
+     *   The zone's calendar and clock at that instant.
+     */
+    function zoneParts(ms, timeZone) {
+      const parts = zoneFormatter(timeZone).formatToParts(new Date(ms))
+      const value = (type) => parts.find((part) => part.type === type)?.value ?? ''
+      return {
+        year: Number(value('year')),
+        month: Number(value('month')),
+        day: Number(value('day')),
+        // Some runtimes render midnight as 24 with hour12 turned off.
+        hour: Number(value('hour')) % 24,
+        minute: Number(value('minute')),
+        second: Number(value('second')),
+        weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(value('weekday')),
+      }
+    }
+
+    /**
+     * A zone's offset from UTC at one instant, in milliseconds.
+     * @param {number} ms The instant.
+     * @param {string} timeZone IANA zone.
+     * @returns {number} The offset.
+     */
+    function zoneOffsetMs(ms, timeZone) {
+      const parts = zoneParts(ms, timeZone)
+      const wall = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)
+      return wall - Math.floor(ms / 1000) * 1000
+    }
+
+    /**
+     * The instant at which a wall-clock time occurs in a zone.
+     *
+     * Two passes: the first lands within a day of the answer, the second
+     * corrects for a DST transition between the guess and the answer.
+     *
+     * @param {string} timeZone IANA zone.
+     * @param {number} year Calendar year.
+     * @param {number} month Calendar month, 1-based.
+     * @param {number} day Calendar day.
+     * @param {number} hour Wall-clock hour.
+     * @param {number} minute Wall-clock minute.
+     * @returns {number} Epoch milliseconds.
+     */
+    function zoneInstant(timeZone, year, month, day, hour, minute) {
+      const wall = Date.UTC(year, month - 1, day, hour, minute, 0)
+      const first = wall - zoneOffsetMs(wall, timeZone)
+      return wall - zoneOffsetMs(first, timeZone)
+    }
+
+    /**
+     * The schedule's phase at one instant.
+     * @param {object} schedule The schedule.
+     * @param {number} now The instant.
+     * @returns {'peak'|'off-peak'} The phase.
+     */
+    function schedulePhase(schedule, now) {
+      const parts = zoneParts(now, schedule.timezone)
+      const date = `${String(parts.year)}-${pad2(parts.month)}-${pad2(parts.day)}`
+      if ((schedule.holidays ?? []).includes(date)) return 'off-peak'
+      if (!schedule.days.includes(parts.weekday)) return 'off-peak'
+      const minutes = parts.hour * 60 + parts.minute
+      for (const window of schedule.windows) {
+        const [fromHour, fromMinute] = window.from.split(':').map(Number)
+        const [toHour, toMinute] = window.to.split(':').map(Number)
+        if (minutes >= fromHour * 60 + fromMinute && minutes < toHour * 60 + toMinute) return 'peak'
+      }
+      return 'off-peak'
+    }
+
+    /**
+     * The next instant at which the phase flips.
+     *
+     * Only window edges are transitions: outside the windows the phase is
+     * always off-peak, so a weekend or a holiday needs no boundary of its own.
+     * Ten days reach past the longest statutory break to the next window.
+     *
+     * @param {object} schedule The schedule.
+     * @param {number} now The instant.
+     * @returns {number | undefined} The next change, when one is within reach.
+     */
+    function nextScheduleChange(schedule, now) {
+      const parts = zoneParts(now, schedule.timezone)
+      let next
+      for (let offset = 0; offset <= 10; offset += 1) {
+        const day = new Date(Date.UTC(parts.year, parts.month - 1, parts.day) + offset * 86_400_000)
+        const year = day.getUTCFullYear()
+        const month = day.getUTCMonth() + 1
+        const date = day.getUTCDate()
+        const key = `${String(year)}-${pad2(month)}-${pad2(date)}`
+        if ((schedule.holidays ?? []).includes(key)) continue
+        if (!schedule.days.includes(day.getUTCDay())) continue
+        for (const window of schedule.windows) {
+          for (const time of [window.from, window.to]) {
+            const [hour, minute] = time.split(':').map(Number)
+            const at = zoneInstant(schedule.timezone, year, month, date, hour, minute)
+            if (at > now && (next === undefined || at < next)) next = at
+          }
+        }
+      }
+      return next
+    }
+
+    /**
+     * The time-of-day pricing block.
+     * @param {object} schedule The schedule.
+     * @param {number} now The instant the card is showing.
+     * @param {(key: string, params?: object) => string} t Translator.
+     * @returns {object} The block.
+     */
+    function scheduleView(schedule, now, t) {
+      const language = activeLanguage()
+      const phase = schedulePhase(schedule, now)
+      const change = nextScheduleChange(schedule, now)
+      const separator = language === 'zh' ? '、' : ', '
+      const windows = schedule.windows.map((window) => `${window.from}–${window.to}`).join(separator)
+      const days =
+        schedule.days.length === 7
+          ? t('schedule.daysDaily')
+          : [1, 2, 3, 4, 5].every((day) => schedule.days.includes(day))
+            ? t('schedule.daysWeekdays')
+            : t('schedule.daysOther')
+      const timezone =
+        schedule.timezoneLabel?.[language] ?? schedule.timezoneLabel?.en ?? schedule.timezone
+      const note = schedule.note?.[language] ?? schedule.note?.en ?? schedule.note?.zh
+      return h(
+        'div',
+        { className: 'dsh-model-allowance-schedule', 'data-phase': phase },
+        h(
+          'div',
+          { className: 'dsh-model-allowance-schedule-head' },
+          h('span', { className: 'dsh-model-allowance-schedule-title' }, t('schedule.title')),
+          h(
+            'span',
+            { className: 'dsh-model-allowance-schedule-state' },
+            h('span', { className: 'dsh-model-allowance-schedule-dot', 'aria-hidden': true }),
+            phase === 'peak' ? t('schedule.peak') : t('schedule.offPeak'),
+          ),
+        ),
+        h(
+          'div',
+          { className: 'dsh-model-allowance-schedule-ranges' },
+          t('schedule.ranges', { days, windows, timezone }),
+        ),
+        change === undefined
+          ? null
+          : h(
+              'div',
+              { className: 'dsh-model-allowance-schedule-countdown' },
+              t(phase === 'peak' ? 'schedule.toOffPeak' : 'schedule.toPeak', {
+                duration: formatCountdown(change - now),
+              }),
+            ),
+        note === undefined ? null : h('div', { className: 'dsh-model-allowance-schedule-note' }, note),
+      )
+    }
+
     /**
      * The badge and its detail popover.
      * @param {object} props Slot props plus the plugin context and translator.
@@ -1096,6 +1342,8 @@ window.__ModuleLoader__.load({
       // carries its provider, so a reading for the route that was selected a
       // moment ago is never shown against the current one.
       const [providerStatus, setProviderStatus] = React.useState(null)
+      // The pricing schedule the vendor meters by, when it publishes one.
+      const [schedule, setSchedule] = React.useState(null)
 
       // The panel names routes from the Host's directory: small, local, and
       // stable for a session. Fetching it at mount means the first open names
@@ -1332,6 +1580,28 @@ window.__ModuleLoader__.load({
         return () => {
           cancelled = true
           clearInterval(timer)
+        }
+      }, [activeProvider, ctx])
+
+      // The pricing schedule is static data: read it as soon as the provider
+      // is known so the card opens with it, and let the card's own clock drive
+      // the countdown from then on.
+      React.useEffect(() => {
+        if (!activeProvider) return undefined
+        let cancelled = false
+        ;(async () => {
+          try {
+            const api = await getBalanceApi()
+            if (!api || typeof api.schedule !== 'function') return
+            const result = await api.schedule(activeProvider)
+            if (cancelled || !result.ok) return
+            setSchedule(result.value)
+          } catch (error) {
+            console.error('[model-allowance] reading the pricing schedule failed', { error })
+          }
+        })()
+        return () => {
+          cancelled = true
         }
       }, [activeProvider, ctx])
 
@@ -1695,6 +1965,11 @@ window.__ModuleLoader__.load({
                 : null,
               view?.status === 'unconfigured'
                 ? h('div', { className: 'dsh-model-allowance-reason' }, t('badge.unconfigured'))
+                : null,
+              // A vendor that prices by the wall clock gets its phase and
+              // countdown here, above the footer.
+              schedule && schedule.provider === activeProvider
+                ? scheduleView(schedule, now, t)
                 : null,
               h(
                 'div',

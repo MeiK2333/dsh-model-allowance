@@ -49,6 +49,16 @@ function createService() {
     async status(route) {
       return { provider: route, state: 'operational', url: 'https://status.deepseek.com' }
     },
+    schedule(route) {
+      return {
+        provider: route,
+        timezone: 'Asia/Shanghai',
+        timezoneLabel: { zh: '北京时间', en: 'Beijing time' },
+        days: [1, 2, 3, 4, 5],
+        windows: [{ from: '09:00', to: '12:00' }],
+        holidays: [],
+      }
+    },
     activeRoutes: new Set(['deepseek-account']),
     async refreshAll() {
       publish('deepseek-account', await this.read('deepseek-account'))
@@ -124,6 +134,15 @@ if (status?.url !== 'https://status.deepseek.com') {
   throw new Error('the status reading lost its source page')
 }
 
+// --- the pricing schedule reaches the browser ----------------------------
+const schedule = await controller.schedule('deepseek-account')
+if (schedule?.timezone !== 'Asia/Shanghai') {
+  throw new Error(`the schedule was not forwarded, got ${JSON.stringify(schedule)}`)
+}
+if (schedule?.windows?.[0]?.from !== '09:00') {
+  throw new Error('the schedule lost its windows')
+}
+
 // --- an aborted stream releases its subscription ---------------------------
 if ((service.subscribe('probe', () => {}) ?? false) !== undefined) {
   // subscribe still works after the stream above ended
@@ -142,11 +161,11 @@ console.log('status:', status.state, status.url)
 // The controller reaches `ctx.modelAllowance.subscribe`, so the shipped service
 // must provide it; the stub above cannot prove that.
 const { default: ModelAllowanceService } = await import('../index.js')
-for (const method of ['read', 'track', 'subscribe', 'defaultProvider', 'refreshAll', 'status']) {
+for (const method of ['read', 'track', 'subscribe', 'defaultProvider', 'refreshAll', 'status', 'schedule']) {
   if (typeof ModelAllowanceService.prototype[method] !== 'function') {
     throw new Error(`ModelAllowanceService is missing ${method}()`)
   }
 }
-console.log('ModelAllowanceService exposes:', 'read, track, subscribe, defaultProvider, refreshAll, status')
+console.log('ModelAllowanceService exposes:', 'read, track, subscribe, defaultProvider, refreshAll, status, schedule')
 
 console.log('OK: the Remote controller opens, streams, and refreshes')
