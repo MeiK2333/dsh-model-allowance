@@ -211,7 +211,10 @@ try {
 console.log(JSON.stringify(results, null, 2))
 
 for (const result of results) {
-  if (result.status !== 'ready') {
+  // Placeholder adapters return 'unsupported' which is valid for platforms
+  // without balance API support. Only fail if the status is neither 'ready'
+  // nor 'unsupported'.
+  if (result.status !== 'ready' && result.status !== 'unsupported') {
     throw new Error(`${result.adapter} did not read: ${result.error ?? result.status}`)
   }
 }

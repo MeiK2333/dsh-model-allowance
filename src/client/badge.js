@@ -475,10 +475,13 @@ export function BalanceBadge(props) {
       // "Loading…" here would claim a request that already finished.
       return t('badge.noData')
     }
-    if (view.status === 'unsupported') return t('badge.unsupported')
+    if (view.status === 'unsupported') {
+      const name = nameOf(activeProvider)
+      return t('badge.unsupportedWithName', { name })
+    }
     if (view.status === 'unconfigured') return t('badge.unconfigured')
     return t('badge.failed')
-  }, [view, provider, t])
+  }, [view, provider, activeProvider, nameOf, t])
 
   if (!provider) return null
 
@@ -802,7 +805,11 @@ export function BalanceBadge(props) {
               )
             : null,
           view?.status === 'unsupported'
-            ? h('div', { className: 'dsh-model-allowance-reason' }, t('badge.unsupported'))
+            ? h(
+                'div',
+                { className: 'dsh-model-allowance-reason' },
+                t('badge.unsupportedWithName', { name: nameOf(activeProvider) }),
+              )
             : null,
           view?.status === 'unconfigured'
             ? h('div', { className: 'dsh-model-allowance-reason' }, t('badge.unconfigured'))

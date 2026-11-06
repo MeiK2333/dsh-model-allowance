@@ -289,7 +289,8 @@ var zh = {
   "badge.quotaPercent": "\u5269\u4F59 {percent}%",
   "badge.quotaRatio": "{remaining} / {total}",
   "badge.quotaDuration": "\u5269\u4F59 {duration}",
-  "badge.unsupported": "\u65E0\u4F59\u989D\u63A5\u53E3",
+  "badge.unsupported": "\u76EE\u524D\u65E0\u4F59\u989D\u63A5\u53E3",
+  "badge.unsupportedWithName": "{name} \u76EE\u524D\u65E0\u4F59\u989D\u63A5\u53E3",
   "badge.unconfigured": "\u672A\u914D\u7F6E\u51ED\u8BC1",
   "badge.failed": "\u65E0\u6CD5\u83B7\u53D6",
   "detail.title": "\u5382\u5546\u4F59\u989D",
@@ -340,6 +341,7 @@ var en = {
   "badge.quotaRatio": "{remaining} / {total}",
   "badge.quotaDuration": "{duration} left",
   "badge.unsupported": "No balance API",
+  "badge.unsupportedWithName": "{name} has no balance API",
   "badge.unconfigured": "No credential",
   "badge.failed": "Unavailable",
   "detail.title": "Provider balance",
@@ -1281,10 +1283,13 @@ function BalanceBadge(props) {
       }
       return t("badge.noData");
     }
-    if (view.status === "unsupported") return t("badge.unsupported");
+    if (view.status === "unsupported") {
+      const name = nameOf(activeProvider);
+      return t("badge.unsupportedWithName", { name });
+    }
     if (view.status === "unconfigured") return t("badge.unconfigured");
     return t("badge.failed");
-  }, [view, provider, t]);
+  }, [view, provider, activeProvider, nameOf, t]);
   if (!provider) return null;
   const serviceState = providerStatus && providerStatus.provider === activeProvider ? providerStatus.state : "unknown";
   const MARK_SIZE = 26;
@@ -1545,7 +1550,11 @@ function BalanceBadge(props) {
         // turns "it does not work" into something actionable.
         view.error ? (0, import_react3.createElement)("div", { className: "dsh-model-allowance-reason" }, view.error) : null
       ) : null,
-      view?.status === "unsupported" ? (0, import_react3.createElement)("div", { className: "dsh-model-allowance-reason" }, t("badge.unsupported")) : null,
+      view?.status === "unsupported" ? (0, import_react3.createElement)(
+        "div",
+        { className: "dsh-model-allowance-reason" },
+        t("badge.unsupportedWithName", { name: nameOf(activeProvider) })
+      ) : null,
       view?.status === "unconfigured" ? (0, import_react3.createElement)("div", { className: "dsh-model-allowance-reason" }, t("badge.unconfigured")) : null,
       // A vendor that prices by the wall clock gets its phase and
       // countdown here, above the footer.
