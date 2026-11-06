@@ -454,14 +454,15 @@ window.__ModuleLoader__.load({
       'a.dsh-model-allowance-status:hover{text-decoration:underline}',
       '.dsh-model-allowance-status-label{flex:none}',
       // The degraded reason hides behind a warning mark: the footer keeps one
-      // row, and the detail is one hover away.
+      // row, and the detail is one hover away. The mark wears the same hue an
+      // exhausted allowance does, so the two warnings read alike.
       '.dsh-model-allowance-status-help{position:relative;display:inline-flex;',
       'align-items:center;justify-content:center;box-sizing:border-box;width:14px;height:14px;',
-      'flex:none;border:1px solid var(--dsw-alias-state-warn-primary);border-radius:50%;',
-      'color:var(--dsw-alias-state-warn-primary);font-size:9px;font-weight:700;line-height:1;',
+      'flex:none;border:1px solid var(--dsw-alias-state-error-primary);border-radius:50%;',
+      'color:var(--dsw-alias-state-error-primary);font-size:9px;font-weight:700;line-height:1;',
       'cursor:help}',
       '.dsh-model-allowance-status-help:hover,',
-      '.dsh-model-allowance-status-help:focus-visible{background:var(--dsw-alias-state-warn-primary);',
+      '.dsh-model-allowance-status-help:focus-visible{background:var(--dsw-alias-state-error-primary);',
       'color:var(--dsw-alias-bg-overlay);outline:none}',
       '.dsh-model-allowance-status-tip{display:none;position:absolute;left:0;',
       'bottom:calc(100% + 8px);z-index:40;width:max-content;max-width:240px;padding:6px 8px;',
@@ -519,8 +520,8 @@ window.__ModuleLoader__.load({
       'var(--dsw-alias-bg-layer-2));',
       'box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l1)}',
       '.dsh-model-allowance-schedule-timeline-peak{position:absolute;top:0;bottom:0;',
-      // A translucent tint rather than a solid block: the peak still reads at
-      // a glance, without the glare a saturated red gives on every open.
+      // The same hue the exhausted allowance uses, so "peak" and "spent" read
+      // as one family of warnings rather than two unrelated colours.
       'background:var(--dsw-alias-state-error-primary);opacity:.4}',
       '.dsh-model-allowance-schedule-timeline-now{position:absolute;top:0;bottom:0;width:2px;',
       'margin-left:-1px;border-radius:1px;background:var(--dsw-alias-label-primary);',
