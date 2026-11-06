@@ -2,3 +2,7 @@ node_modules/
 .templates/
 .ref/
 .deps/
+.sharp/
+.sharp2/
+.sharp3/
+.preview/

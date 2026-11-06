@@ -237,19 +237,28 @@ window.__ModuleLoader__.load({
       'margin-bottom:4px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
       'gap:4px;overflow:hidden}',
-      // A mark is artwork: a letter on the vendor hue, filled for a signed-in
-      // account and outlined for a stored key.
+      // Each mark is the vendor's own artwork in its own colour on a neutral
+      // chip, so a multi-colour mark needs no white-on-brand treatment. The
+      // two DeepSeek routes tell each other apart by chip: filled for the
+      // signed-in account, outlined for a stored key.
       '.dsh-model-balance-tab{display:inline-flex;align-items:center;justify-content:center;',
       'width:22px;height:22px;flex:none;padding:0;border:1px solid transparent;border-radius:6px;',
-      'background:transparent;font-size:11px;font-weight:600;line-height:1;cursor:pointer;',
-      'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.62}',
-      '.dsh-model-balance-tab[data-variant="solid"]{background:var(--provider-mark);color:#fff}',
-      '.dsh-model-balance-tab[data-variant="outline"]{border-color:var(--provider-mark)}',
-      '.dsh-model-balance-tab:hover{opacity:.88}',
+      'background:transparent;line-height:1;cursor:pointer;',
+      'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.66}',
+      '.dsh-model-balance-tab[data-variant="solid"]{background:var(--dsw-alias-bg-layer-2);',
+      'border-color:var(--dsw-alias-border-l1)}',
+      '.dsh-model-balance-tab[data-variant="outline"]{',
+      'border-color:var(--dsw-alias-border-l2);background:transparent}',
+      '.dsh-model-balance-tab:hover{opacity:.9}',
+      // Inset, because an outset ring on the last mark would be clipped by the
+      // strip's overflow rule.
       '.dsh-model-balance-tab[data-active="true"]{opacity:1;',
-      'box-shadow:0 0 0 2px var(--dsw-alias-bg-overlay),0 0 0 3px var(--provider-mark)}',
+      'background:var(--dsw-alias-bg-layer-2);',
+      'box-shadow:inset 0 0 0 1.5px var(--dsw-alias-brand-primary)}',
       '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
-      'outline-offset:1px}',
+      'outline-offset:-1px}',
+      '.dsh-model-balance-tab svg{display:block}',
+      '.dsh-model-balance-tab-letter{font-size:11px;font-weight:600;line-height:1}',
       '.dsh-model-balance-more{display:inline-flex;align-items:center;justify-content:center;',
       'width:22px;height:22px;flex:none;margin-left:auto;padding:0;border-radius:6px;',
       'border:1px solid var(--dsw-alias-border-l1);background:transparent;cursor:pointer;',
@@ -266,10 +275,9 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-menu-item:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-model-balance-menu-mark{display:inline-flex;align-items:center;',
       'justify-content:center;width:18px;height:18px;flex:none;border-radius:5px;',
-      'font-size:10px;font-weight:600;line-height:1;',
+      'line-height:1;background:var(--dsw-alias-bg-layer-2);',
       'color:var(--provider-mark,var(--dsw-alias-label-primary))}',
-      '.dsh-model-balance-menu-mark[data-variant="solid"]{background:var(--provider-mark);',
-      'color:#fff}',
+      '.dsh-model-balance-menu-mark svg{display:block}',
       '.dsh-model-balance-window{margin-top:10px;padding-top:10px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-window-head{display:flex;justify-content:space-between;',
@@ -434,26 +442,66 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The mark drawn for one provider in the switcher.
+     * The real mark of each vendor, plus how a route badges it.
      *
-     * These are original monograms, not vendor logos: a letter on the vendor's
-     * hue, with a filled badge for a signed-in account and an outlined one for
-     * a key the user holds. Both DeepSeek routes therefore read as DeepSeek
-     * while still being tellable apart, and the full name stays in the title
-     * and accessible name.
+     * DeepSeek and MiniMax artwork comes from Simple Icons (CC0-1.0). Zhipu's
+     * glyph is the icon half of the official wordmark at cdn.bigmodel.cn,
+     * separating the four shapes from the lettering. All three are trademarks
+     * of their owners and are used here only to identify the provider.
+     *
+     * A route maps to one vendor's glyph; `variant` then says how the chip is
+     * drawn, which is how the two DeepSeek routes stay distinguishable: a
+     * filled chip marks the signed-in account, an outlined one marks a key the
+     * user holds.
      */
     const PROVIDER_MARKS = {
-      'deepseek-account': { letter: 'D', color: '#4d6bfe', variant: 'solid' },
-      deepseek: { letter: 'D', color: '#4d6bfe', variant: 'outline' },
-      'minimax-cn': { letter: 'M', color: '#0f9f92', variant: 'solid' },
-      zai: { letter: 'Z', color: '#7c5cf0', variant: 'solid' },
-      'zai-coding-cn': { letter: 'Z', color: '#7c5cf0', variant: 'solid' },
+      'deepseek-account': { icon: 'deepseek', color: '#4d6bfe', variant: 'solid' },
+      deepseek: { icon: 'deepseek', color: '#4d6bfe', variant: 'outline' },
+      'minimax-cn': { icon: 'minimax', color: '#e21680', variant: 'solid' },
+      zai: { icon: 'zhipu', color: '#5668f5', variant: 'solid' },
+      'zai-coding-cn': { icon: 'zhipu', color: '#5668f5', variant: 'solid' },
     }
+
+    /** Simple Icons' DeepSeek glyph, 24x24. */
+    const DEEPSEEK_PATH =
+      'M23.748 4.651c-.254-.124-.364.113-.512.233-.051.04-.094.09-.137.137-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.155-.708-.311-.955-.65-.172-.24-.219-.509-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.094.172.187.129.323-.082.28-.18.553-.266.833-.055.179-.137.218-.328.14a5.5 5.5 0 0 1-1.737-1.179c-.857-.828-1.631-1.743-2.597-2.46a12 12 0 0 0-.689-.47c-.985-.957.13-1.743.387-1.836.27-.098.094-.433-.778-.428-.872.003-1.67.295-2.687.685a3 3 0 0 1-.465.136 9.6 9.6 0 0 0-2.883-.101c-1.885.21-3.39 1.1-4.497 2.622C.082 8.776-.231 10.854.152 13.02c.403 2.284 1.568 4.175 3.36 5.653 1.857 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.132-.284 4.994-1.86.47.234.962.328 1.78.398.629.058 1.235-.031 1.705-.129.735-.155.684-.836.418-.961-2.155-1.004-1.682-.595-2.112-.926 1.095-1.295 2.768-3.598 3.284-6.733.05-.346.115-.834.108-1.114-.004-.171.035-.238.23-.257a4.2 4.2 0 0 0 1.545-.475c1.397-.763 1.96-2.016 2.093-3.517.02-.23-.004-.467-.247-.588M11.58 18.168c-2.088-1.642-3.101-2.183-3.52-2.16-.39.024-.32.472-.234.763.09.288.207.487.371.74.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.168-1.361-.801-2.5-1.86-3.301-3.306-.775-1.393-1.225-2.888-1.299-4.482-.02-.385.094-.522.477-.592a4.7 4.7 0 0 1 1.53-.038c2.131.311 3.946 1.264 5.467 2.774.868.86 1.525 1.887 2.202 2.89.72 1.066 1.494 2.082 2.48 2.915.348.291.626.513.892.677-.802.09-2.14.109-3.055-.615zm1.001-6.44a.306.306 0 0 1 .415-.287.3.3 0 0 1 .113.074.3.3 0 0 1 .086.214c0 .17-.136.307-.308.307a.303.303 0 0 1-.306-.307m3.11 1.596c-.2.081-.4.151-.591.16a1.25 1.25 0 0 1-.798-.254c-.274-.23-.47-.358-.551-.758a1.7 1.7 0 0 1 .015-.588c.07-.327-.007-.537-.238-.727-.188-.156-.426-.199-.689-.199a.6.6 0 0 1-.254-.078.253.253 0 0 1-.114-.358 1 1 0 0 1 .192-.21c.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.392.451.462.576.685.915.176.264.336.536.446.848.066.194-.02.353-.25.45'
+
+    /** Simple Icons' MiniMax glyph, 24x24. */
+    const MINIMAX_PATH =
+      'M11.43 3.92a.86.86 0 1 0-1.718 0v14.236a1.999 1.999 0 0 1-3.997 0V9.022a.86.86 0 1 0-1.718 0v3.87a1.999 1.999 0 0 1-3.997 0V11.49a.57.57 0 0 1 1.139 0v1.404a.86.86 0 0 0 1.719 0V9.022a1.999 1.999 0 0 1 3.997 0v9.134a.86.86 0 0 0 1.719 0V3.92a1.998 1.998 0 1 1 3.996 0v11.788a.57.57 0 1 1-1.139 0zm10.572 3.105a2 2 0 0 0-1.999 1.997v7.63a.86.86 0 0 1-1.718 0V3.923a1.999 1.999 0 0 0-3.997 0v16.16a.86.86 0 0 1-1.719 0V18.08a.57.57 0 1 0-1.138 0v2a1.998 1.998 0 0 0 3.996 0V3.92a.86.86 0 0 1 1.719 0v12.73a1.999 1.999 0 0 0 3.996 0V9.023a.86.86 0 1 1 1.72 0v6.686a.57.57 0 0 0 1.138 0V9.022a2 2 0 0 0-1.998-1.997'
+
+    /**
+     * Zhipu's glyph: four gradient blocks around a light cross, lifted from the
+     * official wordmark. Gradients are flattened to their mid tones so the mark
+     * can be drawn twice in one document without duplicating gradient ids.
+     */
+    const ZHIPU_PATHS = [
+      {
+        d: 'M21.0517 11.7895V5.91559C21.0517 5.89816 21.0422 5.88207 21.0268 5.87346L10.5497 0.00632824C10.5422 0.00210946 10.5338 2.92206e-08 10.5254 0V2.45801C10.5254 7.22726 14.5109 11.784 19.4278 11.784C19.3287 11.784 19.2299 11.7858 19.1316 11.7895H21.0517Z',
+        fill: '#5b6fe8',
+      },
+      {
+        d: 'M-0.000925064 11.7895V17.8731C-0.000925064 17.8912 0.00857449 17.9079 0.0239525 17.9168L10.5011 23.9934C10.5086 23.9978 10.517 24 10.5254 24V21.4542C10.5254 16.5146 6.53987 11.7952 1.62302 11.7952C1.72212 11.7952 1.82085 11.7933 1.91917 11.7895H-0.000925064Z',
+        fill: '#57a4ee',
+      },
+      {
+        d: 'M-0.000925064 11.7895V5.91559C-0.000925064 5.89816 0.00857449 5.88207 0.0239525 5.87346L10.5011 0.00632824C10.5086 0.00210946 10.517 2.92206e-08 10.5254 0V2.45801C10.5254 7.22726 6.53987 11.784 1.62302 11.784C1.72212 11.784 1.82085 11.7858 1.91917 11.7895H-0.000925064Z',
+        fill: '#5b6fe8',
+      },
+      {
+        d: 'M21.0517 11.7895V17.8731C21.0517 17.8912 21.0422 17.9079 21.0268 17.9168L10.5497 23.9934C10.5422 23.9978 10.5338 24 10.5254 24V21.4542C10.5254 16.5146 14.5109 11.7952 19.4278 11.7952C19.3287 11.7952 19.2299 11.7933 19.1316 11.7895H21.0517Z',
+        fill: '#5a84ee',
+      },
+      {
+        d: 'M10.5273 2.45801C10.5273 7.22725 14.5129 11.7842 19.4297 11.7842L19.1338 11.7891C19.232 11.7929 19.3307 11.7949 19.4297 11.7949C14.5129 11.7949 10.5274 16.5146 10.5273 21.4541C10.5273 16.5581 6.61178 11.8801 1.75488 11.7979L1.75391 11.792L1.9209 11.7891C1.86537 11.787 1.80969 11.7869 1.75391 11.7861V11.7803C6.61128 11.7015 10.5273 7.18549 10.5273 2.45801Z',
+        fill: '#f7f8fa',
+      },
+    ]
 
     /**
      * The mark for one route, falling back to the route's first letter.
      * @param {string} route Provider route.
-     * @returns {{letter: string, color: string, variant: string}} The mark.
+     * @returns {{icon?: string, letter?: string, color: string, variant: string}} The mark.
      */
     function providerMark(route) {
       return (
@@ -462,6 +510,46 @@ window.__ModuleLoader__.load({
           color: '#6b7280',
           variant: 'solid',
         }
+      )
+    }
+
+    /**
+     * The svg for one mark, sized to sit inside a chip.
+     * @param {string} route Provider route.
+     * @param {number} size Rendered height in pixels.
+     * @returns {object} The icon element.
+     */
+    function providerIcon(route, size) {
+      const mark = providerMark(route)
+      if (mark.icon === 'zhipu') {
+        // The glyph is taller than it is wide, so it takes the height.
+        return h(
+          'svg',
+          {
+            viewBox: '0 0 21.052 24',
+            width: (size * 21.052) / 24,
+            height: size,
+            'aria-hidden': 'true',
+            focusable: 'false',
+          },
+          ...ZHIPU_PATHS.map((path, index) =>
+            h('path', { key: `z-${String(index)}`, d: path.d, fill: path.fill }),
+          ),
+        )
+      }
+      if (mark.letter !== undefined) {
+        return h('span', { className: 'dsh-model-balance-tab-letter' }, mark.letter)
+      }
+      return h(
+        'svg',
+        {
+          viewBox: '0 0 24 24',
+          width: size,
+          height: size,
+          'aria-hidden': 'true',
+          focusable: 'false',
+        },
+        h('path', { d: mark.icon === 'deepseek' ? DEEPSEEK_PATH : MINIMAX_PATH, fill: 'currentColor' }),
       )
     }
 
@@ -856,7 +944,7 @@ window.__ModuleLoader__.load({
               setMenuOpen(false)
             },
           },
-          mark.letter,
+          providerIcon(entry.route, 14),
         )
       }
 
@@ -950,7 +1038,7 @@ window.__ModuleLoader__.load({
                                   'data-variant': providerMark(entry.route).variant,
                                   style: { '--provider-mark': providerMark(entry.route).color },
                                 },
-                                providerMark(entry.route).letter,
+                                providerIcon(entry.route, 12),
                               ),
                               h('span', null, providerName(entry.route, t)),
                             ),
