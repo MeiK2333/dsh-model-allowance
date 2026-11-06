@@ -301,7 +301,7 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
     // Both controls are compact icon buttons.
     const iconButtons = footer.split('class="dsh-model-balance-icon-button"').length - 1
     if (iconButtons !== 2) throw new Error(`expected 2 icon buttons, rendered ${String(iconButtons)}`)
-    if (!footer.includes('title="打开厂商控制台"')) {
+    if (!footer.includes('title="控制台"')) {
       throw new Error('the footer is missing the console button')
     }
     // The refresh button keeps a disabled state while it works.
