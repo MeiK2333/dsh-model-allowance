@@ -447,15 +447,30 @@ window.__ModuleLoader__.load({
       // localized label, and a link to the source page when the vendor
       // publishes one. It sits at the left edge of the footer, so the margin
       // below pushes the reading time and the buttons to the right edge.
+      '.dsh-model-allowance-status-wrap{display:inline-flex;align-items:center;gap:5px;',
+      'margin-right:auto;min-width:0;font-size:11px}',
       '.dsh-model-allowance-status{display:inline-flex;align-items:center;gap:5px;',
-      'margin-right:auto;min-width:0;font-size:11px;',
       'color:var(--dsw-alias-label-primary);text-decoration:none}',
       'a.dsh-model-allowance-status:hover{text-decoration:underline}',
       '.dsh-model-allowance-status-label{flex:none}',
-      // The source's own words are the first thing to give up room when the
-      // footer is narrow; the state label and the dot never shrink.
-      '.dsh-model-allowance-status-summary{color:var(--dsw-alias-label-secondary);',
-      'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      // The degraded reason hides behind a warning mark: the footer keeps one
+      // row, and the detail is one hover away.
+      '.dsh-model-allowance-status-help{position:relative;display:inline-flex;',
+      'align-items:center;justify-content:center;box-sizing:border-box;width:14px;height:14px;',
+      'flex:none;border:1px solid var(--dsw-alias-state-warn-primary);border-radius:50%;',
+      'color:var(--dsw-alias-state-warn-primary);font-size:9px;font-weight:700;line-height:1;',
+      'cursor:help}',
+      '.dsh-model-allowance-status-help:hover,',
+      '.dsh-model-allowance-status-help:focus-visible{background:var(--dsw-alias-state-warn-primary);',
+      'color:var(--dsw-alias-bg-overlay);outline:none}',
+      '.dsh-model-allowance-status-tip{display:none;position:absolute;left:0;',
+      'bottom:calc(100% + 8px);z-index:40;width:max-content;max-width:240px;padding:6px 8px;',
+      'border:1px solid var(--dsw-alias-border-l1);border-radius:8px;',
+      'background:var(--dsw-alias-bg-overlay);box-shadow:0 8px 24px rgb(0 0 0 / 18%);',
+      'font-size:11px;font-weight:400;line-height:1.5;color:var(--dsw-alias-label-secondary);',
+      'white-space:normal;text-align:left}',
+      '.dsh-model-allowance-status-help:hover .dsh-model-allowance-status-tip,',
+      '.dsh-model-allowance-status-help:focus-visible .dsh-model-allowance-status-tip{display:block}',
       '.dsh-model-allowance-status-dot{width:6px;height:6px;border-radius:50%;flex:none;',
       'background:var(--dsw-alias-state-success-primary)}',
       '.dsh-model-allowance-status[data-state="degraded"] .dsh-model-allowance-status-dot,',
@@ -2110,50 +2125,70 @@ window.__ModuleLoader__.load({
                 // row, and the state and the source page stay together.
                 serviceState !== 'unknown'
                   ? h(
-                      providerStatus.url ? 'a' : 'span',
-                      {
-                        className: 'dsh-model-allowance-status',
-                        'data-state': providerStatus.state,
-                        title:
-                          providerStatus.summary === undefined
-                            ? statusLabel(providerStatus.state, t)
-                            : `${statusLabel(providerStatus.state, t)} · ${providerStatus.summary}`,
-                        ...(providerStatus.url
-                          ? {
-                              href: providerStatus.url,
-                              target: '_blank',
-                              rel: 'noreferrer noopener',
-                            }
-                          : {}),
-                      },
-                      h('span', {
-                        className: 'dsh-model-allowance-status-dot',
-                        'aria-hidden': true,
-                      }),
+                      'span',
+                      { className: 'dsh-model-allowance-status-wrap' },
                       h(
-                        'span',
-                        { className: 'dsh-model-allowance-status-label' },
-                        statusLabel(providerStatus.state, t),
+                        providerStatus.url ? 'a' : 'span',
+                        {
+                          className: 'dsh-model-allowance-status',
+                          'data-state': providerStatus.state,
+                          ...(providerStatus.url
+                            ? {
+                                href: providerStatus.url,
+                                target: '_blank',
+                                rel: 'noreferrer noopener',
+                              }
+                            : {}),
+                        },
+                        h('span', {
+                          className: 'dsh-model-allowance-status-dot',
+                          'aria-hidden': true,
+                        }),
+                        h(
+                          'span',
+                          { className: 'dsh-model-allowance-status-label' },
+                          statusLabel(providerStatus.state, t),
+                        ),
+                        ...(providerStatus.url
+                          ? [
+                              h(
+                                'span',
+                                {
+                                  className: 'dsh-model-allowance-status-arrow',
+                                  'aria-hidden': true,
+                                },
+                                '↗',
+                              ),
+                            ]
+                          : []),
                       ),
+                      // The reason is a warning mark rather than another line:
+                      // the footer stays one row, and the detail is one hover
+                      // — or one keyboard focus — away.
                       providerStatus.summary
                         ? h(
                             'span',
-                            { className: 'dsh-model-allowance-status-summary' },
-                            providerStatus.summary,
-                          )
-                        : null,
-                      ...(providerStatus.url
-                        ? [
+                            {
+                              className: 'dsh-model-allowance-status-help',
+                              tabIndex: 0,
+                              role: 'note',
+                              'aria-label': providerStatus.summary,
+                            },
                             h(
                               'span',
                               {
-                                className: 'dsh-model-allowance-status-arrow',
+                                className: 'dsh-model-allowance-status-help-mark',
                                 'aria-hidden': true,
                               },
-                              '↗',
+                              '!',
                             ),
-                          ]
-                        : []),
+                            h(
+                              'span',
+                              { className: 'dsh-model-allowance-status-tip', role: 'tooltip' },
+                              providerStatus.summary,
+                            ),
+                          )
+                        : null,
                     )
                   : null,
                 view?.updatedAt

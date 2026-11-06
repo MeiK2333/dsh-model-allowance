@@ -718,6 +718,13 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     if (statusAt > updatedAt) {
       throw new Error('the status should sit left of the reading time in the footer')
     }
+    // The reason hides behind a warning mark rather than sitting in the row.
+    if (!footer.includes('class="dsh-model-allowance-status-help"')) {
+      throw new Error('the degraded reason should hide behind a warning mark')
+    }
+    if (!footer.includes('class="dsh-model-allowance-status-tip"')) {
+      throw new Error('the warning mark should carry the reason in a tooltip')
+    }
     console.log('status: the card showed the platform state in the footer, left of the reading time')
   }
 
