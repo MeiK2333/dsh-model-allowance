@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "title": "模型余额",
+    "description": "在输入框显示当前会话所用模型的厂商余额或剩余额度。"
+  },
+  "badge": {
+    "loading": "加载中…",
+    "amount": "{amount}",
+    "quotaPercent": "剩余 {percent}%",
+    "quotaRatio": "{remaining} / {total}",
+    "quotaDuration": "剩余 {duration}",
+    "unsupported": "无余额接口",
+    "unconfigured": "未配置凭证",
+    "failed": "无法获取",
+    "noSelection": "请选择模型"
+  },
+  "detail": {
+    "title": "厂商余额",
+    "provider": "厂商",
+    "amount": "余额",
+    "remaining": "剩余",
+    "total": "总额",
+    "updated": "更新时间",
+    "refresh": "刷新",
+    "refreshing": "刷新中…",
+    "console": "打开厂商控制台",
+    "close": "关闭",
+    "error": "无法读取厂商余额。"
+  }
+}

@@ -1,0 +1,3 @@
+- insert:
+    - id: model-balance
+      name: '@local/dsh-model-balance'
