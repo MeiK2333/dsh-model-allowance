@@ -246,15 +246,14 @@ window.__ModuleLoader__.load({
       // (bg-layer-2 is #ffffff) on a #e9ecf2 panel and read as a white
       // background behind the logo.
       //
-      // The two DeepSeek routes still differ: the stored key carries a frame,
-      // the signed-in account does not.
+      // A frame means one thing here: this is the provider being read. It is
+      // not used to say anything else about a route, because a second meaning
+      // makes an unselected mark look selected.
       '.dsh-model-balance-tab{display:inline-flex;align-items:center;justify-content:center;',
       'box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
       'border:1px solid transparent;border-radius:7px;',
       'background:transparent;line-height:1;cursor:pointer;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.66}',
-      '.dsh-model-balance-tab[data-variant="outline"]{',
-      'border-color:var(--dsw-alias-border-l2)}',
       '.dsh-model-balance-tab:hover{opacity:.9}',
       // The selected mark gains the one frame the chip already has, and stops
       // being dimmed. It must not use the brand colour: in this theme that is
@@ -534,7 +533,7 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The real mark of each vendor, plus how a route badges it.
+     * The mark of each vendor.
      *
      * All three are the vendors' own artwork, taken from what each site
      * publishes: DeepSeek serves a standalone square icon SVG, MiniMax and
@@ -543,17 +542,16 @@ window.__ModuleLoader__.load({
      * a letter tile respectively — so the glyph is lifted from the wordmark.
      * All three are trademarks of their owners and identify the provider here.
      *
-     * A route maps to one vendor's glyph; `variant` then says how the chip is
-     * drawn, which is how the two DeepSeek routes stay distinguishable: a
-     * filled chip marks the signed-in account, an outlined one marks a key the
-     * user holds.
+     * Routes that share a vendor share a mark. The two DeepSeek entries look
+     * alike on purpose; the difference between the signed-in account and a
+     * stored key is carried by the name, not by a second frame style.
      */
     const PROVIDER_MARKS = {
-      'deepseek-account': { icon: 'deepseek', color: '#4d6bfe', variant: 'solid' },
-      deepseek: { icon: 'deepseek', color: '#4d6bfe', variant: 'outline' },
-      'minimax-cn': { icon: 'minimax', color: '#e21680', variant: 'solid' },
-      zai: { icon: 'zhipu', color: '#5668f5', variant: 'solid' },
-      'zai-coding-cn': { icon: 'zhipu', color: '#5668f5', variant: 'solid' },
+      'deepseek-account': { icon: 'deepseek', color: '#4d6bfe' },
+      deepseek: { icon: 'deepseek', color: '#4d6bfe' },
+      'minimax-cn': { icon: 'minimax', color: '#e21680' },
+      zai: { icon: 'zhipu', color: '#5668f5' },
+      'zai-coding-cn': { icon: 'zhipu', color: '#5668f5' },
     }
 
     /** DeepSeek's own square icon, 50x50, filled #4D6BFE. */
@@ -638,14 +636,13 @@ window.__ModuleLoader__.load({
     /**
      * The mark for one route, falling back to the route's first letter.
      * @param {string} route Provider route.
-     * @returns {{icon?: string, letter?: string, color: string, variant: string}} The mark.
+     * @returns {{icon?: string, letter?: string, color: string}} The mark.
      */
     function providerMark(route) {
       return (
         PROVIDER_MARKS[route] ?? {
           letter: route.slice(0, 1).toUpperCase(),
           color: '#6b7280',
-          variant: 'solid',
         }
       )
     }
@@ -1101,7 +1098,6 @@ window.__ModuleLoader__.load({
             key: entry.route,
             role: 'tab',
             className: 'dsh-model-balance-tab',
-            'data-variant': mark.variant,
             'data-active': entry.route === activeProvider ? 'true' : 'false',
             'aria-selected': entry.route === activeProvider ? 'true' : 'false',
             'aria-label': name,
@@ -1203,7 +1199,6 @@ window.__ModuleLoader__.load({
                                 'span',
                                 {
                                   className: 'dsh-model-balance-menu-mark',
-                                  'data-variant': providerMark(entry.route).variant,
                                   style: { '--provider-mark': providerMark(entry.route).color },
                                 },
                                 providerIcon(entry.route, 11),

@@ -235,7 +235,7 @@ function render(node) {
   // the switcher's selection, and the accessible name a mark carries.
   const extra = []
   if (props.style?.width) extra.push(`style="width:${String(props.style.width)}"`)
-  for (const name of ['data-tone', 'data-active', 'data-variant', 'aria-selected', 'aria-expanded']) {
+  for (const name of ['data-tone', 'data-active', 'aria-selected', 'aria-expanded']) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
   if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
