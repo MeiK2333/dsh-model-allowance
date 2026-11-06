@@ -4,7 +4,7 @@
  * Each case answers from a recorded real response shape, so this proves the
  * parsers and the two quantity dimensions without touching the network.
  */
-import { findAdapter, KIND_AMOUNT, KIND_QUOTA } from '../lib/providers.js'
+import { findAdapter, KIND_AMOUNT, KIND_QUOTA, PROVIDER_ADAPTERS } from '../lib/providers.js'
 
 const cases = []
 
@@ -232,6 +232,28 @@ if (zhipu.windows?.length !== 2) {
   if (weekly.resetAt === undefined) throw new Error('zhipu weekly reset missing')
   // The exhausted window is the binding constraint on the account.
   if (zhipu.percent !== 0) throw new Error('zhipu binding percent should be the exhausted window')
+}
+
+// --- console links must not point at retired pages ------------------------
+// A dead console link is a dead end the user cannot fix, and these paths have
+// already moved once: Zhipu split API keys from plan keys in October 2026 and
+// retired the old usercenter path, and MiniMax redirects off the older host.
+{
+  const urls = PROVIDER_ADAPTERS.map((adapter) => adapter.consoleUrl)
+  if (urls.some((url) => typeof url !== 'string' || !url.startsWith('https://'))) {
+    throw new Error('every adapter needs an https console link')
+  }
+  const retired = ['open.bigmodel.cn/usercenter/apikeys', 'platform.minimaxi.com']
+  for (const fragment of retired) {
+    if (urls.some((url) => url.includes(fragment))) {
+      throw new Error(`a console link still points at the retired path ${JSON.stringify(fragment)}`)
+    }
+  }
+  // Each brand keeps one destination, so the registry cannot drift per route.
+  const zhipuUrls = new Set(
+    PROVIDER_ADAPTERS.filter((adapter) => adapter.id === 'zhipu-quota').map((a) => a.consoleUrl),
+  )
+  if (zhipuUrls.size !== 1) throw new Error('the zhipu adapter declares more than one console link')
 }
 
 console.log(JSON.stringify(cases, null, 2))

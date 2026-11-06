@@ -104,6 +104,25 @@ DSH 内置的「账户」设置页只显示 **DeepSeek 官方账号**余额。�
 MiniMax 的长窗按实测时长报成 `7 天`，智谱报成 `1 周`——两者是同一节奏，
 客户端把这两种形状统一渲染为「每周额度」。
 
+### 控制台链接
+
+「打开厂商控制台」指向各家的**用量/额度**页，不是 API Key 页——卡片展示的是额度，
+链过去应该看到同一组数字。链接集中定义在 `lib/providers.js` 的 `CONSOLE` 常量里：
+
+| Provider | 链接 |
+|---|---|
+| DeepSeek | `https://platform.deepseek.com/top_up` |
+| MiniMax | `https://platform.minimax.cn/console/usage` |
+| 智谱 | `https://bigmodel.cn/coding-plan/personal/overview` |
+
+这些路径会变。已知的一次：智谱 2026-10-16 把标准 API Key 与套餐 Key 拆开管理，
+`open.bigmodel.cn/usercenter/apikeys` 已作废（标准 Key 迁到
+`bigmodel.cn/usercenter/proj-mgmt/apikeys`，套餐用量在 coding-plan 页面下）；
+MiniMax 的 `platform.minimaxi.com` 会 302 到 `platform.minimax.cn`。
+
+HTTP 状态码对这类 SPA 没有意义（任意路径都返回 200），所以链接正确性只能靠官方文档
+确认。测试里有一条断言禁止退回上述已废弃路径。
+
 未注册的 provider 路由显示「无余额接口」，不报错。
 
 ---
