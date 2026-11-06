@@ -501,6 +501,22 @@ window.__ModuleLoader__.load({
     ]
 
     /**
+     * Each mark's drawn extent, in its own viewBox units.
+     *
+     * Sizing every mark by its viewBox height is wrong for a mixed set: the
+     * DeepSeek and MiniMax glyphs sit inside a 24-tall box with padding above
+     * and below, while Zhipu's fills all 24. Matching viewBox height therefore
+     * drew Zhipu about a third taller than the other two, which read as that
+     * one icon being too big for its chip. Matching the *ink* height instead
+     * gives all three the same top and bottom breathing room.
+     */
+    const ICON_GEOMETRY = {
+      deepseek: { vbW: 24, vbH: 24, inkW: 24, inkH: 17.8 },
+      minimax: { vbW: 24, vbH: 24, inkW: 24, inkH: 20.2 },
+      zhipu: { vbW: 21.052, vbH: 24, inkW: 21.052, inkH: 24 },
+    }
+
+    /**
      * The mark for one route, falling back to the route's first letter.
      * @param {string} route Provider route.
      * @returns {{icon?: string, letter?: string, color: string, variant: string}} The mark.
@@ -516,42 +532,41 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The svg for one mark, sized to sit inside a chip.
+     * The svg for one mark, sized so every mark draws the same ink height.
      * @param {string} route Provider route.
-     * @param {number} size Rendered height in pixels.
+     * @param {number} inkHeight Drawn height of the ink, in pixels.
      * @returns {object} The icon element.
      */
-    function providerIcon(route, size) {
+    function providerIcon(route, inkHeight) {
       const mark = providerMark(route)
-      if (mark.icon === 'zhipu') {
-        // The glyph is taller than it is wide, so it takes the height.
-        return h(
-          'svg',
-          {
-            viewBox: '0 0 21.052 24',
-            width: (size * 21.052) / 24,
-            height: size,
-            'aria-hidden': 'true',
-            focusable: 'false',
-          },
-          ...ZHIPU_PATHS.map((path, index) =>
-            h('path', { key: `z-${String(index)}`, d: path.d, fill: path.fill }),
-          ),
-        )
-      }
       if (mark.letter !== undefined) {
         return h('span', { className: 'dsh-model-balance-tab-letter' }, mark.letter)
       }
+      const geo = ICON_GEOMETRY[mark.icon]
+      const boxH = (inkHeight * geo.vbH) / geo.inkH
+      const boxW = (boxH * geo.vbW) / geo.vbH
+      const paths =
+        mark.icon === 'zhipu'
+          ? ZHIPU_PATHS.map((path, index) =>
+              h('path', { key: `z-${String(index)}`, d: path.d, fill: path.fill }),
+            )
+          : [
+              h('path', {
+                d: mark.icon === 'deepseek' ? DEEPSEEK_PATH : MINIMAX_PATH,
+                fill: 'currentColor',
+              }),
+            ]
       return h(
         'svg',
         {
-          viewBox: '0 0 24 24',
-          width: size,
-          height: size,
+          viewBox: `0 0 ${String(geo.vbW)} ${String(geo.vbH)}`,
+          width: boxW,
+          height: boxH,
+          preserveAspectRatio: 'xMidYMid meet',
           'aria-hidden': 'true',
           focusable: 'false',
         },
-        h('path', { d: mark.icon === 'deepseek' ? DEEPSEEK_PATH : MINIMAX_PATH, fill: 'currentColor' }),
+        ...paths,
       )
     }
 
@@ -946,7 +961,7 @@ window.__ModuleLoader__.load({
               setMenuOpen(false)
             },
           },
-          providerIcon(entry.route, 17),
+          providerIcon(entry.route, 14),
         )
       }
 
@@ -1040,7 +1055,7 @@ window.__ModuleLoader__.load({
                                   'data-variant': providerMark(entry.route).variant,
                                   style: { '--provider-mark': providerMark(entry.route).color },
                                 },
-                                providerIcon(entry.route, 13),
+                                providerIcon(entry.route, 11),
                               ),
                               h('span', null, providerName(entry.route, t)),
                             ),
