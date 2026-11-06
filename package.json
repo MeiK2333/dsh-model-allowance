@@ -1,5 +1,5 @@
 {
-  "name": "@local/dsh-model-balance",
+  "name": "dsh-model-allowance",
   "version": "1.0.0",
   "private": true,
   "type": "module",

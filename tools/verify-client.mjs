@@ -103,7 +103,7 @@ const fakeWindow = {
 new Function('window', source)(fakeWindow)
 if (!registration) throw new Error('bundle did not register a module')
 console.log('registered id:', registration.id)
-if (registration.id !== '@local/dsh-model-balance') {
+if (registration.id !== 'dsh-model-allowance') {
   throw new Error(`unexpected id ${registration.id}`)
 }
 
@@ -271,7 +271,7 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
 
 // --- The turn's difference, and its ten-second life -----------------------
 {
-  if (!settled.includes('class="dsh-model-balance-delta"')) {
+  if (!settled.includes('class="dsh-model-allowance-delta"')) {
     throw new Error('a finished turn should put its difference on the badge')
   }
   if (!settled.includes('↓0.90')) {
@@ -294,7 +294,7 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
   Date.now = realNow
   hookCursor = 0
 
-  if (expired.includes('class="dsh-model-balance-delta"')) {
+  if (expired.includes('class="dsh-model-allowance-delta"')) {
     throw new Error('the difference outlived its ten seconds')
   }
   if (!expired.includes('¥46.71')) throw new Error('the plain value did not come back')
@@ -321,17 +321,17 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
 
   // With one readable provider the card names it instead of offering a switcher.
   if (!opened.includes('DeepSeek 账号')) throw new Error('panel did not render the provider name')
-  if (opened.includes('class="dsh-model-balance-tab"')) {
+  if (opened.includes('class="dsh-model-allowance-tab"')) {
     throw new Error('a single readable provider should not render a switcher')
   }
   if (opened.includes('关闭')) throw new Error('panel still renders a close button')
 
   // --- the footer is two icon buttons plus the reading time ------------------
   {
-    const footerStart = opened.indexOf('dsh-model-balance-actions"')
+    const footerStart = opened.indexOf('dsh-model-allowance-actions"')
     if (footerStart < 0) throw new Error('the footer row was not rendered')
     const footer = opened.slice(footerStart)
-    if (opened.includes('class="dsh-model-balance-action"')) {
+    if (opened.includes('class="dsh-model-allowance-action"')) {
       throw new Error('the old text-button class survived the footer rewrite')
     }
     // The reading time comes before both buttons and carries the new wording.
@@ -342,17 +342,17 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
     if (refreshAt < 0) throw new Error('the footer is missing the refresh button')
     if (clockAt > refreshAt) throw new Error('the reading time should sit left of the refresh button')
     // Both controls are compact icon buttons.
-    const iconButtons = footer.split('class="dsh-model-balance-icon-button"').length - 1
+    const iconButtons = footer.split('class="dsh-model-allowance-icon-button"').length - 1
     if (iconButtons !== 2) throw new Error(`expected 2 icon buttons, rendered ${String(iconButtons)}`)
     if (!footer.includes('title="控制台"')) {
       throw new Error('the footer is missing the console button')
     }
     // The refresh button keeps a disabled state while it works.
-    if (!/class="dsh-model-balance-icon-button"[^>]*>\s*<svg/.test(footer)) {
+    if (!/class="dsh-model-allowance-icon-button"[^>]*>\s*<svg/.test(footer)) {
       throw new Error('the icon buttons should draw a glyph, not a label')
     }
   }
-  console.log('panel opened:', opened.slice(opened.indexOf('<div class="dsh-model-balance-panel"')))
+  console.log('panel opened:', opened.slice(opened.indexOf('<div class="dsh-model-allowance-panel"')))
 
   // A click inside keeps it open.
   for (const listener of documentListeners.get('pointerdown') ?? []) {
@@ -626,7 +626,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   await new Promise((resolve) => setTimeout(resolve, 20))
   hookCursor = 0
   const planOpen = planBadge()
-  const body = planOpen.slice(planOpen.indexOf('dsh-model-balance-panel"'))
+  const body = planOpen.slice(planOpen.indexOf('dsh-model-allowance-panel"'))
   console.log('plan card:', body)
 
   for (const expected of [
@@ -642,20 +642,20 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
 
   // --- the bars carry the numbers and turn colour -------------------------
   // 0% used is an empty bar and a full bar at 100%, and the tone escalates.
-  if (!body.includes('class="dsh-model-balance-bar-fill" style="width:0%" data-tone="ok"')) {
+  if (!body.includes('class="dsh-model-allowance-bar-fill" style="width:0%" data-tone="ok"')) {
     throw new Error('the unused window should render an empty ok bar')
   }
-  if (!body.includes('class="dsh-model-balance-bar-fill" style="width:100%" data-tone="error"')) {
+  if (!body.includes('class="dsh-model-allowance-bar-fill" style="width:100%" data-tone="error"')) {
     throw new Error('the exhausted window should render a full error bar')
   }
   // --- the reset line: countdown left, target instant right ---------------
   // Split per window so each countdown shape is checked on its own block.
   {
-    const blocks = body.split('dsh-model-balance-window"').slice(1)
+    const blocks = body.split('dsh-model-allowance-window"').slice(1)
     const blockOf = (title) => blocks.find((block) => block.includes(title))
     /** The footer's text with its markup removed, or undefined when absent. */
     const footerText = (block) => {
-      const marker = 'dsh-model-balance-foot">'
+      const marker = 'dsh-model-allowance-foot">'
       const start = block.indexOf(marker)
       if (start < 0) return undefined
       const from = start + marker.length
@@ -687,11 +687,11 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   // The 5-hour window has not started here, so the Host reports no resetAt.
   // The card must drop the whole footer rather than print a placeholder.
   {
-    const windows = body.split('dsh-model-balance-window"').slice(1)
+    const windows = body.split('dsh-model-allowance-window"').slice(1)
     const sessionBlock = windows.find((block) => block.includes('5 小时额度'))
     if (!sessionBlock) throw new Error('the session window block was not rendered')
     const sessionOnly = sessionBlock.slice(0, sessionBlock.indexOf('</div></div>'))
-    if (sessionOnly.includes('dsh-model-balance-foot')) {
+    if (sessionOnly.includes('dsh-model-allowance-foot')) {
       throw new Error('a window without a reset should not render the reset footer')
     }
     if (sessionOnly.includes('无重置时间')) {
@@ -699,7 +699,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     }
     // The window that does have a reset keeps its footer.
     const weeklyBlock = windows.find((block) => block.includes('每周额度'))
-    if (!weeklyBlock?.includes('dsh-model-balance-foot')) {
+    if (!weeklyBlock?.includes('dsh-model-allowance-foot')) {
       throw new Error('the window with a reset lost its footer')
     }
   }
@@ -736,7 +736,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     throw new Error('switcher offered a provider without a credential')
   }
   // Every mark sits on one row: the strip must not wrap.
-  if (!body.includes('class="dsh-model-balance-switcher"')) {
+  if (!body.includes('class="dsh-model-allowance-switcher"')) {
     throw new Error('the switcher strip was not rendered')
   }
 
@@ -763,7 +763,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   const tabNamed = (tree, label) =>
     buttonsIn(tree).find(
       (button) =>
-        button.props.className === 'dsh-model-balance-tab' && button.props.title === label,
+        button.props.className === 'dsh-model-allowance-tab' && button.props.title === label,
     )
 
   const miniMaxTab = tabNamed(planTree(), 'MiniMax')
@@ -803,12 +803,12 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     const narrowTree = planTree()
     const narrow = render(narrowTree)
     const tabs = buttonsIn(narrowTree).filter(
-      (button) => button.props.className === 'dsh-model-balance-tab',
+      (button) => button.props.className === 'dsh-model-allowance-tab',
     )
     if (tabs.length !== 1) {
       throw new Error(`a narrow strip should keep one mark, rendered ${String(tabs.length)}`)
     }
-    if (!narrow.includes('dsh-model-balance-more')) {
+    if (!narrow.includes('dsh-model-allowance-more')) {
       throw new Error('a narrow strip should offer the overflow button')
     }
     // The provider being read survives the cut.
@@ -817,12 +817,12 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     }
 
     const moreButton = buttonsIn(narrowTree).find(
-      (button) => button.props.className === 'dsh-model-balance-more',
+      (button) => button.props.className === 'dsh-model-allowance-more',
     )
     moreButton.props.onClick()
     const openedTree = planTree()
     const opened = render(openedTree)
-    if (!opened.includes('dsh-model-balance-menu')) {
+    if (!opened.includes('dsh-model-allowance-menu')) {
       throw new Error('the overflow menu did not open')
     }
     for (const hidden of ['DeepSeek 账号', 'MiniMax']) {
@@ -835,7 +835,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     // Choosing from the menu switches the reading like a mark does.
     const item = buttonsIn(openedTree).find(
       (button) =>
-        button.props.className === 'dsh-model-balance-menu-item' &&
+        button.props.className === 'dsh-model-allowance-menu-item' &&
         textIn(button).includes('MiniMax'),
     )
     if (!item) throw new Error('the MiniMax menu item was not rendered')

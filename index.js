@@ -1,5 +1,5 @@
 /**
- * Host half of the model-balance bundle.
+ * Host half of the model-allowance bundle.
  *
  * The Host owns every provider credential, queries provider balance endpoints,
  * caches the readings, and publishes them through a Remote controller. The
@@ -14,9 +14,9 @@ import { PROVIDER_ADAPTERS, KIND_AMOUNT, KIND_QUOTA, findAdapter } from './lib/p
 import { describeError, logDebug } from './lib/debug.js'
 
 /**
- * The Host-side balance service, registered as `ctx.modelBalance`.
+ * The Host-side balance service, registered as `ctx.modelAllowance`.
  */
-class ModelBalanceService extends Service {
+class ModelAllowanceService extends Service {
   /**
    * Services this plugin depends on.
    */
@@ -27,7 +27,7 @@ class ModelBalanceService extends Service {
    * @param {object} config Resolved configuration.
    */
   constructor(ownerContext, config) {
-    super(ownerContext, 'modelBalance')
+    super(ownerContext, 'modelAllowance')
     this.config = config
 
     /** @type {BalanceService} */
@@ -209,7 +209,7 @@ class ModelBalanceService extends Service {
           void logDebug(`turn end: refreshing ${String(this.activeRoutes.size)} route(s)`)
         }
         this.refreshAll({ withConsumption: true }).catch((error) => {
-          console.error('[model-balance] turn refresh failed', { error })
+          console.error('[model-allowance] turn refresh failed', { error })
         })
       },
       GLOBAL,
@@ -219,7 +219,7 @@ class ModelBalanceService extends Service {
     // reports a difference: a sweep is not a turn.
     ctx.timer.interval(() => {
       this.refreshAll().catch((error) => {
-        console.error('[model-balance] periodic refresh failed', { error })
+        console.error('[model-allowance] periodic refresh failed', { error })
       })
     }, this.balance.ttlMs)
 
@@ -267,7 +267,7 @@ class ModelBalanceService extends Service {
       await logDebug(`no-adapter route probe: ${String(findAdapter('__none__') === undefined)}`)
       await logDebug('=== probe done ===')
     })().catch((error) => {
-      console.error('[model-balance] probe failed', { error })
+      console.error('[model-allowance] probe failed', { error })
     })
   }
 }
@@ -275,13 +275,13 @@ class ModelBalanceService extends Service {
 /**
  * The plugin's configuration schema.
  */
-ModelBalanceService.Config = z.object({
+ModelAllowanceService.Config = z.object({
   /** Lifetime of one cached reading, in milliseconds. */
   ttlMs: z.number().default(5 * 60 * 1000),
   /** Timeout for one provider request, in milliseconds. */
   requestTimeoutMs: z.number().default(15 * 1000),
-  /** Write each reading and its failure reason to `$DSH_HOME/model-balance-debug.log`. */
+  /** Write each reading and its failure reason to `$DSH_HOME/model-allowance-debug.log`. */
   debug: z.boolean().default(false),
 })
 
-export { ModelBalanceService as default, ModelBalanceService, PROVIDER_ADAPTERS, KIND_AMOUNT, KIND_QUOTA }
+export { ModelAllowanceService as default, ModelAllowanceService, PROVIDER_ADAPTERS, KIND_AMOUNT, KIND_QUOTA }

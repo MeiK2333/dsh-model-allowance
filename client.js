@@ -1,5 +1,5 @@
 /**
- * Client half of the model-balance bundle.
+ * Client half of the model-allowance bundle.
  *
  * The badge reads the session's `modelSelection` projection to learn which
  * provider the conversation uses, then asks the Host's `balance` Remote
@@ -8,14 +8,14 @@
  */
 
 window.__ModuleLoader__.load({
-  id: '@local/dsh-model-balance',
+  id: 'dsh-model-allowance',
   factory(require) {
     const React = require('react')
     const h = React.createElement
     const z = require('zod')
 
     /** The locale namespace this plugin owns. */
-    const NS = 'model-balance'
+    const NS = 'model-allowance'
 
     /**
      * Build the client contribution for the `balance` namespace.
@@ -68,20 +68,20 @@ window.__ModuleLoader__.load({
         name: 'provider',
         wire: 'provider',
         source: 'json',
-        codec: strict(providerSchema, 'Provider route to read.', '@local/dsh-model-balance#provider'),
+        codec: strict(providerSchema, 'Provider route to read.', 'dsh-model-allowance#provider'),
       }
       const providerListSchema = z.array(
         z.object({ route: z.string(), configured: z.boolean() }),
       )
       return {
-        package: '@local/dsh-model-balance',
+        package: 'dsh-model-allowance',
         methods: {
           'balance/list': {
             service: 'balanceController',
             description: 'List the provider routes this installation can read.',
             invocation: { kind: 'direct' },
             parameters: [],
-            result: strict(providerListSchema, 'The routes.', '@local/dsh-model-balance#routes'),
+            result: strict(providerListSchema, 'The routes.', 'dsh-model-allowance#routes'),
           },
           'balance/balance': {
             service: 'balanceController',
@@ -91,7 +91,7 @@ window.__ModuleLoader__.load({
             result: strict(
               balanceViewSchema,
               'The reading.',
-              '@local/dsh-model-balance#balanceView',
+              'dsh-model-allowance#balanceView',
             ),
           },
           'balance/refresh': {
@@ -102,7 +102,7 @@ window.__ModuleLoader__.load({
             result: strict(
               balanceViewSchema,
               'The reading.',
-              '@local/dsh-model-balance#balanceView',
+              'dsh-model-allowance#balanceView',
             ),
           },
           'balance/watch': {
@@ -115,7 +115,7 @@ window.__ModuleLoader__.load({
             result: strict(
               balanceViewSchema,
               'One reading.',
-              '@local/dsh-model-balance#balanceView',
+              'dsh-model-allowance#balanceView',
             ),
           },
         },
@@ -209,47 +209,47 @@ window.__ModuleLoader__.load({
      * palettes both follow the host without a second declaration.
      */
     const STYLES = [
-      '.dsh-model-balance-root{position:relative;display:inline-flex;align-items:center}',
-      '.dsh-model-balance-badge{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;',
+      '.dsh-model-allowance-root{position:relative;display:inline-flex;align-items:center}',
+      '.dsh-model-allowance-badge{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;',
       'border:1px solid var(--dsw-alias-border-l1);border-radius:999px;background:transparent;',
       'color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1;cursor:pointer;',
       'font-variant-numeric:tabular-nums;white-space:nowrap}',
-      '.dsh-model-balance-badge:hover{color:var(--dsw-alias-label-primary);',
+      '.dsh-model-allowance-badge:hover{color:var(--dsw-alias-label-primary);',
       'border-color:var(--dsw-alias-border-l2)}',
-      '.dsh-model-balance-badge:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
+      '.dsh-model-allowance-badge:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:1px}',
-      '.dsh-model-balance-dot{width:6px;height:6px;border-radius:50%;flex:none;',
+      '.dsh-model-allowance-dot{width:6px;height:6px;border-radius:50%;flex:none;',
       'background:var(--dsw-alias-state-idle-primary)}',
-      '.dsh-model-balance-root[data-tone="ready"] .dsh-model-balance-dot{',
+      '.dsh-model-allowance-root[data-tone="ready"] .dsh-model-allowance-dot{',
       'background:var(--dsw-alias-state-success-primary)}',
-      '.dsh-model-balance-root[data-tone="failed"] .dsh-model-balance-dot{',
+      '.dsh-model-allowance-root[data-tone="failed"] .dsh-model-allowance-dot{',
       'background:var(--dsw-alias-state-error-primary)}',
-      '.dsh-model-balance-root[data-loading="true"] .dsh-model-balance-dot{opacity:.5}',
+      '.dsh-model-allowance-root[data-loading="true"] .dsh-model-allowance-dot{opacity:.5}',
       // The turn's difference rides beside the value for a few seconds. It is
       // quieter than the value so the balance stays the thing being read, and
       // it fades in rather than popping.
-      '.dsh-model-balance-delta{margin-left:-2px;font-size:11px;',
-      'color:var(--dsw-alias-label-secondary);animation:dsh-model-balance-fade 200ms ease-out}',
-      '.dsh-model-balance-delta[data-direction="up"]{',
+      '.dsh-model-allowance-delta{margin-left:-2px;font-size:11px;',
+      'color:var(--dsw-alias-label-secondary);animation:dsh-model-allowance-fade 200ms ease-out}',
+      '.dsh-model-allowance-delta[data-direction="up"]{',
       'color:var(--dsw-alias-state-success-primary)}',
-      '@keyframes dsh-model-balance-fade{from{opacity:0}to{opacity:1}}',
+      '@keyframes dsh-model-allowance-fade{from{opacity:0}to{opacity:1}}',
       // Anchored to its own right edge: the badge sits next to the model seat
       // near the trailing edge, so the panel opens leftwards instead of
       // running off the side of the composer.
-      '.dsh-model-balance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
+      '.dsh-model-allowance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
       'min-width:250px;padding:8px 10px 10px;border:1px solid var(--dsw-alias-border-l1);',
       'border-radius:10px;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);',
       'box-shadow:0 8px 24px rgb(0 0 0 / 18%);font-size:12px}',
-      '.dsh-model-balance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
-      '.dsh-model-balance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
-      '.dsh-model-balance-usage{font-variant-numeric:tabular-nums}',
+      '.dsh-model-allowance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
+      '.dsh-model-allowance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
+      '.dsh-model-allowance-usage{font-variant-numeric:tabular-nums}',
       // The row cancels the panel's own horizontal padding so the divider under
       // it runs edge to edge, then puts the same padding back so the first mark
       // lines up with the labels below. Without this the marks sit further from
       // the edge than every other row and the whole strip reads as shifted left.
-      '.dsh-model-balance-switcher-wrap{position:relative;margin:-2px -10px 6px;',
+      '.dsh-model-allowance-switcher-wrap{position:relative;margin:-2px -10px 6px;',
       'padding:0 10px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
-      '.dsh-model-balance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
+      '.dsh-model-allowance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
       'gap:4px;overflow:hidden}',
       // The mark sits straight on the panel; the chip draws no surface of its
       // own. It used to be filled, which in this theme meant a pure white tile
@@ -259,84 +259,84 @@ window.__ModuleLoader__.load({
       // A frame means one thing here: this is the provider being read. It is
       // not used to say anything else about a route, because a second meaning
       // makes an unselected mark look selected.
-      '.dsh-model-balance-tab{display:inline-flex;align-items:center;justify-content:center;',
+      '.dsh-model-allowance-tab{display:inline-flex;align-items:center;justify-content:center;',
       'box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
       'border:1px solid transparent;border-radius:7px;',
       'background:transparent;line-height:1;cursor:pointer;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.66}',
-      '.dsh-model-balance-tab:hover{opacity:.9}',
+      '.dsh-model-allowance-tab:hover{opacity:.9}',
       // The selected mark gains the one frame the chip already has, and stops
       // being dimmed. It must not use the brand colour: in this theme that is
       // #0f1115, so a selected chip wore a near-black frame. It also gains no
       // background, since any fill here reintroduces the white tile.
-      '.dsh-model-balance-tab[data-active="true"]{opacity:1;',
+      '.dsh-model-allowance-tab[data-active="true"]{opacity:1;',
       'border-color:var(--dsw-alias-border-l2)}',
-      '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
+      '.dsh-model-allowance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:-1px}',
-      '.dsh-model-balance-tab svg{display:block}',
-      '.dsh-model-balance-tab-letter{font-size:11px;font-weight:600;line-height:1}',
-      '.dsh-model-balance-more{display:inline-flex;align-items:center;justify-content:center;',
+      '.dsh-model-allowance-tab svg{display:block}',
+      '.dsh-model-allowance-tab-letter{font-size:11px;font-weight:600;line-height:1}',
+      '.dsh-model-allowance-more{display:inline-flex;align-items:center;justify-content:center;',
       'box-sizing:border-box;width:26px;height:26px;flex:none;margin-left:auto;padding:0;',
       'border-radius:7px;',
       'border:1px solid var(--dsw-alias-border-l1);background:transparent;cursor:pointer;',
       'color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1}',
-      '.dsh-model-balance-more:hover{color:var(--dsw-alias-label-primary);',
+      '.dsh-model-allowance-more:hover{color:var(--dsw-alias-label-primary);',
       'border-color:var(--dsw-alias-border-l2)}',
-      '.dsh-model-balance-menu{position:absolute;top:calc(100% + 2px);right:0;z-index:30;',
+      '.dsh-model-allowance-menu{position:absolute;top:calc(100% + 2px);right:0;z-index:30;',
       'min-width:150px;padding:4px;border:1px solid var(--dsw-alias-border-l1);',
       'border-radius:8px;background:var(--dsw-alias-bg-overlay);',
       'box-shadow:0 8px 24px rgb(0 0 0 / 18%)}',
-      '.dsh-model-balance-menu-item{display:flex;align-items:center;gap:8px;width:100%;',
+      '.dsh-model-allowance-menu-item{display:flex;align-items:center;gap:8px;width:100%;',
       'padding:4px 6px;border:0;border-radius:6px;background:transparent;',
       'color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}',
-      '.dsh-model-balance-menu-item:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-model-allowance-menu-item:hover{background:var(--dsw-alias-bg-layer-2)}',
       // Same rule as the strip chips: no surface of its own, so the mark sits
       // on the menu instead of on a white tile.
-      '.dsh-model-balance-menu-mark{display:inline-flex;align-items:center;',
+      '.dsh-model-allowance-menu-mark{display:inline-flex;align-items:center;',
       'justify-content:center;width:20px;height:20px;flex:none;border-radius:5px;',
       'line-height:1;background:transparent;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary))}',
-      '.dsh-model-balance-menu-mark svg{display:block}',
-      '.dsh-model-balance-window{margin-top:10px;padding-top:10px;',
+      '.dsh-model-allowance-menu-mark svg{display:block}',
+      '.dsh-model-allowance-window{margin-top:10px;padding-top:10px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
-      '.dsh-model-balance-window-head{display:flex;justify-content:space-between;',
+      '.dsh-model-allowance-window-head{display:flex;justify-content:space-between;',
       'align-items:baseline;gap:12px}',
-      '.dsh-model-balance-window-title{font-weight:500;color:var(--dsw-alias-label-primary)}',
-      '.dsh-model-balance-percent{margin-top:2px;color:var(--dsw-alias-label-secondary);',
+      '.dsh-model-allowance-window-title{font-weight:500;color:var(--dsw-alias-label-primary)}',
+      '.dsh-model-allowance-percent{margin-top:2px;color:var(--dsw-alias-label-secondary);',
       'font-size:11px;font-variant-numeric:tabular-nums}',
-      '.dsh-model-balance-bar{margin-top:6px;height:6px;border-radius:999px;overflow:hidden;',
+      '.dsh-model-allowance-bar{margin-top:6px;height:6px;border-radius:999px;overflow:hidden;',
       'background:var(--dsw-alias-bg-layer-2);',
       'box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l1)}',
-      '.dsh-model-balance-bar-fill{height:100%;border-radius:999px;',
+      '.dsh-model-allowance-bar-fill{height:100%;border-radius:999px;',
       'background:var(--dsw-alias-state-success-primary);transition:width 300ms ease}',
-      '.dsh-model-balance-bar-fill[data-tone="warn"]{',
+      '.dsh-model-allowance-bar-fill[data-tone="warn"]{',
       'background:var(--dsw-alias-state-warn-primary)}',
-      '.dsh-model-balance-bar-fill[data-tone="error"]{',
+      '.dsh-model-allowance-bar-fill[data-tone="error"]{',
       'background:var(--dsw-alias-state-error-primary)}',
-      '.dsh-model-balance-foot{display:flex;justify-content:space-between;',
+      '.dsh-model-allowance-foot{display:flex;justify-content:space-between;',
       'align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:5px;',
       'color:var(--dsw-alias-label-secondary);',
       'font-size:11px;font-variant-numeric:tabular-nums;word-break:break-word}',
-      '.dsh-model-balance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
-      '.dsh-model-balance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
+      '.dsh-model-allowance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
+      '.dsh-model-allowance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
       'font-size:11px;word-break:break-word}',
       // The footer is one right-aligned cluster: the reading time sits directly
       // left of the two icon buttons.
-      '.dsh-model-balance-actions{display:flex;align-items:center;',
+      '.dsh-model-allowance-actions{display:flex;align-items:center;',
       'justify-content:flex-end;gap:8px;margin-top:8px;padding-top:8px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
-      '.dsh-model-balance-updated{color:var(--dsw-alias-label-secondary);font-size:11px;',
+      '.dsh-model-allowance-updated{color:var(--dsw-alias-label-secondary);font-size:11px;',
       'font-variant-numeric:tabular-nums;white-space:nowrap;margin-right:2px}',
-      '.dsh-model-balance-icon-button{display:inline-flex;align-items:center;',
+      '.dsh-model-allowance-icon-button{display:inline-flex;align-items:center;',
       'justify-content:center;box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
       'border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:transparent;',
       'color:var(--dsw-alias-label-secondary);cursor:pointer;text-decoration:none}',
-      '.dsh-model-balance-icon-button:hover{color:var(--dsw-alias-label-primary);',
+      '.dsh-model-allowance-icon-button:hover{color:var(--dsw-alias-label-primary);',
       'border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
-      '.dsh-model-balance-icon-button:focus-visible{',
+      '.dsh-model-allowance-icon-button:focus-visible{',
       'outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
-      '.dsh-model-balance-icon-button[disabled]{opacity:.5;cursor:default}',
-      '.dsh-model-balance-icon-button svg{display:block}',
+      '.dsh-model-allowance-icon-button[disabled]{opacity:.5;cursor:default}',
+      '.dsh-model-allowance-icon-button svg{display:block}',
     ].join('')
 
     /**
@@ -709,7 +709,7 @@ window.__ModuleLoader__.load({
     function providerIcon(route, inkHeight) {
       const mark = providerMark(route)
       if (mark.letter !== undefined) {
-        return h('span', { className: 'dsh-model-balance-tab-letter' }, mark.letter)
+        return h('span', { className: 'dsh-model-allowance-tab-letter' }, mark.letter)
       }
       const geo = ICON_GEOMETRY[mark.icon]
       // Both dimensions must land on whole, even pixels.
@@ -969,7 +969,7 @@ window.__ModuleLoader__.load({
             if (cancelled || !result.ok) return
             setAvailable(result.value.filter((entry) => entry.configured))
           } catch (error) {
-            console.error('[model-balance] listing providers failed', { error })
+            console.error('[model-allowance] listing providers failed', { error })
           }
         })()
         return () => {
@@ -997,7 +997,7 @@ window.__ModuleLoader__.load({
             if (!result.ok) throw new Error('balance reading failed')
             setView(result.value)
           } catch (error) {
-            console.error('[model-balance] reading failed', { provider, error })
+            console.error('[model-allowance] reading failed', { provider, error })
             if (!cancelled) setView({ provider, status: 'failed', kind: 'quota' })
           } finally {
             if (!cancelled) setLoading(false)
@@ -1031,7 +1031,7 @@ window.__ModuleLoader__.load({
                 ended: () => new Error('balance stream ended'),
               })
             } catch (error) {
-              console.error('[model-balance] opening the reading stream failed', { error })
+              console.error('[model-allowance] opening the reading stream failed', { error })
               handle = undefined
             }
             if (handle) {
@@ -1048,7 +1048,7 @@ window.__ModuleLoader__.load({
                 }
               } catch (error) {
                 if (!cancelled) {
-                  console.error('[model-balance] reading stream failed', { provider: activeProvider, error })
+                  console.error('[model-allowance] reading stream failed', { provider: activeProvider, error })
                 }
               } finally {
                 // A stream that produced nothing leaves the badge loading
@@ -1076,7 +1076,7 @@ window.__ModuleLoader__.load({
           const result = await api.refresh(activeProvider)
           if (result.ok) setView(result.value)
         } catch (error) {
-          console.error('[model-balance] refresh failed', { provider: activeProvider, error })
+          console.error('[model-allowance] refresh failed', { provider: activeProvider, error })
         } finally {
           setRefreshing(false)
         }
@@ -1160,7 +1160,7 @@ window.__ModuleLoader__.load({
             type: 'button',
             key: entry.route,
             role: 'tab',
-            className: 'dsh-model-balance-tab',
+            className: 'dsh-model-allowance-tab',
             'data-active': entry.route === activeProvider ? 'true' : 'false',
             'aria-selected': entry.route === activeProvider ? 'true' : 'false',
             'aria-label': name,
@@ -1179,7 +1179,7 @@ window.__ModuleLoader__.load({
         'div',
         {
           ref: rootRef,
-          className: 'dsh-model-balance-root',
+          className: 'dsh-model-allowance-root',
           'data-tone': tone,
           'data-loading': loading ? 'true' : 'false',
         },
@@ -1190,20 +1190,20 @@ window.__ModuleLoader__.load({
           'button',
           {
             type: 'button',
-            className: 'dsh-model-balance-badge',
+            className: 'dsh-model-allowance-badge',
             'data-provider': provider,
             'aria-expanded': open ? 'true' : 'false',
             onClick: () => setOpen((value) => !value),
           },
-          h('span', { className: 'dsh-model-balance-dot', 'aria-hidden': true }),
-          h('span', { className: 'dsh-model-balance-label' }, label),
+          h('span', { className: 'dsh-model-allowance-dot', 'aria-hidden': true }),
+          h('span', { className: 'dsh-model-allowance-label' }, label),
           // What the last turn cost, for a few seconds after it lands. The arrow
           // follows the number shown beside it: down means the balance fell.
           showingDifference
             ? h(
                 'span',
                 {
-                  className: 'dsh-model-balance-delta',
+                  className: 'dsh-model-allowance-delta',
                   'data-direction': view.consumption.delta < 0 ? 'down' : 'up',
                   title: t('badge.consumption'),
                 },
@@ -1215,7 +1215,7 @@ window.__ModuleLoader__.load({
           ? h(
               'div',
               {
-                className: 'dsh-model-balance-panel',
+                className: 'dsh-model-allowance-panel',
                 role: 'dialog',
                 'aria-label': t('detail.title'),
               },
@@ -1227,12 +1227,12 @@ window.__ModuleLoader__.load({
                     // hides what does not fit, and the menu would be clipped
                     // with it if it lived inside.
                     'div',
-                    { className: 'dsh-model-balance-switcher-wrap' },
+                    { className: 'dsh-model-allowance-switcher-wrap' },
                     h(
                       'div',
                       {
                         ref: stripRef,
-                        className: 'dsh-model-balance-switcher',
+                        className: 'dsh-model-allowance-switcher',
                         role: 'tablist',
                         'aria-label': t('detail.provider'),
                         'data-overflow': overflow.length > 0 ? 'true' : 'false',
@@ -1243,7 +1243,7 @@ window.__ModuleLoader__.load({
                             'button',
                             {
                               type: 'button',
-                              className: 'dsh-model-balance-more',
+                              className: 'dsh-model-allowance-more',
                               'aria-haspopup': 'menu',
                               'aria-expanded': menuOpen ? 'true' : 'false',
                               'aria-label': t('detail.moreProviders'),
@@ -1257,7 +1257,7 @@ window.__ModuleLoader__.load({
                     menuOpen && overflow.length > 0
                       ? h(
                           'div',
-                          { className: 'dsh-model-balance-menu', role: 'menu' },
+                          { className: 'dsh-model-allowance-menu', role: 'menu' },
                           ...overflow.map((entry) =>
                             h(
                               'button',
@@ -1265,7 +1265,7 @@ window.__ModuleLoader__.load({
                                 type: 'button',
                                 key: entry.route,
                                 role: 'menuitem',
-                                className: 'dsh-model-balance-menu-item',
+                                className: 'dsh-model-allowance-menu-item',
                                 onClick: () => {
                                   setPicked(entry.route)
                                   setMenuOpen(false)
@@ -1274,7 +1274,7 @@ window.__ModuleLoader__.load({
                               h(
                                 'span',
                                 {
-                                  className: 'dsh-model-balance-menu-mark',
+                                  className: 'dsh-model-allowance-menu-mark',
                                   style: { '--provider-mark': providerMark(entry.route).color },
                                 },
                                 providerIcon(entry.route, 11),
@@ -1287,14 +1287,14 @@ window.__ModuleLoader__.load({
                   )
                 : h(
                     'div',
-                    { className: 'dsh-model-balance-row' },
+                    { className: 'dsh-model-allowance-row' },
                     h('span', null, t('detail.provider')),
                     h('span', null, providerName(activeProvider, t)),
                   ),
               view?.kind === 'amount' && typeof view.amount === 'number'
                 ? h(
                     'div',
-                    { className: 'dsh-model-balance-row' },
+                    { className: 'dsh-model-allowance-row' },
                     h('span', null, t('detail.amount')),
                     h('span', null, formatAmount(view.amount, view.currency)),
                   )
@@ -1312,22 +1312,22 @@ window.__ModuleLoader__.load({
                     const usage = windowUsage(window, t)
                     return h(
                       'div',
-                      { className: 'dsh-model-balance-window', key: `w-${String(index)}` },
+                      { className: 'dsh-model-allowance-window', key: `w-${String(index)}` },
                       h(
                         'div',
-                        { className: 'dsh-model-balance-window-head' },
-                        h('span', { className: 'dsh-model-balance-window-title' }, windowTitle(window, t)),
+                        { className: 'dsh-model-allowance-window-head' },
+                        h('span', { className: 'dsh-model-allowance-window-title' }, windowTitle(window, t)),
                         // Countable units sit beside the title; a plan that
                         // reports only a percentage has none to show.
                         usage === undefined
                           ? null
-                          : h('span', { className: 'dsh-model-balance-usage' }, usage),
+                          : h('span', { className: 'dsh-model-allowance-usage' }, usage),
                       ),
                       percent === undefined
                         ? null
                         : h(
                             'div',
-                            { className: 'dsh-model-balance-percent' },
+                            { className: 'dsh-model-allowance-percent' },
                             t('window.usedPercent', { percent }),
                           ),
                       percent === undefined
@@ -1335,7 +1335,7 @@ window.__ModuleLoader__.load({
                         : h(
                             'div',
                             {
-                              className: 'dsh-model-balance-bar',
+                              className: 'dsh-model-allowance-bar',
                               role: 'progressbar',
                               'aria-valuenow': percent,
                               'aria-valuemin': 0,
@@ -1343,7 +1343,7 @@ window.__ModuleLoader__.load({
                               'aria-valuetext': t('window.usedPercent', { percent }),
                             },
                             h('div', {
-                              className: 'dsh-model-balance-bar-fill',
+                              className: 'dsh-model-allowance-bar-fill',
                               'data-tone': barTone(percent),
                               style: { width: `${String(filled)}%` },
                             }),
@@ -1355,7 +1355,7 @@ window.__ModuleLoader__.load({
                       typeof window.resetAt === 'number'
                         ? h(
                             'div',
-                            { className: 'dsh-model-balance-foot' },
+                            { className: 'dsh-model-allowance-foot' },
                             h(
                               'span',
                               null,
@@ -1373,7 +1373,7 @@ window.__ModuleLoader__.load({
               !Array.isArray(view?.windows) && typeof view?.remainingMs === 'number'
                 ? h(
                     'div',
-                    { className: 'dsh-model-balance-row' },
+                    { className: 'dsh-model-allowance-row' },
                     h('span', null, t('detail.remaining')),
                     h('span', null, formatDuration(view.remainingMs, t)),
                   )
@@ -1381,7 +1381,7 @@ window.__ModuleLoader__.load({
               !Array.isArray(view?.windows) && typeof view?.remaining === 'number'
                 ? h(
                     'div',
-                    { className: 'dsh-model-balance-row' },
+                    { className: 'dsh-model-allowance-row' },
                     h('span', null, t('detail.remaining')),
                     h('span', null, String(view.remaining)),
                   )
@@ -1389,7 +1389,7 @@ window.__ModuleLoader__.load({
               !Array.isArray(view?.windows) && typeof view?.total === 'number'
                 ? h(
                     'div',
-                    { className: 'dsh-model-balance-row' },
+                    { className: 'dsh-model-allowance-row' },
                     h('span', null, t('detail.total')),
                     h('span', null, String(view.total)),
                   )
@@ -1397,28 +1397,28 @@ window.__ModuleLoader__.load({
               view?.status === 'failed'
                 ? h(
                     'div',
-                    { className: 'dsh-model-balance-error' },
+                    { className: 'dsh-model-allowance-error' },
                     t('detail.error'),
                     // The Host reports why a reading failed; showing it is what
                     // turns "it does not work" into something actionable.
                     view.error
-                      ? h('div', { className: 'dsh-model-balance-reason' }, view.error)
+                      ? h('div', { className: 'dsh-model-allowance-reason' }, view.error)
                       : null,
                   )
                 : null,
               view?.status === 'unsupported'
-                ? h('div', { className: 'dsh-model-balance-reason' }, t('badge.unsupported'))
+                ? h('div', { className: 'dsh-model-allowance-reason' }, t('badge.unsupported'))
                 : null,
               view?.status === 'unconfigured'
-                ? h('div', { className: 'dsh-model-balance-reason' }, t('badge.unconfigured'))
+                ? h('div', { className: 'dsh-model-allowance-reason' }, t('badge.unconfigured'))
                 : null,
               h(
                 'div',
-                { className: 'dsh-model-balance-actions' },
+                { className: 'dsh-model-allowance-actions' },
                 view?.updatedAt
                   ? h(
                       'span',
-                      { className: 'dsh-model-balance-updated' },
+                      { className: 'dsh-model-allowance-updated' },
                       t('detail.updatedAt', { time: formatClock(view.updatedAt) }),
                     )
                   : null,
@@ -1426,7 +1426,7 @@ window.__ModuleLoader__.load({
                   'button',
                   {
                     type: 'button',
-                    className: 'dsh-model-balance-icon-button',
+                    className: 'dsh-model-allowance-icon-button',
                     onClick: refresh,
                     disabled: refreshing,
                     title: refreshing ? t('detail.refreshing') : t('detail.refresh'),
@@ -1438,7 +1438,7 @@ window.__ModuleLoader__.load({
                   ? h(
                       'a',
                       {
-                        className: 'dsh-model-balance-icon-button',
+                        className: 'dsh-model-allowance-icon-button',
                         href: view.consoleUrl,
                         target: '_blank',
                         rel: 'noreferrer noopener',
@@ -1506,11 +1506,11 @@ window.__ModuleLoader__.load({
               balanceNamespace = namespace
               settleBalanceNamespace(namespace)
             } else {
-              console.error('[model-balance] the balance namespace did not register')
+              console.error('[model-allowance] the balance namespace did not register')
               settleBalanceNamespace(null)
             }
           })().catch((error) => {
-            console.error('[model-balance] mounting the balance namespace failed', { error })
+            console.error('[model-allowance] mounting the balance namespace failed', { error })
             settleBalanceNamespace(null)
           })
           return () => {
@@ -1518,7 +1518,7 @@ window.__ModuleLoader__.load({
             balanceNamespace = null
             unmount?.()
           }
-        }, 'model-balance: balance namespace')
+        }, 'model-allowance: balance namespace')
 
         // `conversation.input.right` renders immediately before the composer's
         // model seat, so the badge sits directly left of the model name. The
@@ -1529,7 +1529,7 @@ window.__ModuleLoader__.load({
           ctx.slots.register(
             {
               name: SLOT,
-              id: 'model-balance',
+              id: 'model-allowance',
               order: 10,
             },
             (props) => h(BalanceBadge, { ...props, ctx, t }),

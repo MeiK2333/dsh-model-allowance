@@ -1,4 +1,4 @@
-# @local/dsh-model-balance
+# dsh-model-allowance
 
 在 DSH Web 界面的输入框工具行显示**当前会话所用模型的厂商余额或剩余额度**。
 
@@ -310,7 +310,7 @@ http_proxy=http://127.0.0.1:7890
 ## 结构
 
 ```
-index.js              Host 插件：注册 modelBalance 服务、刷新触发
+index.js              Host 插件：注册 modelAllowance 服务、刷新触发
 lib/providers.js      各 provider 的余额适配器注册表
 lib/balance.js        凭证解析、抓取、缓存、TTL、并发去重、订阅
 lib/remote.js         Remote 控制器（balance 命名空间）
@@ -341,8 +341,8 @@ Host 的 `@Remote` 标记通过 `markRemote()` 在构造期写入原型——这
 在 `cordis.patch.yml` 里覆盖：
 
 ```yaml
-- id: model-balance
-  name: '@local/dsh-model-balance'
+- id: model-allowance
+  name: 'dsh-model-allowance'
   config:
     ttlMs: 120000
 ```
@@ -435,11 +435,11 @@ node tools/measure-chips.mjs                   # 读 chip-clean.png，打印偏�
 ### 排错
 
 打开 `debug` 后，插件会在激活时把每条路由试读一次，并把结果追加到
-`$DSH_HOME/model-balance-debug.log`：
+`$DSH_HOME/model-allowance-debug.log`：
 
 ```yaml
-- id: model-balance
-  name: '@local/dsh-model-balance'
+- id: model-allowance
+  name: 'dsh-model-allowance'
   config:
     debug: true
 ```

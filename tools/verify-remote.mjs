@@ -8,7 +8,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { BalanceController } from '../lib/remote.js'
 
-/** A minimal stand-in for the Host modelBalance service. */
+/** A minimal stand-in for the Host modelAllowance service. */
 function createService() {
   const listeners = new Map()
   const publish = (route, view) => {
@@ -53,7 +53,7 @@ function createService() {
 const service = createService()
 // A real Cordis context, because the Service base registers through it.
 const ctx = new Context()
-ctx.reflect.provide('modelBalance', service)
+ctx.reflect.provide('modelAllowance', service)
 
 // The controller's constructor registers an initializer for each `@Remote`
 // marker, so this also proves the plain-JavaScript marker path works.
@@ -116,14 +116,14 @@ console.log('frames:', JSON.stringify(frames.map((frame) => frame.amount)))
 console.log('refresh amount:', refreshed.amount)
 
 // --- the real service exposes what `watch` uses ---------------------------
-// The controller reaches `ctx.modelBalance.subscribe`, so the shipped service
+// The controller reaches `ctx.modelAllowance.subscribe`, so the shipped service
 // must provide it; the stub above cannot prove that.
-const { default: ModelBalanceService } = await import('../index.js')
+const { default: ModelAllowanceService } = await import('../index.js')
 for (const method of ['read', 'track', 'subscribe', 'refreshAll']) {
-  if (typeof ModelBalanceService.prototype[method] !== 'function') {
-    throw new Error(`ModelBalanceService is missing ${method}()`)
+  if (typeof ModelAllowanceService.prototype[method] !== 'function') {
+    throw new Error(`ModelAllowanceService is missing ${method}()`)
   }
 }
-console.log('ModelBalanceService exposes:', 'read, track, subscribe, refreshAll')
+console.log('ModelAllowanceService exposes:', 'read, track, subscribe, refreshAll')
 
 console.log('OK: the Remote controller opens, streams, and refreshes')
