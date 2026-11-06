@@ -138,9 +138,26 @@ node tools/verify-client.mjs
 
 # Host：用真实记录的响应形状跑全部适配器
 node tools/verify-providers.mjs
+
+# Remote 控制器：@Remote 标记、流契约、刷新、服务方法
+node tools/verify-remote.mjs
 ```
 
-两者都用录制的真实响应离线运行，不触网。
+`verify-remote.mjs` 需要 `@deepseek-ai/cordis`、`schemastery`、`dsh-typert-protocol`
+可被解析。插件在 DSH 里运行时这些由宿主提供；在仓库里独立跑测试时，
+先把它们放进 `node_modules/@deepseek-ai/`（`node_modules/` 已被 gitignore）：
+
+```powershell
+# 从安装的 DSH 里取（路径见运行时 checkout）
+node tools/asar-extract.cjs <app.asar> .deps `
+  "/dsh/node_modules/@deepseek-ai/dsh-typert-protocol/" `
+  "/dsh/node_modules/@deepseek-ai/cordis/" `
+  "/dsh/node_modules/@deepseek-ai/cosmokit/" `
+  "/dsh/node_modules/@deepseek-ai/schemastery/"
+Copy-Item .deps/dsh/node_modules/@deepseek-ai node_modules -Recurse
+```
+
+三个脚本都用录制/桩数据离线运行，不触网。
 
 ---
 
