@@ -416,8 +416,8 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
         remainingPercent: 100,
       },
       {
-        id: 'monthly',
-        unit: 'month',
+        id: 'weekly',
+        unit: 'week',
         count: 1,
         used: 10071,
         total: 10000,
@@ -538,7 +538,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     '5 小时额度',           // short window title
     '0 / 2,000',            // countable units beside the title
     '0% 已使用',            // consumed share
-    '每月额度',             // long window title
+    '每周额度',             // long window title
     '10,071 / 10,000',      // long window units, digits grouped
     '100% 已使用',          // long window consumed share
   ]) {
@@ -577,8 +577,8 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
       throw new Error('the card still prints a no-reset placeholder')
     }
     // The window that does have a reset keeps its footer.
-    const monthlyBlock = windows.find((block) => block.includes('每月额度'))
-    if (!monthlyBlock?.includes('dsh-model-balance-foot')) {
+    const weeklyBlock = windows.find((block) => block.includes('每周额度'))
+    if (!weeklyBlock?.includes('dsh-model-balance-foot')) {
       throw new Error('the window with a reset lost its footer')
     }
   }

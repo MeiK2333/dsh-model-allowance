@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
       const providerSchema = z.string().min(1)
       const windowSchema = z.object({
         id: z.string(),
-        unit: z.enum(['hour', 'day', 'month', 'unknown']),
+        unit: z.enum(['hour', 'day', 'week', 'month', 'unknown']),
         count: z.number().optional(),
         used: z.number().optional(),
         total: z.number().optional(),
@@ -413,6 +413,9 @@ window.__ModuleLoader__.load({
       if (window.unit === 'hour' && window.count) {
         return t('window.title.hour', { count: window.count })
       }
+      // A weekly window may be reported as one week or as seven days; both are
+      // the same cadence and read best as "weekly".
+      if (window.unit === 'week') return t('window.title.week')
       if (window.unit === 'day' && window.count === 7) return t('window.title.week')
       if (window.unit === 'day' && window.count) {
         return t('window.title.day', { count: window.count })

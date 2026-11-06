@@ -95,7 +95,7 @@ async function withFetch(responseBody, run) {
 
 // --- Zhipu quota: real recorded response -----------------------------------
 // `unit` is a length code and `number` counts them: unit 3 + 5 is the 5-hour
-// window, unit 6 + 1 is the monthly one. The quota is `usage` and
+// window, unit 6 + 1 the weekly one. The quota is `usage` and
 // `currentValue` is what has been spent.
 {
   const adapter = findAdapter('zai')
@@ -216,8 +216,8 @@ if (zhipu.windows?.length !== 2) {
 }
 {
   const session = zhipu.windows.find((window) => window.id === 'session')
-  const monthly = zhipu.windows.find((window) => window.id === 'monthly')
-  if (!session || !monthly) throw new Error('zhipu windows are not session + monthly')
+  const weekly = zhipu.windows.find((window) => window.id === 'weekly')
+  if (!session || !weekly) throw new Error('zhipu windows are not session + weekly')
   if (session.unit !== 'hour' || session.count !== 5) {
     throw new Error(`zhipu session window length wrong: ${session.unit} ${session.count}`)
   }
@@ -225,10 +225,11 @@ if (zhipu.windows?.length !== 2) {
   if (session.total !== 2000) throw new Error(`zhipu session total should be 2000, got ${session.total}`)
   if (session.used !== 0) throw new Error(`zhipu session used should be 0, got ${session.used}`)
   if (session.remainingPercent !== 100) throw new Error('zhipu session percent mismatch')
-  if (monthly.total !== 10000) throw new Error(`zhipu monthly total should be 10000, got ${monthly.total}`)
-  if (monthly.used !== 10071) throw new Error(`zhipu monthly used should be 10071, got ${monthly.used}`)
-  if (monthly.remainingPercent !== 0) throw new Error('zhipu monthly percent mismatch')
-  if (monthly.resetAt === undefined) throw new Error('zhipu monthly reset missing')
+  if (weekly.total !== 10000) throw new Error(`zhipu weekly total should be 10000, got ${weekly.total}`)
+  if (weekly.used !== 10071) throw new Error(`zhipu weekly used should be 10071, got ${weekly.used}`)
+  if (weekly.unit !== 'week') throw new Error(`zhipu long window unit should be week, got ${weekly.unit}`)
+  if (weekly.remainingPercent !== 0) throw new Error('zhipu weekly percent mismatch')
+  if (weekly.resetAt === undefined) throw new Error('zhipu weekly reset missing')
   // The exhausted window is the binding constraint on the account.
   if (zhipu.percent !== 0) throw new Error('zhipu binding percent should be the exhausted window')
 }
