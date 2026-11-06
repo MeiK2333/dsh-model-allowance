@@ -241,30 +241,26 @@ window.__ModuleLoader__.load({
       'padding:0 10px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
       'gap:4px;overflow:hidden}',
-      // Each mark is the vendor's own artwork in its own colour on a neutral
-      // chip, so a multi-colour mark needs no white-on-brand treatment. The
-      // two DeepSeek routes tell each other apart by chip: filled for the
-      // signed-in account, outlined for a stored key.
+      // The mark sits straight on the panel; the chip draws no surface of its
+      // own. It used to be filled, which in this theme meant a pure white tile
+      // (bg-layer-2 is #ffffff) on a #e9ecf2 panel and read as a white
+      // background behind the logo.
+      //
+      // The two DeepSeek routes still differ: the stored key carries a frame,
+      // the signed-in account does not.
       '.dsh-model-balance-tab{display:inline-flex;align-items:center;justify-content:center;',
       'box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
       'border:1px solid transparent;border-radius:7px;',
       'background:transparent;line-height:1;cursor:pointer;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.66}',
-      '.dsh-model-balance-tab[data-variant="solid"]{background:var(--dsw-alias-bg-layer-2);',
-      'border-color:var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-tab[data-variant="outline"]{',
-      'border-color:var(--dsw-alias-border-l2);background:transparent}',
+      'border-color:var(--dsw-alias-border-l2)}',
       '.dsh-model-balance-tab:hover{opacity:.9}',
-      // The selected mark recolours the one border it already has. An extra
-      // inset ring would stack a second line on top of that border and read as
-      // a thick frame.
-      //
-      // It must not use the brand colour: in this theme that is #0f1115, so a
-      // selected chip wore a near-black frame on a white card. Selection is
-      // carried by the fill and the un-dimmed glyph instead, with a border one
-      // step stronger than the others so it still reads as a frame.
+      // The selected mark gains the one frame the chip already has, and stops
+      // being dimmed. It must not use the brand colour: in this theme that is
+      // #0f1115, so a selected chip wore a near-black frame. It also gains no
+      // background, since any fill here reintroduces the white tile.
       '.dsh-model-balance-tab[data-active="true"]{opacity:1;',
-      'background:var(--dsw-alias-bg-layer-2);',
       'border-color:var(--dsw-alias-border-l2)}',
       '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:-1px}',
@@ -285,9 +281,11 @@ window.__ModuleLoader__.load({
       'padding:4px 6px;border:0;border-radius:6px;background:transparent;',
       'color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}',
       '.dsh-model-balance-menu-item:hover{background:var(--dsw-alias-bg-layer-2)}',
+      // Same rule as the strip chips: no surface of its own, so the mark sits
+      // on the menu instead of on a white tile.
       '.dsh-model-balance-menu-mark{display:inline-flex;align-items:center;',
       'justify-content:center;width:20px;height:20px;flex:none;border-radius:5px;',
-      'line-height:1;background:var(--dsw-alias-bg-layer-2);',
+      'line-height:1;background:transparent;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary))}',
       '.dsh-model-balance-menu-mark svg{display:block}',
       '.dsh-model-balance-window{margin-top:10px;padding-top:10px;',
@@ -592,9 +590,14 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Zhipu's glyph: four gradient blocks around a light cross, lifted from the
-     * official wordmark. Gradients are flattened to their mid tones so the mark
-     * can be drawn twice in one document without duplicating gradient ids.
+     * Zhipu's glyph: the four blocks of the official wordmark, with their
+     * gradients flattened to mid tones so the mark can be drawn twice in one
+     * document without duplicating gradient ids.
+     *
+     * The wordmark also draws the star between the blocks as a shape filled
+     * #f7f8fa. That is negative space, not part of the mark, and painting it
+     * put a near-white star on the panel, which read as the icon having a white
+     * background. Leaving it out lets the panel show through instead.
      */
     const ZHIPU_PATHS = [
       {
@@ -612,10 +615,6 @@ window.__ModuleLoader__.load({
       {
         d: 'M21.0517 11.7895V17.8731C21.0517 17.8912 21.0422 17.9079 21.0268 17.9168L10.5497 23.9934C10.5422 23.9978 10.5338 24 10.5254 24V21.4542C10.5254 16.5146 14.5109 11.7952 19.4278 11.7952C19.3287 11.7952 19.2299 11.7933 19.1316 11.7895H21.0517Z',
         fill: '#5a84ee',
-      },
-      {
-        d: 'M10.5273 2.45801C10.5273 7.22725 14.5129 11.7842 19.4297 11.7842L19.1338 11.7891C19.232 11.7929 19.3307 11.7949 19.4297 11.7949C14.5129 11.7949 10.5274 16.5146 10.5273 21.4541C10.5273 16.5581 6.61178 11.8801 1.75488 11.7979L1.75391 11.792L1.9209 11.7891C1.86537 11.787 1.80969 11.7869 1.75391 11.7861V11.7803C6.61128 11.7015 10.5273 7.18549 10.5273 2.45801Z',
-        fill: '#f7f8fa',
       },
     ]
 

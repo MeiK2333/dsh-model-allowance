@@ -117,6 +117,12 @@ function body(provider) {
   return { w, h, inner, viewBox: `${geo.x} ${geo.y} ${geo.vbW} ${geo.vbH}` }
 }
 
+// The chip draws no surface of its own any more, so the sheet uses the panel
+// colour and only the selected chip gets a frame — the same thing the CSS does.
+const PANEL = '#e9ecf2'
+const FRAME = '#c9ccd4'
+const SELECTED = 'zhipu'
+
 const cells = ['deepseek', 'minimax', 'zhipu']
   .map((provider, index) => {
     const x = gap + index * (chipPx + gap)
@@ -126,9 +132,13 @@ const cells = ['deepseek', 'minimax', 'zhipu']
     const insetY = (chipPx - mark.h) / 2
     const midX = x + chipPx / 2
     const midY = y + chipPx / 2
+    const frame =
+      provider === SELECTED
+        ? `<rect x="${x}" y="${y}" width="${chipPx}" height="${chipPx}" rx="${7 * SCALE}"
+             fill="none" stroke="${FRAME}" stroke-width="${SCALE}"/>`
+        : ''
     return `
-      <rect x="${x}" y="${y}" width="${chipPx}" height="${chipPx}" rx="${7 * SCALE}"
-        fill="#f2f2f5" stroke="#d0d0d8" stroke-width="2"/>
+      ${frame}
       ${crosshair ? `<line x1="${midX}" y1="${y}" x2="${midX}" y2="${y + chipPx}" stroke="#ff00aa" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.85"/>` : ""}
       ${crosshair ? `<line x1="${x}" y1="${midY}" x2="${x + chipPx}" y2="${midY}" stroke="#ff00aa" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.85"/>` : ""}
       <g transform="translate(${x + insetX}, ${y + insetY})">
@@ -141,7 +151,7 @@ const cells = ['deepseek', 'minimax', 'zhipu']
   .join('')
 
 const sheet = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-  <rect width="${width}" height="${height}" fill="#ffffff"/>
+  <rect width="${width}" height="${height}" fill="${PANEL}"/>
   ${cells}
 </svg>`
 

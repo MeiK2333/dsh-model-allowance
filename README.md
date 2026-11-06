@@ -46,7 +46,7 @@
 |---|---|---|
 | DeepSeek | `fe-static.deepseek.com/chat/favicon.svg` — **SVG 50×50**，单 path，纯色 `#4D6BFE`<br>`fe-static.deepseek.com/platform/favicon.svg` — 同图形但**纯黑**<br>`fe-static.deepseek.com/chat/icon-180.png` — PNG 180×180 | **有现成的正方形图标 SVG**，可直接内联 |
 | MiniMax | `mintcdn.com/minimax-zh/…/logo/light.svg` — **SVG 129×32 文字标**，声波是第 1 条 path 加一条渐变<br>`agent.minimax.cn/assets/logo/{favicon_v2,apple-touch_v2}.png` — 96×96 / 1024×1024 | **没有独立的声波图标**；正方形 PNG 是**水母吉祥物**，不是品牌标记。只能从文字标里取图形 |
-| 智谱 | `cdn.bigmodel.cn/static/logo/light.svg` — **SVG 123×25 文字标**，六边形是前 5 条 path<br>`bigmodel.cn/static/images/favicon.png` — 90×90<br>`docs.bigmodel.cn/…/favicon/android-chrome-192x192.png` — 192×192 | 正方形 PNG 是**黑底白 Z 的方块**（应用磁贴），不是六边形；192 那张是六边形但**栅格且发虚**。矢量源只有文字标 |
+| 智谱 | `cdn.bigmodel.cn/static/logo/light.svg` — **SVG 123×25 文字标**，六边形是前 4 条 path（第 5 条是负空间的星，不画）<br>`bigmodel.cn/static/images/favicon.png` — 90×90<br>`docs.bigmodel.cn/…/favicon/android-chrome-192x192.png` — 192×192 | 正方形 PNG 是**黑底白 Z 的方块**（应用磁贴），不是六边形；192 那张是六边形但**栅格且发虚**。矢量源只有文字标 |
 
 也就是说：**三家都有矢量资产，但只有 DeepSeek 提供的是独立正方形图标**，
 另外两家需要从文字标里裁出图形（智谱和 MiniMax 都已这么做）。
@@ -91,14 +91,22 @@ zhipu     12.3 × 14.0
 ### 选中态不用品牌色
 
 `--dsw-alias-brand-primary` 在这个主题下是 **`#0f1115`（近黑）**。拿它画选中芯片的边框，
-效果是白卡片上一个黑框，非常扎眼。选中改用 `border-l2`（比未选中的 `border-l1` 强一档的
-中性灰），选中感由**填充底 + 图标不降透明度**承担——未选中是 `opacity:.66`，选中是 1，
-这个差别比边框颜色更明显也更柔和。
+效果是白卡片上一个黑框，非常扎眼。选中改用 `border-l2`（比未选中的强一档的中性灰），
+选中感由**边框 + 图标不降透明度**承担——未选中是 `opacity:.66`，选中是 1。
 
 只有 `:focus-visible` 的焦点环仍用品牌色，键盘焦点需要高对比。
 
-两条 DeepSeek 路由（账号 / API Key）图标相同，靠**芯片样式**区分：实心底 = 已登录账号，
-描边 = 你持有的 Key。完整名称在 `title` 与 `aria-label` 里，悬停可见。
+### 图标没有白底
+
+芯片**不画自己的底色**。之前用的 `bg-layer-2` 在这个主题下是纯白 `#ffffff`，
+在 `#e9ecf2` 的面板上就是一块白瓷砖，看起来像图标自带白底。
+
+还有一个更隐蔽的白：智谱文字标里那颗星是**填充 `#f7f8fa` 的图形**，但语义上它是四块
+图形围出的**负空间**。照抄填充后，面板上就出现一颗近白的星，同样像白底。现在这条 path
+直接不画，让面板透出来。
+
+两条 DeepSeek 路由（账号 / API Key）图标相同，靠**有无边框**区分：有边框 = 你持有的 Key，
+无边框 = 已登录账号。完整名称在 `title` 与 `aria-label` 里，悬停可见。
 
 图标放不下时**不换行、不裁切**：实时测量这一行的宽度，放不下的移到右侧 `⋯`
 按钮后的下拉菜单里；当前正在查看的厂商**永远保留在行内**，不会被挤进菜单。
