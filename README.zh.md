@@ -47,13 +47,58 @@ OpenCode（`status.opencode.ai`）；智谱没有机器可读的状态页，其�
 
 ## 安装
 
-在 DSH 的插件管理中安装，目标填仓库地址：
+### 前置条件
+
+- DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`。
+- 需要在 DSH 中配置好要查看的厂商凭证：
+  DeepSeek 登录或 `DEEPSEEK_API_KEY`、`MINIMAX_CN_API_KEY`、
+  `ZAI_API_KEY` / `ZAI_CODING_CN_API_KEY`、`KIMI_API_KEY`、
+  `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY`。
+
+### 从 npm 安装（推荐）
+
+1. 打开 DSH 侧边栏的 **Plugins（插件）** 页面。
+2. 点击 **Install（安装）**，填入：
+
+   ```
+   dsh-model-allowance@1.0.0
+   ```
+
+   如果已有更新版本，请把 `1.0.0` 换成最新的精确版本。
+3. 确认安装。如果 DSH 提示需要重启，重启 DSH；否则刷新页面即可。
+
+通过 npm 安装的版本可以在 Plugin Manager 中使用 **Update** 更新。
+
+### 从 GitHub 安装
+
+npm 不可用时，可以安装打了 tag 的 GitHub Release：
 
 ```
-git+https://github.com/MeiK2333/dsh-model-allowance.git
+git+https://github.com/MeiK2333/dsh-model-allowance.git#v1.0.0
 ```
 
-安装后刷新页面。
+Git 安装不受 Plugin Manager 的 **Update** 管理；更新时需要先移除旧版本，
+再安装新的 tag。
+
+### 更新
+
+- **npm 安装**：在 Plugins 页面点击 **Update**，或安装新的精确版本。
+- **GitHub 安装**：移除旧 bundle，再安装新的 tag。
+
+### 卸载
+
+打开 **Plugins（插件）** 页面，选中该 bundle，点击 **Remove**。如果提示
+需要重启，重启 DSH。
+
+### 本地开发
+
+直接链接本地目录：
+
+```
+link:F:\DSH\model-balance-plugin
+```
+
+修改 Host 代码后重启 DSH；修改 Client 代码后执行 `npm run build` 并刷新页面。
 
 ## 开发
 

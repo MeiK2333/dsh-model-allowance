@@ -61,13 +61,62 @@ row.
 
 ## Installation
 
-Install from this repository via DSH's plugin manager, with the target:
+### Requirements
+
+- DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`.
+- Credentials for the providers you want to see, configured in DSH:
+  DeepSeek login or `DEEPSEEK_API_KEY`, `MINIMAX_CN_API_KEY`,
+  `ZAI_API_KEY` / `ZAI_CODING_CN_API_KEY`, `KIMI_API_KEY`, and
+  `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY`.
+
+### Install from npm (recommended)
+
+1. Open the **Plugins** page in the DSH sidebar.
+2. Choose **Install** and enter:
+
+   ```
+   dsh-model-allowance@1.0.0
+   ```
+
+   Use the latest published version instead of `1.0.0` when a newer one
+   exists.
+3. Confirm the installation. If DSH reports **restart required**, restart
+   DSH; otherwise refresh the page.
+
+The npm installation is eligible for the Plugin Manager's **Update** action.
+
+### Install from GitHub
+
+A tagged GitHub release is an alternative when npm is unavailable:
 
 ```
-git+https://github.com/MeiK2333/dsh-model-allowance.git
+git+https://github.com/MeiK2333/dsh-model-allowance.git#v1.0.0
 ```
 
-Refresh the page after installing.
+Git installations are not covered by the Plugin Manager's **Update** action.
+Install the new tag after removing the old version.
+
+### Update
+
+- **npm install**: use **Update** on the Plugins page, or install the new
+  exact version.
+- **GitHub install**: remove the bundle, then install the new tag.
+
+### Uninstall
+
+Open the **Plugins** page, select this bundle, and choose **Remove**. Restart
+DSH if the page asks for it.
+
+### Local development
+
+Install the checkout directly:
+
+```
+link:F:\DSH\model-balance-plugin
+```
+
+After changing Host code, restart DSH; after changing client code, run
+`npm run build` and refresh the page.
 
 ## Development
 
