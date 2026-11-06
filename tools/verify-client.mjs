@@ -389,11 +389,18 @@ const streamCtx = {
   },
   locale: ctx.locale,
   remote: {
+    // A plain `$stream` arrow hid a real bug: the shipping method reads its own
+    // connection, so calling it detached threw `undefined.connection`. The stub
+    // is a method reading `this.connection` for the same reason the real one is.
+    connection: { interactions: 'answer' },
     $mount: async (contribution) => {
       streamMount = { package: contribution.package, descriptors: contribution.descriptors }
       return () => {}
     },
-    $stream: ({ open }) => {
+    $stream(options) {
+      if (this?.connection === undefined) {
+        throw new TypeError("Cannot read properties of undefined (reading 'connection')")
+      }
       const controller = new AbortController()
       const frames = [
         {
@@ -406,9 +413,13 @@ const streamCtx = {
         },
       ]
       return {
+        // Items are wrappers carrying the reading under `value`, exactly as
+        // RemoteStream yields them.
         async *[Symbol.asyncIterator]() {
-          void open(controller.signal)
-          yield* frames
+          void options.open(controller.signal)
+          for (const frame of frames) {
+            yield { generation: 1, value: frame, signal: controller.signal, accept: () => {} }
+          }
         },
         dispose: () => controller.abort(),
       }

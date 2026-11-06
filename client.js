@@ -1017,10 +1017,15 @@ window.__ModuleLoader__.load({
           // sweep runs, so the badge stays current without polling from the
           // browser. A host without the stream API, or a stream that fails
           // before its first frame, falls back to one unary read.
-          const streamFactory = ctx.remote.$stream
-          if (typeof streamFactory === 'function' && typeof api.watch === 'function') {
+          //
+          // `$stream` is a method: it reads its own connection to supervise
+          // carrier generations, so detaching it into a local throws. The items
+          // it yields are wrappers carrying the reading under `value`, and
+          // `accept()` confirms a generation's opening value.
+          const remote = ctx.remote
+          if (typeof remote?.$stream === 'function' && typeof api.watch === 'function') {
             try {
-              handle = streamFactory({
+              handle = remote.$stream({
                 name: 'balance',
                 open: (signal) => api.watch(activeProvider, signal),
                 ended: () => new Error('balance stream ended'),
@@ -1032,11 +1037,14 @@ window.__ModuleLoader__.load({
             if (handle) {
               let received = false
               try {
-                for await (const frame of handle) {
+                for await (const item of handle) {
                   if (cancelled) return
+                  const frame = item?.value
+                  if (frame === undefined) continue
                   received = true
                   setView(frame)
                   setLoading(false)
+                  item?.accept?.()
                 }
               } catch (error) {
                 if (!cancelled) {
