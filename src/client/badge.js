@@ -30,7 +30,7 @@ export function BalanceBadge(props) {
   const selected = selection?.next?.provider ?? selection?.lastUsed?.provider ?? null
   const selectedModel = selection?.next?.model ?? selection?.lastUsed?.model ?? undefined
 
-  const [view, setView] = React.useState(null)
+  const [rawView, setView] = React.useState(null)
   const [loading, setLoading] = React.useState(false)
   const [open, setOpen] = React.useState(false)
   const [refreshing, setRefreshing] = React.useState(false)
@@ -152,6 +152,19 @@ export function BalanceBadge(props) {
   // Host falls back to the provider's own choice.
   const activeProvider = picked ?? provider
   const activeModel = picked === null || picked === provider ? selectedModel : undefined
+  // A reading belongs to the provider that produced it. Deriving the visible
+  // view instead of clearing state keeps a stale reading from flashing on the
+  // badge when the card points at another provider.
+  const view = rawView?.provider === activeProvider ? rawView : null
+
+  // The switcher only steers the card while it is open. Closing the card
+  // returns the badge to the session's own model, which is the number the
+  // composer should always describe when nothing is open.
+  React.useEffect(() => {
+    if (open) return
+    setPicked(null)
+    setMenuOpen(false)
+  }, [open])
 
   // Track the strip's width so the row can decide how many marks fit. A
   // host without ResizeObserver simply shows them all.
@@ -559,7 +572,7 @@ export function BalanceBadge(props) {
       {
         type: 'button',
         className: 'dsh-model-allowance-badge',
-        'data-provider': provider,
+        'data-provider': activeProvider,
         'aria-expanded': open ? 'true' : 'false',
         'aria-controls': open ? 'dsh-model-allowance-panel' : undefined,
         onClick: () => setOpen((value) => !value),
