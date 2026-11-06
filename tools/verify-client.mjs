@@ -394,9 +394,10 @@ console.log(
 )
 if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not render')
 
-// --- Third scenario: a coding plan with two metering windows ----------------
-// Both windows must show their own usage and their own reset countdown, which
-// a single remaining percentage cannot express.
+// --- Third scenario: a coding plan with metering windows --------------------
+// Each window must show its own usage and its own reset countdown, which a
+// single remaining percentage cannot express. The windows deliberately cover
+// all three reset shapes: none, more than a day away, and inside a day.
 {
   const now = Date.now()
   const planView = {
@@ -407,6 +408,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     updatedAt: now,
     consoleUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
     windows: [
+      // Not started: the Host reports no reset for it.
       {
         id: 'session',
         unit: 'hour',
@@ -415,6 +417,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
         total: 2000,
         remainingPercent: 100,
       },
+      // Days away, so the countdown carries a `dd.` prefix.
       {
         id: 'weekly',
         unit: 'week',
@@ -423,6 +426,16 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
         total: 10000,
         remainingPercent: 0,
         resetAt: now + (4 * 24 * 3600 + 3 * 3600) * 1000,
+      },
+      // Inside a day, so the countdown must drop that prefix.
+      {
+        id: 'limit-2',
+        unit: 'unknown',
+        count: undefined,
+        used: 500,
+        total: 1000,
+        remainingPercent: 50,
+        resetAt: now + (3 * 3600 + 30 * 60) * 1000,
       },
     ],
   }
@@ -553,13 +566,39 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   if (!body.includes('class="dsh-model-balance-bar-fill" style="width:100%" data-tone="error"')) {
     throw new Error('the exhausted window should render a full error bar')
   }
-  // One line: a `dd.HH:MM:SS` countdown, then the absolute reset in brackets.
-  const resetLine = /(\d{2})\.(\d{2}):(\d{2}):(\d{2}) 后\((\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\)重置/
-  const match = resetLine.exec(body)
-  if (!match) throw new Error('the reset line does not match dd.HH:MM:SS 后(YYYY-mm-dd HH:MM:SS)重置')
-  // The window resets four days out, so the day field must say so.
-  if (match[1] !== '04' && match[1] !== '03') {
-    throw new Error(`countdown day field should be 4 (or 3 mid-second), got ${match[1]}`)
+  // --- the reset line: countdown left, target instant right ---------------
+  // Split per window so each countdown shape is checked on its own block.
+  {
+    const blocks = body.split('dsh-model-balance-window"').slice(1)
+    const blockOf = (title) => blocks.find((block) => block.includes(title))
+    /** The footer's text with its markup removed, or undefined when absent. */
+    const footerText = (block) => {
+      const marker = 'dsh-model-balance-foot">'
+      const start = block.indexOf(marker)
+      if (start < 0) return undefined
+      const from = start + marker.length
+      return block
+        .slice(from, block.indexOf('</div>', from))
+        .replace(/<[^>]*>/g, '')
+        .trim()
+    }
+
+    const weeklyBlock = blockOf('每周额度')
+    if (!weeklyBlock) throw new Error('the weekly window block was not rendered')
+    const weeklyFoot = footerText(weeklyBlock)
+    // More than a day out keeps the `dd.` prefix, and the countdown precedes
+    // the target instant, which carries no label of its own.
+    if (!/^\d{2}\.\d{2}:\d{2}:\d{2} 后重置\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(weeklyFoot ?? '')) {
+      throw new Error(`unexpected multi-day reset line: ${JSON.stringify(weeklyFoot)}`)
+    }
+
+    // Inside a day drops the prefix entirely.
+    const nearBlock = blockOf('当前额度')
+    if (!nearBlock) throw new Error('the near-reset window block was not rendered')
+    const nearFoot = footerText(nearBlock)
+    if (!/^\d{2}:\d{2}:\d{2} 后重置\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(nearFoot ?? '')) {
+      throw new Error(`a window inside a day should drop the dd. prefix: ${JSON.stringify(nearFoot)}`)
+    }
   }
 
   // --- a window with no reset shows no reset line at all -------------------

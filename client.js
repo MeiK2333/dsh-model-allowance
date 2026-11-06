@@ -150,7 +150,7 @@ window.__ModuleLoader__.load({
       'window.title.unknown': '当前额度',
       'window.usedOfTotal': '{used} / {total}',
       'window.usedPercent': '{percent}% 已使用',
-      'window.reset': '{duration} 后({time})重置',
+      'window.resetIn': '{duration} 后重置',
       'duration.daysHours': '{days} 天 {hours} 小时',
       'duration.hoursMinutes': '{hours} 小时 {minutes} 分',
       'duration.minutes': '{minutes} 分钟',
@@ -189,7 +189,7 @@ window.__ModuleLoader__.load({
       'window.title.unknown': 'Current quota',
       'window.usedOfTotal': '{used} / {total}',
       'window.usedPercent': '{percent}% used',
-      'window.reset': 'resets in {duration} ({time})',
+      'window.resetIn': 'resets in {duration}',
       'duration.daysHours': '{days}d {hours}h',
       'duration.hoursMinutes': '{hours}h {minutes}m',
       'duration.minutes': '{minutes}m',
@@ -258,7 +258,9 @@ window.__ModuleLoader__.load({
       'background:var(--dsw-alias-state-warn-primary)}',
       '.dsh-model-balance-bar-fill[data-tone="error"]{',
       'background:var(--dsw-alias-state-error-primary)}',
-      '.dsh-model-balance-foot{margin-top:5px;color:var(--dsw-alias-label-secondary);',
+      '.dsh-model-balance-foot{display:flex;justify-content:space-between;',
+      'align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:5px;',
+      'color:var(--dsw-alias-label-secondary);',
       'font-size:11px;font-variant-numeric:tabular-nums;word-break:break-word}',
       '.dsh-model-balance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-balance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
@@ -474,24 +476,26 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Format a countdown as `dd.HH:MM:SS`.
+     * Format a countdown as `dd.HH:MM:SS`, or `HH:MM:SS` within a day.
      *
-     * Days are always present and zero-padded, so the field never changes
-     * width as a window crosses a day boundary and the digits stay aligned
-     * while the clock ticks.
+     * The day prefix only appears when there is a whole day to count, so a
+     * window inside 24 hours is not padded with a `00.` that reads as noise.
+     * Beyond a day the field is zero-padded and always present, so the string
+     * does not change width as the clock ticks.
      *
      * @param {number} ms Remaining milliseconds.
      * @returns {string} The countdown.
      */
     function formatCountdown(ms) {
-      if (!Number.isFinite(ms) || ms <= 0) return '00.00:00:00'
-      const totalSeconds = Math.floor(ms / 1000)
+      const remaining = Number.isFinite(ms) && ms > 0 ? ms : 0
+      const totalSeconds = Math.floor(remaining / 1000)
       const days = Math.floor(totalSeconds / 86_400)
       const hours = Math.floor((totalSeconds % 86_400) / 3600)
       const minutes = Math.floor((totalSeconds % 3600) / 60)
       const seconds = totalSeconds % 60
       const pad = (value) => String(value).padStart(2, '0')
-      return `${pad(days)}.${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+      const clock = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+      return days > 0 ? `${pad(days)}.${clock}` : clock
     }
 
     /**
@@ -845,6 +849,8 @@ window.__ModuleLoader__.load({
                           ),
                       // A window the account has not started spending yet has no
                       // reset to report, and saying so would be a line of noise.
+                      // Otherwise the countdown holds the left edge and the
+                      // target instant the right, so the eye can compare them.
                       typeof window.resetAt === 'number'
                         ? h(
                             'div',
@@ -852,11 +858,11 @@ window.__ModuleLoader__.load({
                             h(
                               'span',
                               null,
-                              t('window.reset', {
+                              t('window.resetIn', {
                                 duration: formatCountdown(window.resetAt - now),
-                                time: formatResetAt(window.resetAt),
                               }),
                             ),
+                            h('span', null, formatResetAt(window.resetAt)),
                           )
                         : null,
                     )
