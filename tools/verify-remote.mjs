@@ -43,6 +43,9 @@ function createService() {
     track() {
       return () => {}
     },
+    defaultProvider() {
+      return 'deepseek-account'
+    },
     activeRoutes: new Set(['deepseek-account']),
     async refreshAll() {
       publish('deepseek-account', await this.read('deepseek-account'))
@@ -103,6 +106,12 @@ service.read = async (route) => ({
 const refreshed = await controller.refresh('deepseek-account')
 if (refreshed.amount !== 12.5) throw new Error('refresh did not return a fresh reading')
 
+// --- a session with no selection still has a provider ---------------------
+const fallback = await controller.defaultProvider()
+if (fallback?.provider !== 'deepseek-account') {
+  throw new Error(`the default provider was not reported, got ${JSON.stringify(fallback)}`)
+}
+
 // --- an aborted stream releases its subscription ---------------------------
 if ((service.subscribe('probe', () => {}) ?? false) !== undefined) {
   // subscribe still works after the stream above ended
@@ -114,16 +123,17 @@ console.log('service name:', controller.name)
 console.log('namespace:', controller.typertRemote.namespace)
 console.log('frames:', JSON.stringify(frames.map((frame) => frame.amount)))
 console.log('refresh amount:', refreshed.amount)
+console.log('default provider:', fallback.provider)
 
 // --- the real service exposes what `watch` uses ---------------------------
 // The controller reaches `ctx.modelAllowance.subscribe`, so the shipped service
 // must provide it; the stub above cannot prove that.
 const { default: ModelAllowanceService } = await import('../index.js')
-for (const method of ['read', 'track', 'subscribe', 'refreshAll']) {
+for (const method of ['read', 'track', 'subscribe', 'defaultProvider', 'refreshAll']) {
   if (typeof ModelAllowanceService.prototype[method] !== 'function') {
     throw new Error(`ModelAllowanceService is missing ${method}()`)
   }
 }
-console.log('ModelAllowanceService exposes:', 'read, track, subscribe, refreshAll')
+console.log('ModelAllowanceService exposes:', 'read, track, subscribe, defaultProvider, refreshAll')
 
 console.log('OK: the Remote controller opens, streams, and refreshes')

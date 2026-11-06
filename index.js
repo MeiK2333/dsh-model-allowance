@@ -102,6 +102,27 @@ class ModelAllowanceService extends Service {
   }
 
   /**
+   * The provider a session with no model selection would use.
+   *
+   * A session that has not taken a turn yet carries no `modelSelection`
+   * projection, so the browser cannot name a provider from the log. The
+   * installation's default model is the answer the model selector itself falls
+   * back to, so the badge follows the same one.
+   *
+   * @returns {string | undefined} Provider route, when the installation names one.
+   */
+  defaultProvider() {
+    try {
+      const selection = this.ctx.get('agentDefaultModel')?.currentSelection?.()
+      const provider = selection?.provider
+      return typeof provider === 'string' && provider.length > 0 ? provider : undefined
+    } catch {
+      // A deployment without a default-model service simply has none.
+      return undefined
+    }
+  }
+
+  /**
    * Refresh every tracked provider.
    * @returns {Promise<void>} Resolves when the refreshes settle.
    */

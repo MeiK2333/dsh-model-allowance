@@ -173,6 +173,7 @@ const ctx = {
             },
           }),
           refresh: async () => ({ ok: true, value: {} }),
+          defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
         }
       : undefined,
   slots: {
@@ -430,6 +431,7 @@ const streamCtx = {
       ? {
           balance: async () => ({ ok: false, error: { message: 'unary should not run' } }),
           refresh: async () => ({ ok: true, value: {} }),
+          defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
           watch: (_provider, _signal) => ({ async *[Symbol.asyncIterator]() {} }),
         }
       : undefined,
@@ -569,6 +571,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
             },
             refresh: async (route) => readFor(route),
             list: async () => ({ ok: true, value: providerDirectory }),
+            defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
           }
         : undefined,
     slots: {
@@ -849,6 +852,37 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     }
     console.log('switcher: picking from the menu read the provider')
   }
+}
+
+// --- A session with no turns yet shows the installation's default ----------
+{
+  // The plan scenario above mounted its own namespace; mount the plain one
+  // again so this block reads the same fixture the first section did.
+  plugin.apply(ctx)
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  hookState = []
+  hookCursor = 0
+  const renderBlank = () => {
+    hookCursor = 0
+    return render(registrationEntry.Component({ useProjection: () => undefined }))
+  }
+  // Nothing to name a provider with yet, so the badge stays out of the way.
+  const before = renderBlank()
+  if (before !== '') {
+    throw new Error(`a blank session painted before the default arrived: ${before}`)
+  }
+  // The default arrives asynchronously, and the reading it triggers does too.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    renderBlank()
+  }
+  const html = renderBlank()
+  if (!html.includes('¥46.71')) {
+    throw new Error(
+      `a blank session did not pick up the default provider, rendered ${JSON.stringify(html)}`,
+    )
+  }
+  console.log('blank session: the installation default filled the badge')
 }
 
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')

@@ -94,6 +94,17 @@ window.__ModuleLoader__.load({
               'dsh-model-allowance#balanceView',
             ),
           },
+          'balance/defaultProvider': {
+            service: 'balanceController',
+            description: 'The provider a session with no model selection would use.',
+            invocation: { kind: 'direct' },
+            parameters: [],
+            result: strict(
+              z.object({ provider: z.string().optional() }),
+              'The default provider.',
+              'dsh-model-allowance#defaultProvider',
+            ),
+          },
           'balance/refresh': {
             service: 'balanceController',
             description: 'Force a fresh reading for one provider, bypassing the cache.',
@@ -874,7 +885,7 @@ window.__ModuleLoader__.load({
 
       // The session's durable model selection names the provider in use.
       const selection = useProjection('modelSelection')
-      const provider = selection?.next?.provider ?? selection?.lastUsed?.provider ?? null
+      const selected = selection?.next?.provider ?? selection?.lastUsed?.provider ?? null
 
       const [view, setView] = React.useState(null)
       const [loading, setLoading] = React.useState(false)
@@ -899,6 +910,33 @@ window.__ModuleLoader__.load({
       const [menuOpen, setMenuOpen] = React.useState(false)
       const [stripWidth, setStripWidth] = React.useState(0)
       const stripRef = React.useRef(null)
+
+      // A session that has not taken a turn yet has no `modelSelection` to
+      // read, and rendering nothing there would leave the composer without a
+      // badge until the first message. Ask what a new session would use — the
+      // installation's default, which the model selector also falls back to.
+      const [defaultProvider, setDefaultProvider] = React.useState(null)
+      React.useEffect(() => {
+        if (selected !== null) return undefined
+        let cancelled = false
+        ;(async () => {
+          try {
+            const api = await getBalanceApi()
+            if (!api || typeof api.defaultProvider !== 'function') return
+            const result = await api.defaultProvider()
+            if (cancelled || result?.ok !== true) return
+            const provider = result.value?.provider
+            if (typeof provider === 'string' && provider !== '') setDefaultProvider(provider)
+          } catch (error) {
+            console.error('[model-allowance] reading the default provider failed', { error })
+          }
+        })()
+        return () => {
+          cancelled = true
+        }
+      }, [selected, ctx])
+
+      const provider = selected ?? defaultProvider
 
       // Dropping the override belongs to the model *changing*, not to every
       // render, so the previous value is compared rather than reset blindly.
