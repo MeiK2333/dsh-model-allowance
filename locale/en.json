@@ -24,7 +24,6 @@
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
     "console": "Open provider console",
-    "close": "Close",
     "error": "Could not read the provider balance."
   }
 }

@@ -41,7 +41,27 @@ const React = {
     hookCursor++
     return fn()
   },
+  useRef(initial) {
+    const index = hookCursor++
+    if (!(index in hookState)) hookState[index] = { current: initial }
+    return hookState[index]
+  },
 }
+
+// The panel closes on an outside click or Escape, so the component touches the
+// document. Record the listeners so a test can also fire them.
+const documentListeners = new Map()
+globalThis.document = {
+  addEventListener(type, listener) {
+    const set = documentListeners.get(type) ?? new Set()
+    set.add(listener)
+    documentListeners.set(type, set)
+  },
+  removeEventListener(type, listener) {
+    documentListeners.get(type)?.delete(listener)
+  },
+}
+globalThis.Node = class Node {}
 
 // --- Fake zod: only the codec shape is exercised ----------------------------
 const zodChain = () => {
@@ -214,6 +234,52 @@ const settled = render(
 )
 console.log('rendered (settled):', settled)
 if (!settled.includes('¥46.71')) throw new Error('badge did not render the DeepSeek amount')
+
+// --- The detail panel opens with no close button ---------------------------
+{
+  const renderBadge = () =>
+    render(
+      registrationEntry.Component({
+        useProjection: (key) => (key === 'modelSelection' ? projectionValue : undefined),
+      }),
+    )
+
+  const rootNode = new Node()
+  const insideNode = new Node()
+  const outsideNode = new Node()
+  // `open` is the third state slot; `rootRef` is the fourth hook.
+  hookState[2] = true
+  hookState[4] = { current: { contains: (target) => target === insideNode || target === rootNode } }
+  hookCursor = 0
+  const opened = renderBadge()
+
+  if (!opened.includes('deepseek-account')) throw new Error('panel did not render the provider')
+  if (opened.includes('关闭')) throw new Error('panel still renders a close button')
+  if (!opened.includes('刷新')) throw new Error('panel lost its refresh action')
+  console.log('panel opened:', opened.slice(opened.indexOf('<div class="dsh-model-balance-panel"')))
+
+  // A click inside keeps it open.
+  for (const listener of documentListeners.get('pointerdown') ?? []) {
+    listener({ target: insideNode })
+  }
+  if (hookState[2] !== true) throw new Error('a click inside the panel closed it')
+
+  // A click outside dismisses it.
+  for (const listener of documentListeners.get('pointerdown') ?? []) {
+    listener({ target: outsideNode })
+  }
+  if (hookState[2] !== false) throw new Error('a click outside did not close the panel')
+
+  // Escape dismisses it too.
+  hookState[2] = true
+  hookCursor = 0
+  renderBadge()
+  for (const listener of documentListeners.get('keydown') ?? []) {
+    listener({ key: 'Escape' })
+  }
+  if (hookState[2] !== false) throw new Error('Escape did not close the panel')
+  console.log('outside click and Escape both close the panel; no close button rendered')
+}
 
 // --- Second scenario: the stream path --------------------------------------
 // A host that exposes `$stream` is the preferred path, so prove it renders the

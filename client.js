@@ -122,7 +122,6 @@ window.__ModuleLoader__.load({
       'detail.refresh': '刷新',
       'detail.refreshing': '刷新中…',
       'detail.console': '打开厂商控制台',
-      'detail.close': '关闭',
       'detail.error': '无法读取厂商余额。',
     }
 
@@ -146,7 +145,6 @@ window.__ModuleLoader__.load({
       'detail.refresh': 'Refresh',
       'detail.refreshing': 'Refreshing…',
       'detail.console': 'Open provider console',
-      'detail.close': 'Close',
       'detail.error': 'Could not read the provider balance.',
     }
 
@@ -281,6 +279,29 @@ window.__ModuleLoader__.load({
       const [loading, setLoading] = React.useState(false)
       const [open, setOpen] = React.useState(false)
       const [refreshing, setRefreshing] = React.useState(false)
+      const rootRef = React.useRef(null)
+
+      // The panel has no close button: a click anywhere outside it dismisses it,
+      // and Escape does the same for keyboard users. The listener is on the
+      // document during capture so a click on a control that stops propagation
+      // still closes the panel.
+      React.useEffect(() => {
+        if (!open) return
+        const onPointerDown = (event) => {
+          const root = rootRef.current
+          if (root && event.target instanceof Node && root.contains(event.target)) return
+          setOpen(false)
+        }
+        const onKeyDown = (event) => {
+          if (event.key === 'Escape') setOpen(false)
+        }
+        document.addEventListener('pointerdown', onPointerDown, true)
+        document.addEventListener('keydown', onKeyDown)
+        return () => {
+          document.removeEventListener('pointerdown', onPointerDown, true)
+          document.removeEventListener('keydown', onKeyDown)
+        }
+      }, [open])
 
       React.useEffect(() => {
         if (!provider) {
@@ -410,7 +431,12 @@ window.__ModuleLoader__.load({
 
       return h(
         'div',
-        { className: 'dsh-model-balance-root', 'data-tone': tone, 'data-loading': loading ? 'true' : 'false' },
+        {
+          ref: rootRef,
+          className: 'dsh-model-balance-root',
+          'data-tone': tone,
+          'data-loading': loading ? 'true' : 'false',
+        },
         // Component-local styles: React removes them with the component, and
         // every colour comes from a theme token so light and dark both follow.
         h('style', { key: 'styles' }, STYLES),
@@ -523,15 +549,6 @@ window.__ModuleLoader__.load({
                       t('detail.console'),
                     )
                   : null,
-                h(
-                  'button',
-                  {
-                    type: 'button',
-                    className: 'dsh-model-balance-action',
-                    onClick: () => setOpen(false),
-                  },
-                  t('detail.close'),
-                ),
               ),
             )
           : null,
