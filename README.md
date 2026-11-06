@@ -31,7 +31,8 @@ plan allowance.
   says otherwise, and grey when no status source exists for the route
 - Vendors that price by the wall clock get a schedule block: DeepSeek's peak
   windows (weekdays 09:00–12:00 and 14:00–18:00 Beijing time, holidays
-  excluded), the phase the clock is in now, and a live countdown to the flip
+  excluded) and Zhipu's (weekdays 14:00–18:00), the phase the clock is in
+  now, and a live countdown to the flip
 - Credentials never leave the host process — the web UI only ever sees readings
 
 ## Supported providers

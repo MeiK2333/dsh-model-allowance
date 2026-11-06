@@ -194,5 +194,27 @@ for (const adapter of PROVIDER_ADAPTERS) {
 // An unknown route is not an adapter, but the client may still ask.
 if (findAdapter('__none__') !== undefined) throw new Error('an unknown route should not resolve')
 
+// --- vendors that price by the wall clock declare their windows -----------
+// The schedule is data the card renders, so a wrong window is a wrong card;
+// these are the vendors whose docs state one.
+{
+  const ranges = (schedule) => schedule.windows.map((window) => `${window.from}-${window.to}`)
+  const deepseek = findAdapter('deepseek')?.schedule
+  if (deepseek === undefined) throw new Error('deepseek should declare its peak schedule')
+  if (ranges(deepseek).join(',') !== '09:00-12:00,14:00-18:00') {
+    throw new Error(`deepseek windows changed: ${ranges(deepseek).join(',')}`)
+  }
+  if (deepseek.holidays.length === 0) throw new Error('deepseek declares no holidays')
+
+  const zhipu = findAdapter('zai')?.schedule
+  if (zhipu === undefined) throw new Error('zhipu should declare its peak schedule')
+  if (ranges(zhipu).join(',') !== '14:00-18:00') {
+    throw new Error(`zhipu windows changed: ${ranges(zhipu).join(',')}`)
+  }
+  // Zhipu's rule has no holiday exception.
+  if (zhipu.holidays.length !== 0) throw new Error('zhipu should not declare holidays')
+  console.log('schedule: deepseek and zhipu declare their peak windows')
+}
+
 console.log(JSON.stringify(cases, null, 2))
 console.log(`OK: ${String(PROVIDER_ADAPTERS.length)} adapters parse their recorded responses`)
