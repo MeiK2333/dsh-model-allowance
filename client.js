@@ -144,7 +144,7 @@ window.__ModuleLoader__.load({
       'detail.console': '控制台',
       'detail.error': '无法读取厂商余额。',
       'detail.moreProviders': '更多厂商',
-      'badge.consumption': '本轮消耗',
+      'badge.consumption': '相对上次读数的变化',
       'window.title.hour': '{count} 小时额度',
       'window.title.day': '{count} 天额度',
       'window.title.week': '每周额度',
@@ -185,7 +185,7 @@ window.__ModuleLoader__.load({
       'detail.console': 'Console',
       'detail.error': 'Could not read the provider balance.',
       'detail.moreProviders': 'More providers',
-      'badge.consumption': 'Change over the last turn',
+      'badge.consumption': 'Change since the last reading',
       'window.title.hour': '{count}-hour quota',
       'window.title.day': '{count}-day quota',
       'window.title.week': 'Weekly quota',
@@ -944,10 +944,10 @@ window.__ModuleLoader__.load({
         }
       }, [open])
 
-      // Refresh the clock while the panel is open, and while a difference from
-      // the last turn is being shown — the card must fall back to the plain
-      // value on its own, with no other render to trigger it. Once the
-      // difference expires this effect re-runs and the interval stops.
+      // Refresh the clock while the panel is open, and while a difference is
+      // being shown — the card must fall back to the plain value on its own,
+      // with no other render to trigger it. Once the difference expires this
+      // effect re-runs and the interval stops.
       const showingDifference = consumptionFreshAt(view?.consumption, now)
       React.useEffect(() => {
         if (!open && !showingDifference) return
@@ -1197,8 +1197,9 @@ window.__ModuleLoader__.load({
           },
           h('span', { className: 'dsh-model-allowance-dot', 'aria-hidden': true }),
           h('span', { className: 'dsh-model-allowance-label' }, label),
-          // What the last turn cost, for a few seconds after it lands. The arrow
-          // follows the number shown beside it: down means the balance fell.
+          // How far the number moved since the last reading, for a few seconds
+          // after it lands. The arrow follows the number shown beside it: down
+          // means the balance fell.
           showingDifference
             ? h(
                 'span',

@@ -92,51 +92,86 @@ for (const result of results) {
   }
 }
 
-// --- The difference from the turn's baseline --------------------------------
-// A finished turn is the only read that reports one, and it must be attached to
-// the published reading without being cached, so a later sweep cannot repeat it.
+// --- The difference a reading carries ---------------------------------------
+// Every read that asks the provider compares its answer with the reading
+// published last time, so a sweep and a manual refresh report movement too. A
+// turn-end read may instead measure from the start of the turn. Either way the
+// difference rides the published copy only: caching it would let a later sweep
+// republish a stale one.
 {
   const seen = []
   const route = 'deepseek'
   const stop = service.subscribe(route, (view) => seen.push(view))
-  globalThis.fetch = async (url) => ({
+  let amount = 46.71
+  const respond = async (url) => ({
     ok: true,
     status: 200,
-    json: async () => responses[url],
+    json: async () =>
+      url === 'https://api.deepseek.com/user/balance'
+        ? { balance_infos: [{ currency: 'CNY', total_balance: amount.toFixed(2) }] }
+        : responses[url],
   })
+  globalThis.fetch = respond
   try {
-    const before = service.peek(route)
-    if (before === undefined || typeof before.amount !== 'number') {
-      throw new Error('the cached reading was not available as a baseline')
+    // No published reading means no anchor, so the first read states nothing.
+    service.invalidateAll()
+    const first = await service.read(route, { force: true })
+    if (first.consumption !== undefined) {
+      throw new Error('the first reading has nothing to be measured against')
     }
-    // Pretend the provider started the turn with a little more money.
-    const baseline = { ...before, amount: before.amount + 0.9 }
 
-    const after = await service.read(route, { force: true, baseline })
-    if (after.consumption?.kind !== 'amount') {
-      throw new Error(`a turn-end read should report its difference, got ${JSON.stringify(after.consumption)}`)
+    // A sweep is a forced read with no baseline; it reports what it saw move.
+    amount = 45.81
+    const swept = await service.read(route, { force: true })
+    if (swept.consumption?.kind !== 'amount') {
+      throw new Error(`a sweep should report its movement, got ${JSON.stringify(swept.consumption)}`)
     }
-    if (Math.abs(after.consumption.delta + 0.9) > 1e-9) {
-      throw new Error(`the difference should be -0.9, got ${String(after.consumption.delta)}`)
+    if (Math.abs(swept.consumption.delta + 0.9) > 1e-9) {
+      throw new Error(`the movement should be -0.9, got ${String(swept.consumption.delta)}`)
     }
-    if (!Number.isFinite(after.consumption.at)) throw new Error('the difference has no instant')
+    if (!Number.isFinite(swept.consumption.at)) throw new Error('the movement has no instant')
 
     // The subscriber sees the annotated reading, so the badge can show it.
     const published = seen.at(-1)
     if (published?.consumption === undefined) {
-      throw new Error('the difference was not published to subscribers')
+      throw new Error('the movement was not published to subscribers')
     }
-    // The cache keeps the plain reading, so a later sweep reports no difference.
-    const cached = service.peek(route)
-    if (cached?.consumption !== undefined) {
-      throw new Error('the difference was cached and would be reported again by a sweep')
+    // The cache keeps the plain reading, so remembering it cannot replay a
+    // movement that this read has already reported.
+    if (service.peek(route)?.consumption !== undefined) {
+      throw new Error('the movement was cached and would be reported again')
     }
-    // A read with no baseline says nothing about a difference.
-    const plain = await service.read(route, { force: true })
-    if (plain.consumption !== undefined) {
-      throw new Error('a read without a baseline should carry no difference')
+
+    // An unchanged reading carries a zero movement, which the badge drops at
+    // display precision instead of announcing nothing.
+    const still = await service.read(route, { force: true })
+    if (still.consumption?.delta !== 0) {
+      throw new Error(`an unchanged reading should report zero, got ${JSON.stringify(still.consumption)}`)
     }
-    console.log('service: turn-end reads report a difference; sweeps do not')
+
+    // A turn-end read may measure from the start of the turn instead, which is
+    // a longer span than the reading published last time.
+    const baseline = { ...still, amount: still.amount + 2 }
+    const turn = await service.read(route, { force: true, baseline })
+    if (Math.abs(turn.consumption?.delta + 2) > 1e-9) {
+      throw new Error(`a turn-end read should measure from its baseline, got ${JSON.stringify(turn.consumption)}`)
+    }
+
+    // A failed read clears the anchor: the gap it spans says nothing about
+    // what the next reading is compared with.
+    globalThis.fetch = async () => {
+      throw new Error('offline')
+    }
+    const failed = await service.read(route, { force: true })
+    if (failed.status !== 'failed') throw new Error('the offline read should fail')
+
+    globalThis.fetch = respond
+    const recovered = await service.read(route, { force: true })
+    if (recovered.consumption !== undefined) {
+      throw new Error('a reading after a failure has no anchor to be measured against')
+    }
+
+    console.log('service: every read reports the movement it saw, from its own anchor')
   } finally {
     stop()
     globalThis.fetch = originalFetch

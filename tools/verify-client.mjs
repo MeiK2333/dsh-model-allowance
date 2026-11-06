@@ -269,13 +269,13 @@ const settled = render(
 console.log('rendered (settled):', settled)
 if (!settled.includes('¥46.71')) throw new Error('badge did not render the DeepSeek amount')
 
-// --- The turn's difference, and its ten-second life -----------------------
+// --- The difference on the badge, and its ten-second life -----------------
 {
   if (!settled.includes('class="dsh-model-allowance-delta"')) {
-    throw new Error('a finished turn should put its difference on the badge')
+    throw new Error('a reading that moved should put its difference on the badge')
   }
   if (!settled.includes('↓0.90')) {
-    throw new Error(`the badge should show what the turn cost, rendered ${JSON.stringify(settled)}`)
+    throw new Error(`the badge should show how far it moved, rendered ${JSON.stringify(settled)}`)
   }
 
   // The component re-reads the clock on every render, so expiry cannot be
@@ -298,7 +298,7 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
     throw new Error('the difference outlived its ten seconds')
   }
   if (!expired.includes('¥46.71')) throw new Error('the plain value did not come back')
-  console.log('badge: showed ↓0.90 after the turn, and dropped it ten seconds later')
+  console.log('badge: showed ↓0.90 when the reading moved, and dropped it ten seconds later')
 }
 
 // --- The detail panel opens with no close button ---------------------------

@@ -111,6 +111,8 @@ class ModelAllowanceService extends Service {
    * Refresh every tracked provider.
    * @param {{withConsumption?: boolean}} [options] When `withConsumption`,
    *   each reading is compared with the one captured when the turn began.
+   *   Otherwise it is compared with the reading published last time, so a sweep
+   *   still reports the movement it saw — only over a shorter span.
    * @returns {Promise<void>} Resolves when the refreshes settle.
    */
   async refreshAll(options = {}) {
@@ -215,8 +217,9 @@ class ModelAllowanceService extends Service {
       GLOBAL,
     )
 
-    // A periodic sweep keeps a long-lived session's reading current. It never
-    // reports a difference: a sweep is not a turn.
+    // A periodic sweep keeps a long-lived session's reading current. It is not
+    // a turn, so it reports movement since the previous reading rather than a
+    // turn's cost — but a reading that moved is still worth a difference.
     ctx.timer.interval(() => {
       this.refreshAll().catch((error) => {
         console.error('[model-allowance] periodic refresh failed', { error })
