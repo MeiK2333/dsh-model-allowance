@@ -230,7 +230,15 @@ function render(node) {
   const { type, props, children } = node
   const rendered = (children ?? []).map(render).join('')
   if (typeof type === 'function') return render(type({ ...props, children }))
-  return `<${type} class="${props.className ?? ''}">${rendered}</${type}>`
+  // Surface the attributes the assertions read: the bar's fill width and tone,
+  // and the switcher's selected tab.
+  const extra = []
+  if (props.style?.width) extra.push(`style="width:${String(props.style.width)}"`)
+  for (const name of ['data-tone', 'data-active']) {
+    if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
+  }
+  const suffix = extra.length > 0 ? ` ${extra.join(' ')}` : ''
+  return `<${type} class="${props.className ?? ''}"${suffix}>${rendered}</${type}>`
 }
 
 const html = render(element)
@@ -527,17 +535,30 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   console.log('plan card:', body)
 
   for (const expected of [
-    '5 小时',            // short window title
-    '已用 0 / 2,000',    // short window usage
-    '剩余 100%',         // short window remaining
-    '无重置时间',        // short window has no reset in this payload
-    '每月',              // long window title
-    '已用 10,071 / 10,000', // long window usage, digits grouped
-    '剩余 0%',           // long window remaining
-    '重置',              // long window reset time
-    '4 天 3 小时后',     // long window countdown, from resetAt minus now
+    '5 小时额度',           // short window title
+    '0 / 2,000',            // countable units beside the title
+    '0% 已使用',            // consumed share
+    '无重置时间',           // short window has no reset in this payload
+    '每月额度',             // long window title
+    '10,071 / 10,000',      // long window units, digits grouped
+    '100% 已使用',          // long window consumed share
+    '后重置',               // countdown wording
+    '重置时间 2026-',       // absolute reset instant
   ]) {
     if (!body.includes(expected)) throw new Error(`plan card is missing ${JSON.stringify(expected)}`)
+  }
+
+  // --- the bars carry the numbers and turn colour -------------------------
+  // 0% used is an empty bar and a full bar at 100%, and the tone escalates.
+  if (!body.includes('class="dsh-model-balance-bar-fill" style="width:0%" data-tone="ok"')) {
+    throw new Error('the unused window should render an empty ok bar')
+  }
+  if (!body.includes('class="dsh-model-balance-bar-fill" style="width:100%" data-tone="error"')) {
+    throw new Error('the exhausted window should render a full error bar')
+  }
+  // The countdown is a clock, so it has HH:MM:SS shape, not prose.
+  if (!/\d{2}:\d{2}:\d{2} 后重置/.test(body)) {
+    throw new Error('the countdown should render as a ticking clock')
   }
 
   // --- the switcher lists what this installation can actually read ---------
@@ -588,7 +609,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   if (!readRoutes.includes('minimax-cn')) {
     throw new Error(`switching did not read minimax-cn, read ${JSON.stringify(readRoutes)}`)
   }
-  if (!afterSwitch.includes('每 7 天')) {
+  if (!afterSwitch.includes('每周额度')) {
     throw new Error('switched card did not show the MiniMax weekly window')
   }
   console.log('switcher: picked MiniMax and the card re-read it')

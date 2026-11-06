@@ -143,16 +143,17 @@ window.__ModuleLoader__.load({
       'detail.refreshing': '刷新中…',
       'detail.console': '打开厂商控制台',
       'detail.error': '无法读取厂商余额。',
-      'window.hour': '{count} 小时',
-      'window.day': '每 {count} 天',
-      'window.month': '每月',
-      'window.unknown': '当前窗口',
-      'window.usedOfTotal': '已用 {used} / {total}',
-      'window.usedPercent': '已用 {percent}%',
-      'window.leftPercent': '剩余 {percent}%',
-      'window.resetAt': '{time} 重置',
-      'window.resetIn': '{duration}后',
+      'window.title.hour': '{count} 小时额度',
+      'window.title.day': '{count} 天额度',
+      'window.title.week': '每周额度',
+      'window.title.month': '每月额度',
+      'window.title.unknown': '当前额度',
+      'window.usedOfTotal': '{used} / {total}',
+      'window.usedPercent': '{percent}% 已使用',
+      'window.resetIn': '{duration} 后重置',
+      'window.resetAtLabel': '重置时间 {time}',
       'window.noReset': '无重置时间',
+      'countdown.days': '{days} 天 {clock}',
       'duration.daysHours': '{days} 天 {hours} 小时',
       'duration.hoursMinutes': '{hours} 小时 {minutes} 分',
       'duration.minutes': '{minutes} 分钟',
@@ -184,16 +185,17 @@ window.__ModuleLoader__.load({
       'detail.refreshing': 'Refreshing…',
       'detail.console': 'Open provider console',
       'detail.error': 'Could not read the provider balance.',
-      'window.hour': '{count}-hour window',
-      'window.day': 'Every {count} days',
-      'window.month': 'Monthly',
-      'window.unknown': 'Current window',
-      'window.usedOfTotal': 'Used {used} / {total}',
-      'window.usedPercent': 'Used {percent}%',
-      'window.leftPercent': '{percent}% left',
-      'window.resetAt': 'resets {time}',
-      'window.resetIn': 'in {duration}',
+      'window.title.hour': '{count}-hour quota',
+      'window.title.day': '{count}-day quota',
+      'window.title.week': 'Weekly quota',
+      'window.title.month': 'Monthly quota',
+      'window.title.unknown': 'Current quota',
+      'window.usedOfTotal': '{used} / {total}',
+      'window.usedPercent': '{percent}% used',
+      'window.resetIn': 'resets in {duration}',
+      'window.resetAtLabel': 'resets {time}',
       'window.noReset': 'no reset time',
+      'countdown.days': '{days}d {clock}',
       'duration.daysHours': '{days}d {hours}h',
       'duration.hoursMinutes': '{hours}h {minutes}m',
       'duration.minutes': '{minutes}m',
@@ -246,10 +248,25 @@ window.__ModuleLoader__.load({
       'border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:1px}',
-      '.dsh-model-balance-window{margin-top:8px;padding-top:8px;',
+      '.dsh-model-balance-window{margin-top:10px;padding-top:10px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
-      '.dsh-model-balance-reset{color:var(--dsw-alias-label-secondary);font-size:11px;',
-      'padding-top:1px;font-variant-numeric:tabular-nums}',
+      '.dsh-model-balance-window-head{display:flex;justify-content:space-between;',
+      'align-items:baseline;gap:12px}',
+      '.dsh-model-balance-window-title{font-weight:500;color:var(--dsw-alias-label-primary)}',
+      '.dsh-model-balance-percent{margin-top:2px;color:var(--dsw-alias-label-secondary);',
+      'font-size:11px;font-variant-numeric:tabular-nums}',
+      '.dsh-model-balance-bar{margin-top:6px;height:6px;border-radius:999px;overflow:hidden;',
+      'background:var(--dsw-alias-bg-layer-2);',
+      'box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l1)}',
+      '.dsh-model-balance-bar-fill{height:100%;border-radius:999px;',
+      'background:var(--dsw-alias-state-success-primary);transition:width 300ms ease}',
+      '.dsh-model-balance-bar-fill[data-tone="warn"]{',
+      'background:var(--dsw-alias-state-warn-primary)}',
+      '.dsh-model-balance-bar-fill[data-tone="error"]{',
+      'background:var(--dsw-alias-state-error-primary)}',
+      '.dsh-model-balance-foot{display:flex;justify-content:space-between;gap:10px;',
+      'flex-wrap:wrap;margin-top:5px;color:var(--dsw-alias-label-secondary);',
+      'font-size:11px;font-variant-numeric:tabular-nums}',
       '.dsh-model-balance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-balance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
       'font-size:11px;word-break:break-word}',
@@ -340,23 +357,21 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Format a reset timestamp: the clock time when it is today, otherwise the
-     * date and time.
+     * Format a reset instant as a full local date and time.
+     *
+     * The countdown says how soon; this says exactly when, so a reset that is
+     * days away is unambiguous without counting on your fingers.
+     *
      * @param {number} epochMs Reset instant.
-     * @returns {string} The formatted instant.
+     * @returns {string} `YYYY-MM-DD HH:MM:SS` in local time.
      */
     function formatResetAt(epochMs) {
       const at = new Date(epochMs)
-      const now = new Date()
-      if (at.toDateString() === now.toDateString()) {
-        return at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-      return at.toLocaleString([], {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      const pad = (value) => String(value).padStart(2, '0')
+      return (
+        `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+        ` ${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`
+      )
     }
 
     /**
@@ -400,57 +415,89 @@ window.__ModuleLoader__.load({
      * @param {object} window The window.
      * @param {(key: string, params?: object) => string} t Translator.
      * @returns {string} The window title.
-     */    function windowTitle(window, t) {
-      if (window.unit === 'hour' && window.count) return t('window.hour', { count: window.count })
-      if (window.unit === 'day' && window.count) return t('window.day', { count: window.count })
-      if (window.unit === 'month') return t('window.month')
-      return t('window.unknown')
+     */
+    function windowTitle(window, t) {
+      if (window.unit === 'hour' && window.count) {
+        return t('window.title.hour', { count: window.count })
+      }
+      if (window.unit === 'day' && window.count === 7) return t('window.title.week')
+      if (window.unit === 'day' && window.count) {
+        return t('window.title.day', { count: window.count })
+      }
+      if (window.unit === 'month') return t('window.title.month')
+      return t('window.title.unknown')
     }
 
     /**
-     * The usage half of a window row.
+     * How much of a window's allowance has been spent, as a percentage.
      *
-     * A plan that reports a quota gets "used / total"; one that reports only a
-     * percentage gets the consumed share instead, rather than a fabricated
-     * total.
+     * The percentage is what the bar and the headline both read, so it is
+     * derived once: from the remaining share when the provider reports one, and
+     * from used over total otherwise. It may exceed 100 — a plan can be
+     * overrun — and the bar clamps while the number stays honest.
      *
      * @param {object} window The window.
+     * @returns {number | undefined} The consumed percentage.
+     */
+    function windowUsedPercent(window) {
+      if (typeof window.remainingPercent === 'number') return 100 - window.remainingPercent
+      if (
+        typeof window.used === 'number' &&
+        typeof window.total === 'number' &&
+        window.total > 0
+      ) {
+        return (window.used / window.total) * 100
+      }
+      return undefined
+    }
+
+    /**
+     * The "used / total" label, when the provider meters in countable units.
+     * @param {object} window The window.
      * @param {(key: string, params?: object) => string} t Translator.
-     * @returns {string} The usage text.
+     * @returns {string | undefined} The label, or undefined when the provider
+     *   reports only a percentage.
      */
     function windowUsage(window, t) {
-      if (typeof window.total === 'number' && typeof window.used === 'number') {
-        return t('window.usedOfTotal', {
-          used: formatNumber(window.used),
-          total: formatNumber(window.total),
-        })
-      }
-      if (typeof window.remainingPercent === 'number') {
-        return t('window.usedPercent', { percent: Math.round(100 - window.remainingPercent) })
-      }
-      return '—'
+      if (typeof window.total !== 'number' || typeof window.used !== 'number') return undefined
+      return t('window.usedOfTotal', {
+        used: formatNumber(window.used),
+        total: formatNumber(window.total),
+      })
     }
 
     /**
-     * The remaining share and reset line of a window.
-     * @param {object} window The window.
-     * @param {number} now Current instant, so the countdown ticks.
-     * @param {(key: string, params?: object) => string} t Translator.
-     * @returns {string} The reset text.
+     * Severity of a consumption level, for colouring the bar.
+     * @param {number} percent Consumed percentage.
+     * @returns {'ok'|'warn'|'error'} The tone.
      */
-    function windowReset(window, now, t) {
-      const parts = []
-      if (typeof window.remainingPercent === 'number') {
-        parts.push(t('window.leftPercent', { percent: Math.round(window.remainingPercent) }))
-      }
-      if (typeof window.resetAt === 'number') {
-        parts.push(t('window.resetAt', { time: formatResetAt(window.resetAt) }))
-        const left = window.resetAt - now
-        if (left > 0) parts.push(t('window.resetIn', { duration: formatDuration(left, t) }))
-      } else {
-        parts.push(t('window.noReset'))
-      }
-      return parts.join(' · ')
+    function barTone(percent) {
+      if (percent >= 85) return 'error'
+      if (percent >= 60) return 'warn'
+      return 'ok'
+    }
+
+    /**
+     * Format a countdown as a clock, so it visibly ticks.
+     *
+     * A window hours away reads best as `HH:MM:SS`; a multi-day window keeps
+     * its days in front rather than turning into a 96-hour clock.
+     *
+     * @param {number} ms Remaining milliseconds.
+     * @param {(key: string, params?: object) => string} t Translator.
+     * @returns {string} The countdown.
+     */
+    function formatCountdown(ms, t) {
+      if (!Number.isFinite(ms) || ms <= 0) return '00:00:00'
+      const totalSeconds = Math.floor(ms / 1000)
+      const days = Math.floor(totalSeconds / 86_400)
+      const hours = Math.floor((totalSeconds % 86_400) / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const seconds = totalSeconds % 60
+      const clock = [hours, minutes, seconds]
+        .map((part) => String(part).padStart(2, '0'))
+        .join(':')
+      return days > 0 ? t('countdown.days', { days, clock }) : clock
     }
 
     /**
@@ -512,13 +559,13 @@ window.__ModuleLoader__.load({
         }
       }, [open])
 
-      // Refresh the countdown baseline while the panel is open. Thirty seconds
-      // is enough resolution for a window that resets hours from now, and the
-      // tick stops as soon as the panel closes.
+      // Refresh the countdown baseline while the panel is open. The countdown
+      // shows seconds, so this ticks every second — but only while the panel is
+      // open, and the interval stops the moment it closes.
       React.useEffect(() => {
         if (!open) return
         setNow(Date.now())
-        const timer = setInterval(() => setNow(Date.now()), 30_000)
+        const timer = setInterval(() => setNow(Date.now()), 1000)
         return () => clearInterval(timer)
       }, [open])
 
@@ -753,22 +800,75 @@ window.__ModuleLoader__.load({
                     h('span', null, formatAmount(view.amount, view.currency)),
                   )
                 : null,
-              // A metered plan reports one block per window: the allowance it
-              // enforces and when it resets.
+              // A metered plan reports one block per window. Each shows how much
+              // of its allowance is spent as one bar you can read at a glance,
+              // then when it comes back.
               ...(Array.isArray(view?.windows) && view.windows.length > 0
-                ? view.windows.map((window, index) =>
-                    h(
+                ? view.windows.map((window, index) => {
+                    const consumed = windowUsedPercent(window)
+                    const percent =
+                      consumed === undefined ? undefined : Math.max(0, Math.round(consumed))
+                    const filled =
+                      consumed === undefined ? 0 : Math.min(100, Math.max(0, consumed))
+                    const usage = windowUsage(window, t)
+                    const countdown =
+                      typeof window.resetAt === 'number'
+                        ? t('window.resetIn', {
+                            duration: formatCountdown(window.resetAt - now, t),
+                          })
+                        : t('window.noReset')
+                    return h(
                       'div',
                       { className: 'dsh-model-balance-window', key: `w-${String(index)}` },
                       h(
                         'div',
-                        { className: 'dsh-model-balance-row' },
-                        h('span', null, windowTitle(window, t)),
-                        h('span', { className: 'dsh-model-balance-usage' }, windowUsage(window, t)),
+                        { className: 'dsh-model-balance-window-head' },
+                        h('span', { className: 'dsh-model-balance-window-title' }, windowTitle(window, t)),
+                        // Countable units sit beside the title; a plan that
+                        // reports only a percentage has none to show.
+                        usage === undefined
+                          ? null
+                          : h('span', { className: 'dsh-model-balance-usage' }, usage),
                       ),
-                      h('div', { className: 'dsh-model-balance-reset' }, windowReset(window, now, t)),
-                    ),
-                  )
+                      percent === undefined
+                        ? null
+                        : h(
+                            'div',
+                            { className: 'dsh-model-balance-percent' },
+                            t('window.usedPercent', { percent }),
+                          ),
+                      percent === undefined
+                        ? null
+                        : h(
+                            'div',
+                            {
+                              className: 'dsh-model-balance-bar',
+                              role: 'progressbar',
+                              'aria-valuenow': percent,
+                              'aria-valuemin': 0,
+                              'aria-valuemax': 100,
+                              'aria-valuetext': t('window.usedPercent', { percent }),
+                            },
+                            h('div', {
+                              className: 'dsh-model-balance-bar-fill',
+                              'data-tone': barTone(percent),
+                              style: { width: `${String(filled)}%` },
+                            }),
+                          ),
+                      h(
+                        'div',
+                        { className: 'dsh-model-balance-foot' },
+                        h('span', null, countdown),
+                        typeof window.resetAt === 'number'
+                          ? h(
+                              'span',
+                              null,
+                              t('window.resetAtLabel', { time: formatResetAt(window.resetAt) }),
+                            )
+                          : null,
+                      ),
+                    )
+                  })
                 : []),
               // A single scalar reading has no windows to break down.
               !Array.isArray(view?.windows) && typeof view?.remainingMs === 'number'
