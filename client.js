@@ -188,6 +188,46 @@ window.__ModuleLoader__.load({
     ].join('')
 
     /**
+     * The mounted `balance` namespace.
+     *
+     * A Remote namespace is a Cordis service, so reading `ctx.remote.balance`
+     * without declaring it in `inject` throws. This plugin cannot declare it:
+     * `apply` is what mounts the namespace, so waiting for it would deadlock.
+     * `ctx.get` is the inject-free lookup, and this promise lets a component
+     * that renders before the mount finishes wait for it instead of guessing.
+     *
+     * @type {object | null}
+     */
+    let balanceNamespace = null
+    /** @type {(value: object | null) => void} */
+    let settleBalanceNamespace
+    const balanceNamespaceReady = new Promise((resolve) => {
+      settleBalanceNamespace = resolve
+    })
+
+    /**
+     * Resolve the balance namespace, or null when the mount failed.
+     * @returns {Promise<object | null>} The namespace.
+     */
+    async function getBalanceApi() {
+      if (balanceNamespace) return balanceNamespace
+      return await balanceNamespaceReady
+    }
+
+    /**
+     * Look the namespace up without requiring it to be injected.
+     * @param {object} ctx Client plugin context.
+     * @returns {object | undefined} The namespace, when mounted.
+     */
+    function lookupBalanceNamespace(ctx) {
+      try {
+        return ctx.get('remote.balance')
+      } catch {
+        return undefined
+      }
+    }
+
+    /**
      * Format a monetary amount with its currency.
      * @param {number} amount The amount.
      * @param {string | undefined} currency Currency code.
@@ -244,12 +284,13 @@ window.__ModuleLoader__.load({
           return
         }
         let cancelled = false
+        let handle
         setLoading(true)
 
         /** One unary read, used when the stream is unavailable or fails. */
-        const readOnce = async () => {
+        const readOnce = async (api) => {
           try {
-            const result = await ctx.remote.balance.balance(provider)
+            const result = await api.balance(provider)
             if (cancelled) return
             if (!result.ok) throw new Error('balance reading failed')
             setView(result.value)
@@ -261,25 +302,32 @@ window.__ModuleLoader__.load({
           }
         }
 
-        // The Host pushes a new reading when a turn ends or the periodic sweep
-        // runs, so the badge stays current without polling from the browser.
-        // A host without the stream API, or a stream that fails before its
-        // first frame, falls back to one unary read.
-        const streamFactory = ctx.remote.$stream
-        const watch = ctx.remote.balance?.watch
-        if (typeof streamFactory === 'function' && typeof watch === 'function') {
-          let handle
-          try {
-            handle = streamFactory({
-              name: 'balance',
-              open: (signal) => watch(provider, signal),
-              ended: () => new Error('balance stream ended'),
-            })
-          } catch (error) {
-            console.error('[model-balance] opening the reading stream failed', { error })
+        ;(async () => {
+          const api = await getBalanceApi()
+          if (cancelled) return
+          if (!api) {
+            setView({ provider, status: 'failed', kind: 'quota' })
+            setLoading(false)
+            return
           }
-          if (handle) {
-            ;(async () => {
+
+          // The Host pushes a new reading when a turn ends or the periodic
+          // sweep runs, so the badge stays current without polling from the
+          // browser. A host without the stream API, or a stream that fails
+          // before its first frame, falls back to one unary read.
+          const streamFactory = ctx.remote.$stream
+          if (typeof streamFactory === 'function' && typeof api.watch === 'function') {
+            try {
+              handle = streamFactory({
+                name: 'balance',
+                open: (signal) => api.watch(provider, signal),
+                ended: () => new Error('balance stream ended'),
+              })
+            } catch (error) {
+              console.error('[model-balance] opening the reading stream failed', { error })
+              handle = undefined
+            }
+            if (handle) {
               let received = false
               try {
                 for await (const frame of handle) {
@@ -295,26 +343,27 @@ window.__ModuleLoader__.load({
               } finally {
                 // A stream that produced nothing leaves the badge loading
                 // forever, so answer the same question the unary call would.
-                if (!cancelled && !received) await readOnce()
+                if (!cancelled && !received) await readOnce(api)
               }
-            })()
-            return () => {
-              cancelled = true
-              handle.dispose?.()
+              return
             }
           }
-        }
 
-        void readOnce()
+          await readOnce(api)
+        })()
+
         return () => {
           cancelled = true
+          handle?.dispose?.()
         }
       }, [provider, ctx])
 
       const refresh = React.useCallback(async () => {
         setRefreshing(true)
         try {
-          const result = await ctx.remote.balance.refresh(provider)
+          const api = await getBalanceApi()
+          if (!api) return
+          const result = await api.refresh(provider)
           if (result.ok) setView(result.value)
         } catch (error) {
           console.error('[model-balance] refresh failed', { provider, error })
@@ -514,11 +563,23 @@ window.__ModuleLoader__.load({
               return
             }
             unmount = disposer
+            // The namespace service exists once the mount settles, so this is
+            // the point where the inject-free lookup can succeed.
+            const namespace = lookupBalanceNamespace(ctx)
+            if (namespace) {
+              balanceNamespace = namespace
+              settleBalanceNamespace(namespace)
+            } else {
+              console.error('[model-balance] the balance namespace did not register')
+              settleBalanceNamespace(null)
+            }
           })().catch((error) => {
             console.error('[model-balance] mounting the balance namespace failed', { error })
+            settleBalanceNamespace(null)
           })
           return () => {
             disposed = true
+            balanceNamespace = null
             unmount?.()
           }
         }, 'model-balance: balance namespace')

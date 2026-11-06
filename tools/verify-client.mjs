@@ -115,21 +115,27 @@ const ctx = {
       remoteMount = { package: contribution.package, descriptors: contribution.descriptors }
       return () => {}
     },
-    balance: {
-      balance: async () => ({
-        ok: true,
-        value: {
-          provider: 'deepseek-account',
-          status: 'ready',
-          kind: 'amount',
-          amount: 46.71,
-          currency: 'CNY',
-          updatedAt: Date.now(),
-        },
-      }),
-      refresh: async () => ({ ok: true, value: {} }),
-    },
+    // Deliberately no `balance` here: a Remote namespace must be reached
+    // through `ctx.get`, because reading it as an injected service throws.
   },
+  // The inject-free lookup the component uses to reach the namespace.
+  get: (key) =>
+    key === 'remote.balance'
+      ? {
+          balance: async () => ({
+            ok: true,
+            value: {
+              provider: 'deepseek-account',
+              status: 'ready',
+              kind: 'amount',
+              amount: 46.71,
+              currency: 'CNY',
+              updatedAt: Date.now(),
+            },
+          }),
+          refresh: async () => ({ ok: true, value: {} }),
+        }
+      : undefined,
   slots: {
     inject: (_key, callback) => {
       const effect = callback()
@@ -238,12 +244,15 @@ const streamCtx = {
         dispose: () => controller.abort(),
       }
     },
-    balance: {
-      balance: async () => ({ ok: false, error: { message: 'unary should not run' } }),
-      refresh: async () => ({ ok: true, value: {} }),
-      watch: (_provider, _signal) => ({ async *[Symbol.asyncIterator]() {} }),
-    },
   },
+  get: (key) =>
+    key === 'remote.balance'
+      ? {
+          balance: async () => ({ ok: false, error: { message: 'unary should not run' } }),
+          refresh: async () => ({ ok: true, value: {} }),
+          watch: (_provider, _signal) => ({ async *[Symbol.asyncIterator]() {} }),
+        }
+      : undefined,
   slots: {
     inject: (_key, callback) => {
       const effect = callback()
