@@ -178,6 +178,8 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
       '.dsh-model-balance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
       '.dsh-model-balance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
+      '.dsh-model-balance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
+      'font-size:11px;word-break:break-word}',
       '.dsh-model-balance-actions{display:flex;gap:8px;margin-top:8px;padding-top:8px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-action{padding:2px 6px;border:1px solid var(--dsw-alias-border-l1);',
@@ -468,7 +470,22 @@ window.__ModuleLoader__.load({
                   )
                 : null,
               view?.status === 'failed'
-                ? h('div', { className: 'dsh-model-balance-error' }, t('detail.error'))
+                ? h(
+                    'div',
+                    { className: 'dsh-model-balance-error' },
+                    t('detail.error'),
+                    // The Host reports why a reading failed; showing it is what
+                    // turns "it does not work" into something actionable.
+                    view.error
+                      ? h('div', { className: 'dsh-model-balance-reason' }, view.error)
+                      : null,
+                  )
+                : null,
+              view?.status === 'unsupported'
+                ? h('div', { className: 'dsh-model-balance-reason' }, t('badge.unsupported'))
+                : null,
+              view?.status === 'unconfigured'
+                ? h('div', { className: 'dsh-model-balance-reason' }, t('badge.unconfigured'))
                 : null,
               view?.updatedAt
                 ? h(
