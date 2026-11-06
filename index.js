@@ -47,12 +47,6 @@ class ModelAllowanceService extends Service {
     /** Routes a subscriber asked about, so polling touches only live providers. */
     this.activeRoutes = new Set()
 
-    /**
-     * The reading each route showed when the current turn began.
-     * @type {Map<string, import('./lib/providers.js').BalanceView>}
-     */
-    this.baselines = new Map()
-
     // The Remote controller is a service of its own; it registers under the
     // `balanceController` key and exposes the `balance` wire namespace.
     this.controller = new BalanceController(ownerContext)
@@ -109,70 +103,22 @@ class ModelAllowanceService extends Service {
 
   /**
    * Refresh every tracked provider.
-   * @param {{withConsumption?: boolean}} [options] When `withConsumption`,
-   *   each reading is compared with the one captured when the turn began.
-   *   Otherwise it is compared with the reading published last time, so a sweep
-   *   still reports the movement it saw — only over a shorter span.
    * @returns {Promise<void>} Resolves when the refreshes settle.
    */
-  async refreshAll(options = {}) {
-    const report = options.withConsumption === true
+  async refreshAll() {
     await Promise.all(
-      [...this.activeRoutes].map((route) => {
-        // The armed baseline is the reading from before this turn consumed
-        // anything. Falling back to the cached reading covers a turn whose
-        // start was never seen — the plugin loaded mid-turn, or the host never
-        // announced it. It is less precise, since a sweep may have refreshed
-        // the cache mid-turn, but it keeps the feature working.
-        const baseline = report
-          ? (this.baselines.get(route) ?? this.balance.peek(route))
-          : undefined
-        return this.balance.read(route, { force: true, baseline }).then((view) => {
-          if (report && this.config.debug === true) {
-            const consumption = view.consumption
-            const measure =
-              typeof view.amount === 'number'
-                ? `after=${String(view.amount)}`
-                : `after%=${String(view.percent)}`
-            const from =
-              typeof baseline?.amount === 'number'
-                ? `before=${String(baseline.amount)}`
-                : baseline == null
-                  ? 'before=none'
-                  : `before%=${String(baseline.percent)}`
+      [...this.activeRoutes].map((route) =>
+        this.balance.read(route, { force: true }).then((view) => {
+          if (this.config.debug === true && view.consumption !== undefined) {
             void logDebug(
-              `turn cost route=${route} status=${view.status} ${from} ${measure}` +
-                (consumption === undefined
-                  ? ' consumption=-'
-                  : ` consumption=${consumption.kind}:${String(consumption.delta)}`),
+              `movement route=${route} status=${view.status}` +
+                ` consumption=${view.consumption.kind}:${String(view.consumption.delta)}`,
             )
           }
           return view
-        })
-      }),
+        }),
+      ),
     )
-    if (report) this.baselines.clear()
-  }
-
-  /**
-   * Remember what each tracked provider last read, as the baseline for a turn
-   * that is about to start.
-   *
-   * An existing baseline is not replaced. Turns nest — a subagent runs its own
-   * turn inside the one that started it — and re-arming on the inner turn would
-   * measure only the tail of the outer one.
-   *
-   * @returns {void}
-   */
-  armBaselines() {
-    for (const route of this.activeRoutes) {
-      if (this.baselines.has(route)) continue
-      const view = this.balance.peek(route)
-      if (view !== undefined) this.baselines.set(route, view)
-    }
-    if (this.config.debug === true) {
-      void logDebug(`turn start: armed ${String(this.baselines.size)} baseline(s)`)
-    }
   }
 
   /**
@@ -190,19 +136,9 @@ class ModelAllowanceService extends Service {
     // registers its own cross-session listeners the same way.
     const GLOBAL = { global: true }
 
-    // A turn beginning is the only reliable "before" instant: the provider is
-    // not asked, so this costs nothing, and the value is the last reading taken.
-    ctx.on(
-      'agent/status',
-      (payload) => {
-        if (payload.status !== 'running') return
-        this.armBaselines()
-      },
-      GLOBAL,
-    )
-
     // A finished turn consumed provider quota, so the reading it belongs to is
-    // stale. This is also the moment to report what the turn cost.
+    // stale. Refreshing here is what turns "the number is old" into "here is
+    // what moved".
     ctx.on(
       'session/event',
       (_session, event) => {
@@ -210,16 +146,14 @@ class ModelAllowanceService extends Service {
         if (this.config.debug === true) {
           void logDebug(`turn end: refreshing ${String(this.activeRoutes.size)} route(s)`)
         }
-        this.refreshAll({ withConsumption: true }).catch((error) => {
+        this.refreshAll().catch((error) => {
           console.error('[model-allowance] turn refresh failed', { error })
         })
       },
       GLOBAL,
     )
 
-    // A periodic sweep keeps a long-lived session's reading current. It is not
-    // a turn, so it reports movement since the previous reading rather than a
-    // turn's cost — but a reading that moved is still worth a difference.
+    // A periodic sweep keeps a long-lived session's reading current.
     ctx.timer.interval(() => {
       this.refreshAll().catch((error) => {
         console.error('[model-allowance] periodic refresh failed', { error })

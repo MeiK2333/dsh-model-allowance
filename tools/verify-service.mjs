@@ -94,10 +94,9 @@ for (const result of results) {
 
 // --- The difference a reading carries ---------------------------------------
 // Every read that asks the provider compares its answer with the reading
-// published last time, so a sweep and a manual refresh report movement too. A
-// turn-end read may instead measure from the start of the turn. Either way the
-// difference rides the published copy only: caching it would let a later sweep
-// republish a stale one.
+// published last time — whether a turn ended, the card was refreshed by hand,
+// or the sweep ran. The difference rides the published copy only: caching it
+// would let a later sweep republish a stale one.
 {
   const seen = []
   const route = 'deepseek'
@@ -120,7 +119,7 @@ for (const result of results) {
       throw new Error('the first reading has nothing to be measured against')
     }
 
-    // A sweep is a forced read with no baseline; it reports what it saw move.
+    // A sweep is a forced read; it reports what it saw move.
     amount = 45.81
     const swept = await service.read(route, { force: true })
     if (swept.consumption?.kind !== 'amount') {
@@ -149,13 +148,6 @@ for (const result of results) {
       throw new Error(`an unchanged reading should report zero, got ${JSON.stringify(still.consumption)}`)
     }
 
-    // A turn-end read may measure from the start of the turn instead, which is
-    // a longer span than the reading published last time.
-    const baseline = { ...still, amount: still.amount + 2 }
-    const turn = await service.read(route, { force: true, baseline })
-    if (Math.abs(turn.consumption?.delta + 2) > 1e-9) {
-      throw new Error(`a turn-end read should measure from its baseline, got ${JSON.stringify(turn.consumption)}`)
-    }
 
     // A failed read clears the anchor: the gap it spans says nothing about
     // what the next reading is compared with.
