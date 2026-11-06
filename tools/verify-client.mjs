@@ -164,6 +164,7 @@ const ctx = {
               amount: 46.71,
               currency: 'CNY',
               updatedAt: Date.now(),
+              consoleUrl: 'https://platform.deepseek.com/top_up',
             },
           }),
           refresh: async () => ({ ok: true, value: {} }),
@@ -281,7 +282,33 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
     throw new Error('a single readable provider should not render a switcher')
   }
   if (opened.includes('关闭')) throw new Error('panel still renders a close button')
-  if (!opened.includes('刷新')) throw new Error('panel lost its refresh action')
+
+  // --- the footer is two icon buttons plus the reading time ------------------
+  {
+    const footerStart = opened.indexOf('dsh-model-balance-actions"')
+    if (footerStart < 0) throw new Error('the footer row was not rendered')
+    const footer = opened.slice(footerStart)
+    if (opened.includes('class="dsh-model-balance-action"')) {
+      throw new Error('the old text-button class survived the footer rewrite')
+    }
+    // The reading time comes before both buttons and carries the new wording.
+    const updated = /更新于 \d{2}:\d{2}:\d{2}/.exec(footer)
+    if (!updated) throw new Error(`the footer is missing the reading time: ${JSON.stringify(footer)}`)
+    const refreshAt = footer.indexOf('title="刷新"')
+    const clockAt = footer.indexOf(updated[0])
+    if (refreshAt < 0) throw new Error('the footer is missing the refresh button')
+    if (clockAt > refreshAt) throw new Error('the reading time should sit left of the refresh button')
+    // Both controls are compact icon buttons.
+    const iconButtons = footer.split('class="dsh-model-balance-icon-button"').length - 1
+    if (iconButtons !== 2) throw new Error(`expected 2 icon buttons, rendered ${String(iconButtons)}`)
+    if (!footer.includes('title="打开厂商控制台"')) {
+      throw new Error('the footer is missing the console button')
+    }
+    // The refresh button keeps a disabled state while it works.
+    if (!/class="dsh-model-balance-icon-button"[^>]*>\s*<svg/.test(footer)) {
+      throw new Error('the icon buttons should draw a glyph, not a label')
+    }
+  }
   console.log('panel opened:', opened.slice(opened.indexOf('<div class="dsh-model-balance-panel"')))
 
   // A click inside keeps it open.

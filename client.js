@@ -138,7 +138,7 @@ window.__ModuleLoader__.load({
       'detail.amount': '余额',
       'detail.remaining': '剩余',
       'detail.total': '总额',
-      'detail.updated': '更新时间',
+      'detail.updatedAt': '更新于 {time}',
       'detail.refresh': '刷新',
       'detail.refreshing': '刷新中…',
       'detail.console': '打开厂商控制台',
@@ -178,7 +178,7 @@ window.__ModuleLoader__.load({
       'detail.amount': 'Balance',
       'detail.remaining': 'Remaining',
       'detail.total': 'Total',
-      'detail.updated': 'Updated',
+      'detail.updatedAt': 'updated {time}',
       'detail.refresh': 'Refresh',
       'detail.refreshing': 'Refreshing…',
       'detail.console': 'Open provider console',
@@ -244,7 +244,8 @@ window.__ModuleLoader__.load({
       // two DeepSeek routes tell each other apart by chip: filled for the
       // signed-in account, outlined for a stored key.
       '.dsh-model-balance-tab{display:inline-flex;align-items:center;justify-content:center;',
-      'width:26px;height:26px;flex:none;padding:0;border:1px solid transparent;border-radius:7px;',
+      'box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
+      'border:1px solid transparent;border-radius:7px;',
       'background:transparent;line-height:1;cursor:pointer;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.66}',
       '.dsh-model-balance-tab[data-variant="solid"]{background:var(--dsw-alias-bg-layer-2);',
@@ -252,17 +253,19 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-tab[data-variant="outline"]{',
       'border-color:var(--dsw-alias-border-l2);background:transparent}',
       '.dsh-model-balance-tab:hover{opacity:.9}',
-      // Inset, because an outset ring on the last mark would be clipped by the
-      // strip's overflow rule.
+      // The selected mark recolours the one border it already has. An extra
+      // inset ring would stack a second line on top of that border and read as
+      // a thick frame.
       '.dsh-model-balance-tab[data-active="true"]{opacity:1;',
       'background:var(--dsw-alias-bg-layer-2);',
-      'box-shadow:inset 0 0 0 1.5px var(--dsw-alias-brand-primary)}',
+      'border-color:var(--dsw-alias-brand-primary)}',
       '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:-1px}',
       '.dsh-model-balance-tab svg{display:block}',
       '.dsh-model-balance-tab-letter{font-size:11px;font-weight:600;line-height:1}',
       '.dsh-model-balance-more{display:inline-flex;align-items:center;justify-content:center;',
-      'width:26px;height:26px;flex:none;margin-left:auto;padding:0;border-radius:7px;',
+      'box-sizing:border-box;width:26px;height:26px;flex:none;margin-left:auto;padding:0;',
+      'border-radius:7px;',
       'border:1px solid var(--dsw-alias-border-l1);background:transparent;cursor:pointer;',
       'color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1}',
       '.dsh-model-balance-more:hover{color:var(--dsw-alias-label-primary);',
@@ -303,13 +306,23 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-balance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
       'font-size:11px;word-break:break-word}',
-      '.dsh-model-balance-actions{display:flex;gap:8px;margin-top:8px;padding-top:8px;',
+      // The footer is one right-aligned cluster: the reading time sits directly
+      // left of the two icon buttons.
+      '.dsh-model-balance-actions{display:flex;align-items:center;',
+      'justify-content:flex-end;gap:6px;margin-top:8px;padding-top:8px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
-      '.dsh-model-balance-action{padding:2px 6px;border:1px solid var(--dsw-alias-border-l1);',
-      'border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);',
-      'font-size:12px;cursor:pointer;text-decoration:none}',
-      '.dsh-model-balance-action:hover{border-color:var(--dsw-alias-border-l2)}',
-      '.dsh-model-balance-action:disabled{opacity:.6;cursor:default}',
+      '.dsh-model-balance-updated{color:var(--dsw-alias-label-secondary);font-size:11px;',
+      'font-variant-numeric:tabular-nums;white-space:nowrap;margin-right:2px}',
+      '.dsh-model-balance-icon-button{display:inline-flex;align-items:center;',
+      'justify-content:center;box-sizing:border-box;width:22px;height:22px;flex:none;padding:0;',
+      'border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:transparent;',
+      'color:var(--dsw-alias-label-secondary);cursor:pointer;text-decoration:none}',
+      '.dsh-model-balance-icon-button:hover{color:var(--dsw-alias-label-primary);',
+      'border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-model-balance-icon-button:focus-visible{',
+      'outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
+      '.dsh-model-balance-icon-button[disabled]{opacity:.5;cursor:default}',
+      '.dsh-model-balance-icon-button svg{display:block}',
     ].join('')
 
     /**
@@ -414,6 +427,74 @@ window.__ModuleLoader__.load({
      */
     function formatNumber(value) {
       return Number.isInteger(value) ? value.toLocaleString() : String(value)
+    }
+
+    /**
+     * Format an instant as a wall clock, for the footer's reading time.
+     * @param {number} epochMs The instant.
+     * @returns {string} `HH:MM:SS` in local time.
+     */
+    function formatClock(epochMs) {
+      const at = new Date(epochMs)
+      const pad = (value) => String(value).padStart(2, '0')
+      return `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}`
+    }
+
+    /**
+     * The refresh glyph: an arc with a filled arrowhead, so it reads as
+     * "rotate" rather than a hook.
+     * @param {number} size Rendered size in pixels.
+     * @returns {object} The icon element.
+     */
+    function refreshGlyph(size) {
+      return h(
+        'svg',
+        { viewBox: '0 0 20 20', width: size, height: size, 'aria-hidden': 'true', focusable: 'false' },
+        h('path', {
+          d: 'M12.05 4.36A6 6 0 1 1 7.95 4.36',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.7,
+          strokeLinecap: 'round',
+        }),
+        h('path', {
+          d: 'M15.05 5.45L10.48 6.35L12.12 1.83Z',
+          fill: 'currentColor',
+          stroke: 'currentColor',
+          strokeWidth: 0.6,
+          strokeLinejoin: 'round',
+        }),
+      )
+    }
+
+    /**
+     * The credits glyph: a plain dollar sign.
+     *
+     * A coin with a dollar inside was tried first and collapsed into a blob at
+     * this size, while a bare sign stays legible at fourteen pixels.
+     *
+     * @param {number} size Rendered size in pixels.
+     * @returns {object} The icon element.
+     */
+    function creditsGlyph(size) {
+      return h(
+        'svg',
+        { viewBox: '0 0 20 20', width: size, height: size, 'aria-hidden': 'true', focusable: 'false' },
+        h('path', {
+          d: 'M10 3.2v13.6',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.7,
+          strokeLinecap: 'round',
+        }),
+        h('path', {
+          d: 'M13.6 6.4c0-1.6-1.5-2.4-3.6-2.4s-3.6.8-3.6 2.4c0 1.4 1.3 2 3.6 2.5 2.3.5 3.6 1.1 3.6 2.5 0 1.6-1.5 2.4-3.6 2.4s-3.6-.8-3.6-2.4',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.7,
+          strokeLinecap: 'round',
+        }),
+      )
     }
 
     /**
@@ -1190,37 +1271,40 @@ window.__ModuleLoader__.load({
               view?.status === 'unconfigured'
                 ? h('div', { className: 'dsh-model-balance-reason' }, t('badge.unconfigured'))
                 : null,
-              view?.updatedAt
-                ? h(
-                    'div',
-                    { className: 'dsh-model-balance-row' },
-                    h('span', null, t('detail.updated')),
-                    h('span', null, new Date(view.updatedAt).toLocaleTimeString()),
-                  )
-                : null,
               h(
                 'div',
                 { className: 'dsh-model-balance-actions' },
+                view?.updatedAt
+                  ? h(
+                      'span',
+                      { className: 'dsh-model-balance-updated' },
+                      t('detail.updatedAt', { time: formatClock(view.updatedAt) }),
+                    )
+                  : null,
                 h(
                   'button',
                   {
                     type: 'button',
-                    className: 'dsh-model-balance-action',
+                    className: 'dsh-model-balance-icon-button',
                     onClick: refresh,
                     disabled: refreshing,
+                    title: refreshing ? t('detail.refreshing') : t('detail.refresh'),
+                    'aria-label': refreshing ? t('detail.refreshing') : t('detail.refresh'),
                   },
-                  refreshing ? t('detail.refreshing') : t('detail.refresh'),
+                  refreshGlyph(14),
                 ),
                 view?.consoleUrl
                   ? h(
                       'a',
                       {
-                        className: 'dsh-model-balance-action',
+                        className: 'dsh-model-balance-icon-button',
                         href: view.consoleUrl,
                         target: '_blank',
                         rel: 'noreferrer noopener',
+                        title: t('detail.console'),
+                        'aria-label': t('detail.console'),
                       },
-                      t('detail.console'),
+                      creditsGlyph(15),
                     )
                   : null,
               ),
