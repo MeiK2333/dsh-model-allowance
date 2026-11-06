@@ -141,6 +141,9 @@ node tools/verify-providers.mjs
 
 # Remote 控制器：@Remote 标记、流契约、刷新、服务方法
 node tools/verify-remote.mjs
+
+# 余额服务：用「拒绝未声明属性」的代理上下文模拟 Cordis，跑完整读取路径
+node tools/verify-service.mjs
 ```
 
 `verify-remote.mjs` 需要 `@deepseek-ai/cordis`、`schemastery`、`dsh-typert-protocol`
@@ -158,6 +161,29 @@ Copy-Item .deps/dsh/node_modules/@deepseek-ai node_modules -Recurse
 ```
 
 三个脚本都用录制/桩数据离线运行，不触网。
+
+### 排错
+
+打开 `debug` 后，插件会在激活时把每条路由试读一次，并把结果追加到
+`$DSH_HOME/model-balance-debug.log`：
+
+```yaml
+- id: model-balance
+  name: '@local/dsh-model-balance'
+  config:
+    debug: true
+```
+
+```
+=== probe: 4 adapters ===
+deepseekAccount present: true
+adapter=deepseek-account route=deepseek-account status=ready kind=amount amount=45.26 error=-
+adapter=minimax-token-plan route=minimax-cn status=ready kind=quota percent=0 error=-
+=== probe done ===
+```
+
+失败读数也会记录在案（`read route=... status=failed error=...`）。
+调试结束后把 `debug` 去掉或设为 `false`，不再写文件。
 
 ---
 
