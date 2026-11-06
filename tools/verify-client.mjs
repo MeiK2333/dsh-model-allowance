@@ -49,9 +49,12 @@ const React = {
 }
 
 // The panel closes on an outside click or Escape, so the component touches the
-// document. Record the listeners so a test can also fire them.
+// document. Record the listeners so a test can also fire them. The locale
+// service keeps `<html lang>` on the active locale, so the stub carries one:
+// the provider names below are the Chinese ones.
 const documentListeners = new Map()
 globalThis.document = {
+  documentElement: { lang: 'zh-CN' },
   addEventListener(type, listener) {
     const set = documentListeners.get(type) ?? new Set()
     set.add(listener)
@@ -173,6 +176,22 @@ const ctx = {
             },
           }),
           refresh: async () => ({ ok: true, value: {} }),
+          list: async () => ({
+            ok: true,
+            value: [
+              {
+                route: 'deepseek-account',
+                configured: true,
+                name: { zh: 'DeepSeek 账号', en: 'DeepSeek account' },
+                color: '#4d6bfe',
+                iconHint: 'deepseek',
+              },
+            ],
+          }),
+          status: async (route) => ({
+            ok: true,
+            value: { provider: route, state: 'operational', url: 'https://status.deepseek.com' },
+          }),
           defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
         }
       : undefined,
@@ -241,7 +260,7 @@ function render(node) {
   // the switcher's selection, and the accessible name a mark carries.
   const extra = []
   if (props.style?.width) extra.push(`style="width:${String(props.style.width)}"`)
-  for (const name of ['data-tone', 'data-active', 'aria-selected', 'aria-expanded']) {
+  for (const name of ['data-tone', 'data-service', 'data-active', 'aria-selected', 'aria-expanded']) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
   if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
@@ -269,6 +288,11 @@ const settled = render(
 )
 console.log('rendered (settled):', settled)
 if (!settled.includes('¥46.71')) throw new Error('badge did not render the DeepSeek amount')
+// The dot speaks for the platform: this provider's status page says it is
+// operational, so the light is green.
+if (!settled.includes('data-service="operational"')) {
+  throw new Error('an operational platform should light the badge dot green')
+}
 
 // --- The difference on the badge, and its ten-second life -----------------
 {
@@ -529,10 +553,34 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   /** Routes the card asked the Host about, in order. */
   const readRoutes = []
   const providerDirectory = [
-    { route: 'deepseek-account', configured: true },
-    { route: 'deepseek', configured: false },
-    { route: 'minimax-cn', configured: true },
-    { route: 'zai', configured: true },
+    {
+      route: 'deepseek-account',
+      configured: true,
+      name: { zh: 'DeepSeek 账号', en: 'DeepSeek account' },
+      color: '#4d6bfe',
+      iconHint: 'deepseek',
+    },
+    {
+      route: 'deepseek',
+      configured: false,
+      name: { zh: 'DeepSeek API', en: 'DeepSeek API' },
+      color: '#4d6bfe',
+      iconHint: 'deepseek',
+    },
+    {
+      route: 'minimax-cn',
+      configured: true,
+      name: { zh: 'MiniMax', en: 'MiniMax' },
+      color: '#e21680',
+      iconHint: 'minimax',
+    },
+    {
+      route: 'zai',
+      configured: true,
+      name: { zh: '智谱 GLM', en: 'Zhipu GLM' },
+      color: '#5668f5',
+      iconHint: 'zhipu',
+    },
   ]
 
   const readFor = (route) => ({
@@ -571,6 +619,16 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
             },
             refresh: async (route) => readFor(route),
             list: async () => ({ ok: true, value: providerDirectory }),
+            status: async (route) => ({
+              ok: true,
+              value: {
+                provider: route,
+                state: 'degraded',
+                summary: 'go · upstream, free · latency',
+                url: 'https://status.opencode.ai',
+                updatedAt: Date.now(),
+              },
+            }),
             defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
           }
         : undefined,
@@ -620,6 +678,10 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   if (!planClosed.includes('剩余 0%')) {
     throw new Error('badge should report the binding window')
   }
+  // The platform is degraded in this scenario, so the badge dot is red.
+  if (!planClosed.includes('data-service="degraded"')) {
+    throw new Error('a degraded platform should light the badge dot red')
+  }
 
   // Open the card and read both window blocks. The switcher list arrives from
   // the Host asynchronously, so sample the render after it settles.
@@ -631,6 +693,26 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   const planOpen = planBadge()
   const body = planOpen.slice(planOpen.indexOf('dsh-model-allowance-panel"'))
   console.log('plan card:', body)
+
+  // The platform's own status rides in the footer, left of the reading time,
+  // so a bad number can be told apart from a bad day without another row.
+  {
+    const footerAt = body.indexOf('dsh-model-allowance-actions')
+    if (footerAt < 0) throw new Error('the footer row was not rendered')
+    const footer = body.slice(footerAt)
+    for (const expected of ['服务降级', 'go · upstream, free · latency']) {
+      if (!footer.includes(expected)) {
+        throw new Error(`the footer status is missing ${JSON.stringify(expected)}`)
+      }
+    }
+    const statusAt = footer.indexOf('服务降级')
+    const updatedAt = footer.indexOf('更新于')
+    if (updatedAt < 0) throw new Error('the footer lost the reading time')
+    if (statusAt > updatedAt) {
+      throw new Error('the status should sit left of the reading time in the footer')
+    }
+    console.log('status: the card showed the platform state in the footer, left of the reading time')
+  }
 
   for (const expected of [
     '5 小时额度',           // short window title
@@ -883,6 +965,96 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     )
   }
   console.log('blank session: the installation default filled the badge')
+}
+
+// --- A provider this build has no artwork for reads as its initial ---------
+// The point of the metadata contract: a vendor added long after this client
+// bundle was built still appears, named and coloured by the Host, with its
+// initial standing in for artwork this build does not carry.
+{
+  const letterDirectory = [
+    {
+      route: 'deepseek-account',
+      configured: true,
+      name: { zh: 'DeepSeek 账号', en: 'DeepSeek account' },
+      color: '#4d6bfe',
+      iconHint: 'deepseek',
+    },
+    {
+      route: 'kimi-coding',
+      configured: true,
+      name: { zh: 'Kimi Coding', en: 'Kimi Coding' },
+      color: '#636ff6',
+    },
+  ]
+  const readLetter = (route) => ({
+    ok: true,
+    value: {
+      provider: route,
+      status: 'ready',
+      kind: 'quota',
+      percent: 60,
+      updatedAt: Date.now(),
+      windows: [{ id: 'weekly', unit: 'week', remainingPercent: 60 }],
+    },
+  })
+  let letterSlot
+  const letterCtx = {
+    effect: (fn) => fn(),
+    locale: ctx.locale,
+    remote: { $mount: async () => () => {}, $stream: undefined },
+    get: (key) =>
+      key === 'remote.balance'
+        ? {
+            balance: async (route) => readLetter(route),
+            refresh: async (route) => readLetter(route),
+            list: async () => ({ ok: true, value: letterDirectory }),
+            defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
+          }
+        : undefined,
+    slots: {
+      inject: (_key, callback) => callback(),
+      register: (options, Component) => {
+        letterSlot = { options, Component }
+        return () => {}
+      },
+    },
+  }
+  plugin.apply(letterCtx)
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  hookState = []
+  hookCursor = 0
+  const letterProjection = {
+    lastUsed: { provider: 'kimi-coding', model: 'kimi-k2' },
+    next: null,
+  }
+  const renderLetter = () => {
+    hookCursor = 0
+    return render(
+      letterSlot.Component({
+        useProjection: (key) => (key === 'modelSelection' ? letterProjection : undefined),
+      }),
+    )
+  }
+  renderLetter()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  hookState[2] = true
+  hookCursor = 0
+  const letterCard = renderLetter()
+  if (!letterCard.includes('class="dsh-model-allowance-tab-letter">K<')) {
+    throw new Error(
+      `a provider without artwork should draw its initial, rendered ${JSON.stringify(letterCard)}`,
+    )
+  }
+  if (!letterCard.includes('title="Kimi Coding"')) {
+    throw new Error('the added provider was not named from its metadata')
+  }
+  // This stub answers no status, so the light stays grey rather than claiming
+  // the platform is fine.
+  if (!letterCard.includes('data-service="unknown"')) {
+    throw new Error('a route without a status source should leave the badge dot grey')
+  }
+  console.log('client: a vendor without artwork reads as its initial')
 }
 
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')

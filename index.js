@@ -9,6 +9,7 @@
 import { Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { BalanceService } from './lib/balance.js'
+import { StatusService } from './lib/status.js'
 import { BalanceController } from './lib/remote.js'
 import { PROVIDER_ADAPTERS, KIND_AMOUNT, KIND_QUOTA, findAdapter } from './lib/providers.js'
 import { describeError, logDebug } from './lib/debug.js'
@@ -46,6 +47,12 @@ class ModelAllowanceService extends Service {
 
     /** Routes a subscriber asked about, so polling touches only live providers. */
     this.activeRoutes = new Set()
+
+    /**
+     * Platform status readings. Every source is a public page, so this half
+     * needs no credential — only the vendor's status URL.
+     */
+    this.statusService = new StatusService({ ctx: ownerContext })
 
     // The Remote controller is a service of its own; it registers under the
     // `balanceController` key and exposes the `balance` wire namespace.
@@ -99,6 +106,19 @@ class ModelAllowanceService extends Service {
    */
   async list() {
     return await this.balance.available()
+  }
+
+  /**
+   * Read one provider's platform status, for the card's status row.
+   *
+   * A route whose vendor publishes no status page answers `unknown` and the
+   * browser hides the row, so this never needs a guard at the call site.
+   *
+   * @param {string} provider Provider route.
+   * @returns {Promise<import('./lib/status.js').StatusView>} The status reading.
+   */
+  async status(provider) {
+    return await this.statusService.read(provider)
   }
 
   /**
@@ -216,6 +236,14 @@ class ModelAllowanceService extends Service {
           )
           if (Array.isArray(view.windows) && view.windows.length > 0) {
             await logDebug(`  windows=${JSON.stringify(view.windows)}`)
+          }
+          if (adapter.status !== undefined) {
+            const platform = await this.statusService.read(route)
+            await logDebug(
+              `  platform=${platform.state}` +
+                (platform.summary ? ` summary=${platform.summary}` : '') +
+                (platform.error ? ` error=${platform.error}` : ''),
+            )
           }
         } catch (error) {
           await logDebug(`adapter=${adapter.id} route=${route} THREW ${describeError(error)}`)

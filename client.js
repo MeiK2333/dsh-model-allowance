@@ -5,6 +5,11 @@
  * provider the conversation uses, then asks the Host's `balance` Remote
  * namespace for that provider's reading. No credential ever reaches this half;
  * only readings do.
+ *
+ * Provider names, brand colours, and artwork hints arrive with the Host's
+ * route list, so this half knows no vendor by name: adding one needs no
+ * change here, and a vendor this build has no artwork for reads as its
+ * initial over the colour the Host declared.
  */
 
 window.__ModuleLoader__.load({
@@ -56,6 +61,21 @@ window.__ModuleLoader__.load({
         updatedAt: z.number().optional(),
         error: z.string().optional(),
       })
+      const balanceStatusSchema = z.object({
+        provider: z.string(),
+        state: z.enum([
+          'operational',
+          'degraded',
+          'partial-outage',
+          'major-outage',
+          'maintenance',
+          'unknown',
+        ]),
+        summary: z.string().optional(),
+        url: z.string().optional(),
+        updatedAt: z.number().optional(),
+        error: z.string().optional(),
+      })
       /** A strict codec carries the Zod factory the gateway validates with. */
       const strict = (schema, description, typeSymbol) => ({
         mode: 'strict',
@@ -70,8 +90,16 @@ window.__ModuleLoader__.load({
         source: 'json',
         codec: strict(providerSchema, 'Provider route to read.', 'dsh-model-allowance#provider'),
       }
+      // A provider entry carries what the browser needs to name and draw the
+      // route. Every added field is optional, so an older Host still answers.
       const providerListSchema = z.array(
-        z.object({ route: z.string(), configured: z.boolean() }),
+        z.object({
+          route: z.string(),
+          configured: z.boolean(),
+          name: z.object({ zh: z.string().optional(), en: z.string().optional() }).optional(),
+          color: z.string().optional(),
+          iconHint: z.string().optional(),
+        }),
       )
       return {
         package: 'dsh-model-allowance',
@@ -129,6 +157,17 @@ window.__ModuleLoader__.load({
               'dsh-model-allowance#balanceView',
             ),
           },
+          'balance/status': {
+            service: 'balanceController',
+            description: "Read one provider's platform status.",
+            invocation: { kind: 'direct' },
+            parameters: [providerParameter],
+            result: strict(
+              balanceStatusSchema,
+              'The status reading.',
+              'dsh-model-allowance#balanceStatus',
+            ),
+          },
         },
       }
     }
@@ -155,6 +194,12 @@ window.__ModuleLoader__.load({
       'detail.console': '控制台',
       'detail.error': '无法读取厂商余额。',
       'detail.moreProviders': '更多厂商',
+      'status.operational': '运行正常',
+      'status.degraded': '服务降级',
+      'status.partialOutage': '部分服务中断',
+      'status.majorOutage': '大面积中断',
+      'status.maintenance': '维护中',
+      'status.unknown': '状态未知',
       'badge.consumption': '相对上次读数的变化',
       'window.title.hour': '{count} 小时额度',
       'window.title.day': '{count} 天额度',
@@ -168,10 +213,6 @@ window.__ModuleLoader__.load({
       'duration.hoursMinutes': '{hours} 小时 {minutes} 分',
       'duration.minutes': '{minutes} 分钟',
       'duration.lessThanMinute': '不到 1 分钟',
-      'provider.deepseekAccount': 'DeepSeek 账号',
-      'provider.deepseekApiKey': 'DeepSeek API',
-      'provider.minimaxTokenPlan': 'MiniMax',
-      'provider.zhipuQuota': '智谱 GLM',
     }
 
     /** English dictionary. */
@@ -196,6 +237,12 @@ window.__ModuleLoader__.load({
       'detail.console': 'Console',
       'detail.error': 'Could not read the provider balance.',
       'detail.moreProviders': 'More providers',
+      'status.operational': 'Operational',
+      'status.degraded': 'Degraded',
+      'status.partialOutage': 'Partial outage',
+      'status.majorOutage': 'Major outage',
+      'status.maintenance': 'Maintenance',
+      'status.unknown': 'Status unknown',
       'badge.consumption': 'Change since the last reading',
       'window.title.hour': '{count}-hour quota',
       'window.title.day': '{count}-day quota',
@@ -209,10 +256,6 @@ window.__ModuleLoader__.load({
       'duration.hoursMinutes': '{hours}h {minutes}m',
       'duration.minutes': '{minutes}m',
       'duration.lessThanMinute': 'under a minute',
-      'provider.deepseekAccount': 'DeepSeek account',
-      'provider.deepseekApiKey': 'DeepSeek API',
-      'provider.minimaxTokenPlan': 'MiniMax',
-      'provider.zhipuQuota': 'Zhipu GLM',
     }
 
     /**
@@ -231,9 +274,15 @@ window.__ModuleLoader__.load({
       'outline-offset:1px}',
       '.dsh-model-allowance-dot{width:6px;height:6px;border-radius:50%;flex:none;',
       'background:var(--dsw-alias-state-idle-primary)}',
-      '.dsh-model-allowance-root[data-tone="ready"] .dsh-model-allowance-dot{',
+      // The dot reports the platform, not the reading: green while the service
+      // is available, red once its own status page says otherwise, and grey
+      // when this installation has no status source for the route.
+      '.dsh-model-allowance-root[data-service="operational"] .dsh-model-allowance-dot{',
       'background:var(--dsw-alias-state-success-primary)}',
-      '.dsh-model-allowance-root[data-tone="failed"] .dsh-model-allowance-dot{',
+      '.dsh-model-allowance-root[data-service="degraded"] .dsh-model-allowance-dot,',
+      '.dsh-model-allowance-root[data-service="partial-outage"] .dsh-model-allowance-dot,',
+      '.dsh-model-allowance-root[data-service="major-outage"] .dsh-model-allowance-dot,',
+      '.dsh-model-allowance-root[data-service="maintenance"] .dsh-model-allowance-dot{',
       'background:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-allowance-root[data-loading="true"] .dsh-model-allowance-dot{opacity:.5}',
       // The turn's difference rides beside the value for a few seconds. It is
@@ -348,6 +397,29 @@ window.__ModuleLoader__.load({
       'outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
       '.dsh-model-allowance-icon-button[disabled]{opacity:.5;cursor:default}',
       '.dsh-model-allowance-icon-button svg{display:block}',
+      // The platform status row: one dot whose colour is the state, the
+      // localized label, and a link to the source page when the vendor
+      // publishes one. It sits at the left edge of the footer, so the margin
+      // below pushes the reading time and the buttons to the right edge.
+      '.dsh-model-allowance-status{display:inline-flex;align-items:center;gap:5px;',
+      'margin-right:auto;min-width:0;font-size:11px;',
+      'color:var(--dsw-alias-label-primary);text-decoration:none}',
+      'a.dsh-model-allowance-status:hover{text-decoration:underline}',
+      '.dsh-model-allowance-status-label{flex:none}',
+      // The source's own words are the first thing to give up room when the
+      // footer is narrow; the state label and the dot never shrink.
+      '.dsh-model-allowance-status-summary{color:var(--dsw-alias-label-secondary);',
+      'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.dsh-model-allowance-status-dot{width:6px;height:6px;border-radius:50%;flex:none;',
+      'background:var(--dsw-alias-state-success-primary)}',
+      '.dsh-model-allowance-status[data-state="degraded"] .dsh-model-allowance-status-dot,',
+      '.dsh-model-allowance-status[data-state="maintenance"] .dsh-model-allowance-status-dot{',
+      'background:var(--dsw-alias-state-warn-primary)}',
+      '.dsh-model-allowance-status[data-state="partial-outage"] .dsh-model-allowance-status-dot,',
+      '.dsh-model-allowance-status[data-state="major-outage"] .dsh-model-allowance-status-dot{',
+      'background:var(--dsw-alias-state-error-primary)}',
+      '.dsh-model-allowance-status-arrow{font-size:10px;flex:none;',
+      'color:var(--dsw-alias-label-secondary)}',
     ].join('')
 
     /**
@@ -456,6 +528,16 @@ window.__ModuleLoader__.load({
 
     /** How long a finished turn's difference stays on the badge. */
     const CONSUMPTION_MS = 10 * 1000
+
+    /**
+     * How often the badge re-reads the platform status.
+     *
+     * The dot speaks for the platform at a glance, so it cannot wait for the
+     * panel to open. The Host caches each status source for the same minute,
+     * so this cadence costs at most one upstream fetch per source per minute
+     * however many browser tabs are open.
+     */
+    const STATUS_REFRESH_MS = 60 * 1000
 
     /**
      * Whether a reading's difference is still worth showing.
@@ -570,34 +652,60 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Route to locale key for the provider's display name.
+     * The language the interface is in.
      *
-     * A route without an entry falls back to its own id, so a newly added
-     * adapter is readable before anyone writes copy for it.
+     * The locale service keeps `<html lang>` pointed at the active locale, so
+     * reading it is reading the same choice every `t()` call resolves
+     * through. A non-browser host has no document, and English is the
+     * baseline there.
+     *
+     * @returns {'zh' | 'en'} The language, collapsed to the two baselines.
      */
-    const PROVIDER_NAME_KEYS = {
-      'deepseek-account': 'provider.deepseekAccount',
-      deepseek: 'provider.deepseekApiKey',
-      'minimax-cn': 'provider.minimaxTokenPlan',
-      zai: 'provider.zhipuQuota',
-      'zai-coding-cn': 'provider.zhipuQuota',
+    function activeLanguage() {
+      const tag = typeof document !== 'undefined' ? document.documentElement?.lang : undefined
+      return typeof tag === 'string' && tag.toLowerCase().startsWith('zh') ? 'zh' : 'en'
     }
 
     /**
-     * Name a provider route for the switcher.
+     * Pick one route's display name from the Host metadata.
+     *
+     * A route without metadata falls back to its own id, so a newly added
+     * adapter is readable before anyone writes copy for it.
+     *
+     * @param {{name?: {zh?: string, en?: string}} | undefined} entry Directory entry.
      * @param {string} route Provider route.
-     * @param {(key: string, params?: object) => string} t Translator.
      * @returns {string} The display name.
      */
-    function providerName(route, t) {
-      const key = PROVIDER_NAME_KEYS[route]
-      if (key === undefined) return route
-      const name = t(key)
-      return name === key ? route : name
+    function pickName(entry, route) {
+      const name = entry?.name
+      if (!name) return route
+      return name[activeLanguage()] ?? name.en ?? name.zh ?? route
+    }
+
+    /** Shared status state to its locale key. */
+    const STATUS_LABEL_KEYS = {
+      operational: 'status.operational',
+      degraded: 'status.degraded',
+      'partial-outage': 'status.partialOutage',
+      'major-outage': 'status.majorOutage',
+      maintenance: 'status.maintenance',
+      unknown: 'status.unknown',
     }
 
     /**
-     * The mark of each vendor.
+     * Name one status state in the interface language.
+     * @param {string} state Shared status state.
+     * @param {(key: string, params?: object) => string} t Translator.
+     * @returns {string} The label.
+     */
+    function statusLabel(state, t) {
+      const key = STATUS_LABEL_KEYS[state]
+      return key === undefined ? t('status.unknown') : t(key)
+    }
+
+    /**
+     * The artwork this build can draw, keyed by the hint a route's Host
+     * metadata carries.
      *
      * All three are the vendors' own artwork, taken from what each site
      * publishes: DeepSeek serves a standalone square icon SVG, MiniMax and
@@ -606,17 +714,12 @@ window.__ModuleLoader__.load({
      * a letter tile respectively — so the glyph is lifted from the wordmark.
      * All three are trademarks of their owners and identify the provider here.
      *
-     * Routes that share a vendor share a mark. The two DeepSeek entries look
-     * alike on purpose; the difference between the signed-in account and a
-     * stored key is carried by the name, not by a second frame style.
+     * Routes that share a vendor share a hint; the two DeepSeek entries look
+     * alike on purpose, and the difference between the signed-in account and a
+     * stored key is carried by the name. A hint this build has no artwork for
+     * falls back to the route's initial over its brand colour, so adding a
+     * vendor never requires touching this file.
      */
-    const PROVIDER_MARKS = {
-      'deepseek-account': { icon: 'deepseek', color: '#4d6bfe' },
-      deepseek: { icon: 'deepseek', color: '#4d6bfe' },
-      'minimax-cn': { icon: 'minimax', color: '#e21680' },
-      zai: { icon: 'zhipu', color: '#5668f5' },
-      'zai-coding-cn': { icon: 'zhipu', color: '#5668f5' },
-    }
 
     /** DeepSeek's own square icon, 50x50, filled #4D6BFE. */
     const DEEPSEEK_PATH =
@@ -698,31 +801,40 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The mark for one route, falling back to the route's first letter.
+     * The mark for one route: its Host-declared artwork hint and brand colour,
+     * or the route's initial in grey when this installation named neither.
+     * @param {{iconHint?: string, color?: string} | undefined} entry Directory entry.
      * @param {string} route Provider route.
      * @returns {{icon?: string, letter?: string, color: string}} The mark.
      */
-    function providerMark(route) {
-      return (
-        PROVIDER_MARKS[route] ?? {
-          letter: route.slice(0, 1).toUpperCase(),
-          color: '#6b7280',
-        }
-      )
+    function markOf(entry, route) {
+      const color = typeof entry?.color === 'string' && entry.color !== '' ? entry.color : '#6b7280'
+      if (typeof entry?.iconHint === 'string' && entry.iconHint !== '') {
+        return { icon: entry.iconHint, color }
+      }
+      return { letter: route.slice(0, 1).toUpperCase(), color }
     }
 
     /**
      * The svg for one mark, sized so every mark draws the same ink height.
+     *
+     * A hint this build has no artwork for draws the route's initial instead:
+     * a blank chip would be worse than a letter.
+     *
      * @param {string} route Provider route.
      * @param {number} inkHeight Drawn height of the ink, in pixels.
+     * @param {{icon?: string, letter?: string, color: string}} mark The mark.
      * @returns {object} The icon element.
      */
-    function providerIcon(route, inkHeight) {
-      const mark = providerMark(route)
-      if (mark.letter !== undefined) {
-        return h('span', { className: 'dsh-model-allowance-tab-letter' }, mark.letter)
+    function providerIcon(route, inkHeight, mark) {
+      const geo = mark.icon === undefined ? undefined : ICON_GEOMETRY[mark.icon]
+      if (mark.letter !== undefined || geo === undefined) {
+        return h(
+          'span',
+          { className: 'dsh-model-allowance-tab-letter' },
+          mark.letter ?? route.slice(0, 1).toUpperCase(),
+        )
       }
-      const geo = ICON_GEOMETRY[mark.icon]
       // Both dimensions must land on whole, even pixels.
       //
       // A fractional box is placed by flooring it against the chip's centre:
@@ -901,8 +1013,35 @@ window.__ModuleLoader__.load({
       // provider this installation can read. `picked` holds that override and
       // is cleared whenever the model moves, so the card snaps back to it.
       const [picked, setPicked] = React.useState(null)
-      const [available, setAvailable] = React.useState([])
+      // Every route the Host can read, with the metadata that names and draws
+      // it. The switcher offers the configured ones; the metadata of the rest
+      // still names the route when it is the one being read.
+      const [directory, setDirectory] = React.useState([])
       const lastModelProvider = React.useRef(null)
+
+      /** The routes this installation can read, for the switcher. */
+      const available = directory.filter((entry) => entry.configured)
+
+      /**
+       * The directory entry for one route, when the Host named it.
+       * @param {string} route Provider route.
+       * @returns {object | undefined} The entry.
+       */
+      const entryOf = (route) => directory.find((entry) => entry.route === route)
+
+      /**
+       * Name a route from its metadata, falling back to the route id.
+       * @param {string} route Provider route.
+       * @returns {string} The display name.
+       */
+      const nameOf = (route) => pickName(entryOf(route), route)
+
+      /**
+       * The mark for a route, from its metadata.
+       * @param {string} route Provider route.
+       * @returns {{icon?: string, letter?: string, color: string}} The mark.
+       */
+      const markFor = (route) => markOf(entryOf(route), route)
 
       // The switcher is a single row of marks. When they cannot all fit, the
       // tail moves into a menu behind a button on the right, so the strip never
@@ -916,6 +1055,33 @@ window.__ModuleLoader__.load({
       // badge until the first message. Ask what a new session would use — the
       // installation's default, which the model selector also falls back to.
       const [defaultProvider, setDefaultProvider] = React.useState(null)
+      // The provider's own platform status, fetched with the panel. The view
+      // carries its provider, so a reading for the route that was selected a
+      // moment ago is never shown against the current one.
+      const [providerStatus, setProviderStatus] = React.useState(null)
+
+      // The panel names routes from the Host's directory: small, local, and
+      // stable for a session. Fetching it at mount means the first open names
+      // a route instead of flashing its id; the open-time refresh below keeps
+      // it current when a credential changed in the same session.
+      React.useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+          try {
+            const api = await getBalanceApi()
+            if (!api || typeof api.list !== 'function') return
+            const result = await api.list()
+            if (cancelled || !result.ok) return
+            setDirectory(result.value)
+          } catch (error) {
+            console.error('[model-allowance] listing providers failed', { error })
+          }
+        })()
+        return () => {
+          cancelled = true
+        }
+      }, [ctx])
+
       React.useEffect(() => {
         if (selected !== null) return undefined
         let cancelled = false
@@ -1005,7 +1171,7 @@ window.__ModuleLoader__.load({
             if (!api || typeof api.list !== 'function') return
             const result = await api.list()
             if (cancelled || !result.ok) return
-            setAvailable(result.value.filter((entry) => entry.configured))
+            setDirectory(result.value)
           } catch (error) {
             console.error('[model-allowance] listing providers failed', { error })
           }
@@ -1106,6 +1272,32 @@ window.__ModuleLoader__.load({
         }
       }, [activeProvider, ctx])
 
+      // The badge dot speaks for the platform: green while the service is
+      // available, red once its own status page says otherwise. It is read for
+      // the provider the badge speaks for, not only while the panel is open,
+      // and refreshed on the same slow clock the Host caches it with.
+      React.useEffect(() => {
+        if (!activeProvider) return undefined
+        let cancelled = false
+        const readStatus = async () => {
+          try {
+            const api = await getBalanceApi()
+            if (!api || typeof api.status !== 'function') return
+            const result = await api.status(activeProvider)
+            if (cancelled || !result.ok) return
+            setProviderStatus(result.value)
+          } catch (error) {
+            console.error('[model-allowance] reading provider status failed', { error })
+          }
+        }
+        void readStatus()
+        const timer = setInterval(readStatus, STATUS_REFRESH_MS)
+        return () => {
+          cancelled = true
+          clearInterval(timer)
+        }
+      }, [activeProvider, ctx])
+
       const refresh = React.useCallback(async () => {
         setRefreshing(true)
         try {
@@ -1113,6 +1305,12 @@ window.__ModuleLoader__.load({
           if (!api) return
           const result = await api.refresh(activeProvider)
           if (result.ok) setView(result.value)
+          // Status has its own cache, so a refresh asks again and takes
+          // whatever the Host considers fresh.
+          if (typeof api.status === 'function') {
+            const status = await api.status(activeProvider)
+            if (status.ok) setProviderStatus(status.value)
+          }
         } catch (error) {
           console.error('[model-allowance] refresh failed', { provider: activeProvider, error })
         } finally {
@@ -1159,8 +1357,13 @@ window.__ModuleLoader__.load({
 
       if (!provider) return null
 
-      const tone =
-        view?.status === 'ready' ? 'ready' : view?.status === 'failed' ? 'failed' : 'idle'
+      // Which platform light the badge shows. A status reading for another
+      // route — or none yet — is not evidence about this one, so it stays
+      // grey rather than claiming the platform is fine.
+      const serviceState =
+        providerStatus && providerStatus.provider === activeProvider
+          ? providerStatus.state
+          : 'unknown'
 
       // How many marks fit on one row. Each mark is `MARK_SIZE` plus the gap;
       // the menu button, when it appears, needs its own slot. An unmeasured
@@ -1190,8 +1393,8 @@ window.__ModuleLoader__.load({
 
       /** One provider mark. */
       const markButton = (entry) => {
-        const mark = providerMark(entry.route)
-        const name = providerName(entry.route, t)
+        const mark = markFor(entry.route)
+        const name = nameOf(entry.route)
         return h(
           'button',
           {
@@ -1209,7 +1412,7 @@ window.__ModuleLoader__.load({
               setMenuOpen(false)
             },
           },
-          providerIcon(entry.route, 14),
+          providerIcon(entry.route, 14, mark),
         )
       }
 
@@ -1218,7 +1421,7 @@ window.__ModuleLoader__.load({
         {
           ref: rootRef,
           className: 'dsh-model-allowance-root',
-          'data-tone': tone,
+          'data-service': serviceState,
           'data-loading': loading ? 'true' : 'false',
         },
         // Component-local styles: React removes them with the component, and
@@ -1314,11 +1517,11 @@ window.__ModuleLoader__.load({
                                 'span',
                                 {
                                   className: 'dsh-model-allowance-menu-mark',
-                                  style: { '--provider-mark': providerMark(entry.route).color },
+                                  style: { '--provider-mark': markFor(entry.route).color },
                                 },
-                                providerIcon(entry.route, 11),
+                                providerIcon(entry.route, 11, markFor(entry.route)),
                               ),
-                              h('span', null, providerName(entry.route, t)),
+                              h('span', null, nameOf(entry.route)),
                             ),
                           ),
                         )
@@ -1328,7 +1531,7 @@ window.__ModuleLoader__.load({
                     'div',
                     { className: 'dsh-model-allowance-row' },
                     h('span', null, t('detail.provider')),
-                    h('span', null, providerName(activeProvider, t)),
+                    h('span', null, nameOf(activeProvider)),
                   ),
               view?.kind === 'amount' && typeof view.amount === 'number'
                 ? h(
@@ -1454,6 +1657,57 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 { className: 'dsh-model-allowance-actions' },
+                // The platform status sits at the left edge of the footer, on
+                // the same line as the reading time: the card gains no extra
+                // row, and the state and the source page stay together.
+                serviceState !== 'unknown'
+                  ? h(
+                      providerStatus.url ? 'a' : 'span',
+                      {
+                        className: 'dsh-model-allowance-status',
+                        'data-state': providerStatus.state,
+                        title:
+                          providerStatus.summary === undefined
+                            ? statusLabel(providerStatus.state, t)
+                            : `${statusLabel(providerStatus.state, t)} · ${providerStatus.summary}`,
+                        ...(providerStatus.url
+                          ? {
+                              href: providerStatus.url,
+                              target: '_blank',
+                              rel: 'noreferrer noopener',
+                            }
+                          : {}),
+                      },
+                      h('span', {
+                        className: 'dsh-model-allowance-status-dot',
+                        'aria-hidden': true,
+                      }),
+                      h(
+                        'span',
+                        { className: 'dsh-model-allowance-status-label' },
+                        statusLabel(providerStatus.state, t),
+                      ),
+                      providerStatus.summary
+                        ? h(
+                            'span',
+                            { className: 'dsh-model-allowance-status-summary' },
+                            providerStatus.summary,
+                          )
+                        : null,
+                      ...(providerStatus.url
+                        ? [
+                            h(
+                              'span',
+                              {
+                                className: 'dsh-model-allowance-status-arrow',
+                                'aria-hidden': true,
+                              },
+                              '↗',
+                            ),
+                          ]
+                        : []),
+                    )
+                  : null,
                 view?.updatedAt
                   ? h(
                       'span',

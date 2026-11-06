@@ -17,18 +17,28 @@ DSH 自带的账户页只显示 DeepSeek 官方账号余额。会话切到 MiniM
 - 每轮对话结束自动刷新，并短暂显示读数的变化（如 `↓0.90`）
 - 点击徽章查看详情：分窗口进度条、重置倒计时、手动刷新、直达厂商控制台
 - 可切换查看本机已配置的其他厂商；未配置凭证的厂商不会出现
+- 显示厂商官方的平台状态（读取其状态页），把"读数拿不到"和"平台故障"区分开来：
+  徽章左侧圆点绿色表示服务可用，红色表示状态页报告异常；无状态源的路由显示灰点
 - 凭证只在本机进程内使用，网页端只看到读数
 
 ## 支持的厂商
 
-| 厂商                | 显示内容                   | 凭证                  |
-| ------------------- | -------------------------- | --------------------- |
-| DeepSeek 账号       | 余额                       | 无需配置（DSH 登录）  |
-| DeepSeek API Key    | 余额                       | `DEEPSEEK_API_KEY`    |
-| MiniMax Coding Plan | 5 小时窗 + 每周窗剩余额度  | `MINIMAX_CN_API_KEY`  |
-| 智谱 Coding Plan    | 5 小时窗 + 每周窗剩余配额  | `ZAI_API_KEY`         |
+| 厂商                | 显示内容                   | 凭证                        |
+| ------------------- | -------------------------- | --------------------------- |
+| DeepSeek 账号       | 余额                       | 无需配置（DSH 登录）        |
+| DeepSeek API Key    | 余额                       | `DEEPSEEK_API_KEY`          |
+| MiniMax Coding Plan | 5 小时窗 + 每周窗剩余额度  | `MINIMAX_CN_API_KEY`        |
+| 智谱 Coding Plan    | 5 小时窗 + 每周窗剩余配额  | `ZAI_API_KEY` / `ZAI_CODING_CN_API_KEY` |
+| Kimi for Coding     | 每周窗 + 5 小时窗剩余额度  | `KIMI_API_KEY`              |
+| OpenCode Go         | 5 小时窗 + 每周窗 + 每月窗 | `OPENCODE_API_KEY`          |
 
-插件复用 DSH 已有的凭证配置：这些 Key 只要配过，装完即用。
+插件复用 DSH 已有的凭证配置：它会向 harness 询问每条厂商路由用的是哪个凭证，
+这些 Key 只要配过，装完即用；profile 里自定义了 `apiKeyEnv` 的路由也能覆盖。
+上表列出的是默认凭证名。
+
+平台状态取自各厂商自己的状态页：DeepSeek（`status.deepseek.com`）、
+MiniMax（`status.minimaxi.com`）、Moonshot/Kimi（`status.moonshot.cn`）、
+OpenCode（`status.opencode.ai`）；智谱没有机器可读的状态页，其卡片不显示状态行。
 
 ## 安装
 

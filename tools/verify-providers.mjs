@@ -1,23 +1,32 @@
 /**
- * Exercise the Host provider adapters against stubbed transports.
+ * Exercise every provider adapter against its recorded response fixtures.
  *
- * Each case answers from a recorded real response shape, so this proves the
- * parsers and the two quantity dimensions without touching the network.
+ * Adding a vendor means adding one file under `lib/providers/`, and that file
+ * carries its own recorded response and expectations. This runner walks the
+ * registry and turns each fixture into an assertion, so a new adapter is
+ * covered without touching this file. Only the rules that hold for every
+ * adapter live here: https console links, no retired console paths, complete
+ * display metadata, and globally unique routes.
  */
-import { findAdapter, KIND_AMOUNT, KIND_QUOTA, PROVIDER_ADAPTERS } from '../lib/providers.js'
+import { findAdapter, PROVIDER_ADAPTERS } from '../lib/providers.js'
+import { readEndpointAdapter } from '../lib/providers/shared.js'
 
-const cases = []
-
-/** Run one adapter with a stubbed global fetch. */
-async function withFetch(responseBody, run) {
+/**
+ * Stub fetch with one recorded response, and record the request it answered.
+ * @param {object} fixture Recorded fixture.
+ * @param {() => Promise<object>} run The read to perform.
+ * @returns {Promise<{result: object, seen: Array<{url: string, init: object}>}>}
+ *   The reading and the requests it made.
+ */
+async function withFetch(fixture, run) {
   const original = globalThis.fetch
-  let seen
+  const seen = []
   globalThis.fetch = async (url, init) => {
-    seen = { url, init }
+    seen.push({ url, init })
     return {
-      ok: true,
-      status: 200,
-      json: async () => responseBody,
+      ok: (fixture.httpStatus ?? 200) < 400,
+      status: fixture.httpStatus ?? 200,
+      json: async () => fixture.response ?? {},
     }
   }
   try {
@@ -27,234 +36,163 @@ async function withFetch(responseBody, run) {
   }
 }
 
-// --- DeepSeek API key: real recorded response -------------------------------
-{
-  const adapter = findAdapter('deepseek')
-  const { result, seen } = await withFetch(
-    {
-      is_available: true,
-      balance_infos: [
-        { currency: 'CNY', total_balance: '46.71', granted_balance: '0.00', topped_up_balance: '46.71' },
-      ],
-    },
-    () => adapter.read('deepseek', 'sk-test', AbortSignal.timeout(5000)),
-  )
-  cases.push({
-    name: 'deepseek api-key',
-    status: result.status,
-    kind: result.kind,
-    amount: result.amount,
-    currency: result.currency,
-    auth: seen.init.headers.authorization,
-    url: seen.url,
-  })
-}
-
-// --- MiniMax coding plan: real recorded response ---------------------------
-// The plan meters a 5-hour window and a 7-day window, and reports both as
-// percentages plus the closing timestamp of each.
-{
-  const adapter = findAdapter('minimax-cn')
-  const intervalStart = 1793937039924
-  const intervalEnd = intervalStart + 5 * 3_600_000
-  const weeklyStart = 1793727425969
-  const weeklyEnd = weeklyStart + 7 * 86_400_000
-  const { result, seen } = await withFetch(
-    {
-      model_remains: [
-        {
-          start_time: intervalStart,
-          end_time: intervalEnd,
-          remains_time: 16380448,
-          current_interval_total_count: 0,
-          current_interval_usage_count: 0,
-          current_interval_remaining_percent: 82,
-          weekly_start_time: weeklyStart,
-          weekly_end_time: weeklyEnd,
-          weekly_remains_time: 393566493,
-          current_weekly_total_count: 0,
-          current_weekly_usage_count: 0,
-          current_weekly_remaining_percent: 66,
-        },
-      ],
-      base_resp: { status_code: 0, status_msg: 'success' },
-    },
-    () => adapter.read('minimax-cn', 'sk-cp-test', AbortSignal.timeout(5000)),
-  )
-  cases.push({
-    name: 'minimax-cn token plan',
-    status: result.status,
-    kind: result.kind,
-    percent: result.percent,
-    windows: result.windows,
-    auth: seen.init.headers.authorization,
-    intervalEnd,
-    weeklyEnd,
-  })
-}
-
-// --- Zhipu quota: real recorded response -----------------------------------
-// `unit` is a length code and `number` counts them: unit 3 + 5 is the 5-hour
-// window, unit 6 + 1 the weekly one. The quota is `usage` and
-// `currentValue` is what has been spent.
-{
-  const adapter = findAdapter('zai')
-  const { result } = await withFetch(
-    {
-      code: 200,
-      data: {
-        limits: [
-          {
-            type: 'CREDIT_LIMIT',
-            unit: 3,
-            number: 5,
-            usage: 2000,
-            currentValue: 0,
-            remaining: 2000,
-            percentage: 0,
-          },
-          {
-            type: 'CREDIT_LIMIT',
-            unit: 6,
-            number: 1,
-            usage: 10000,
-            currentValue: 10071,
-            remaining: 0,
-            percentage: 100,
-            nextResetTime: 1794305132998,
-          },
-        ],
-        level: 'lite',
-      },
-    },
-    () => adapter.read('zai', 'test-key', AbortSignal.timeout(5000)),
-  )
-  cases.push({
-    name: 'zhipu quota',
-    status: result.status,
-    kind: result.kind,
-    percent: result.percent,
-    windows: result.windows,
-  })
-}
-
-// --- DeepSeek account: forwarded to the Host service ----------------------
-{
-  const adapter = findAdapter('deepseek-account')
-  const ctx = {
-    get: (key) =>
-      key === 'deepseekAccount'
-        ? {
-            getBalance: async (client) => ({
-              status: 'ready',
-              value: [{ currency: 'CNY', balance: '40.00' }],
-              bonusWallets: [{ currency: 'CNY', balance: '6.71' }],
-              client,
-            }),
-          }
-        : undefined,
+/**
+ * Assert that every expected field is present and equal.
+ *
+ * Nested objects are walked key by key and arrays compare element-wise on the
+ * expected length, so a fixture states only the fields it cares about.
+ *
+ * @param {unknown} actual The reading.
+ * @param {unknown} expect Expected fields.
+ * @param {string} path Where the comparison is, for the failure message.
+ * @param {string} where Fixture identity, for the failure message.
+ */
+function expectSubset(actual, expect, path, where) {
+  if (Array.isArray(expect)) {
+    if (!Array.isArray(actual) || actual.length !== expect.length) {
+      const got = Array.isArray(actual) ? actual.length : typeof actual
+      throw new Error(`${where}: expected ${String(expect.length)} entries at ${path}, got ${String(got)}`)
+    }
+    expect.forEach((entry, index) => {
+      expectSubset(actual[index], entry, `${path}[${String(index)}]`, where)
+    })
+    return
   }
-  const result = await adapter.readWithEnv({
-    route: 'deepseek-account',
-    apiKey: undefined,
-    ctx,
-    signal: AbortSignal.timeout(5000),
-  })
-  cases.push({
-    name: 'deepseek-account (host service)',
-    status: result.status,
-    kind: result.kind,
-    amount: result.amount,
-    currency: result.currency,
-  })
-}
-
-// --- Unknown route --------------------------------------------------------
-cases.push({ name: 'unknown route', adapter: findAdapter('openai') ?? null })
-
-// --- Assertions -----------------------------------------------------------
-const byName = Object.fromEntries(cases.map((entry) => [entry.name, entry]))
-
-if (byName['deepseek api-key'].amount !== 46.71) throw new Error('deepseek amount mismatch')
-if (byName['deepseek api-key'].kind !== KIND_AMOUNT) throw new Error('deepseek kind mismatch')
-if (byName['deepseek api-key'].auth !== 'Bearer sk-test') throw new Error('deepseek auth mismatch')
-if (byName['deepseek-account (host service)'].amount !== 46.71) {
-  throw new Error('account wallet sum mismatch')
-}
-if (byName['unknown route'].adapter !== null) throw new Error('unknown route should not resolve')
-
-const minimax = byName['minimax-cn token plan']
-if (minimax.kind !== KIND_QUOTA) throw new Error('minimax kind mismatch')
-if (minimax.percent !== 82) throw new Error('minimax percent mismatch')
-if (minimax.windows?.length !== 2) {
-  throw new Error(`minimax should report two windows, got ${minimax.windows?.length}`)
-}
-{
-  const [session, weekly] = minimax.windows
-  if (session.id !== 'session') throw new Error('minimax window 0 is not the session window')
-  if (session.unit !== 'hour' || session.count !== 5) {
-    throw new Error(`minimax session window length wrong: ${session.unit} ${session.count}`)
+  if (expect !== null && typeof expect === 'object') {
+    if (actual === null || typeof actual !== 'object') {
+      throw new Error(`${where}: expected an object at ${path}`)
+    }
+    for (const [key, value] of Object.entries(expect)) {
+      expectSubset(
+        /** @type {Record<string, unknown>} */ (actual)[key],
+        value,
+        `${path}.${key}`,
+        where,
+      )
+    }
+    return
   }
-  if (session.remainingPercent !== 82) throw new Error('minimax session percent mismatch')
-  if (session.resetAt !== minimax.intervalEnd) throw new Error('minimax session reset mismatch')
-
-  // The plan's long window is seven days. Calling it a month would be wrong.
-  if (weekly.id !== 'weekly') throw new Error('minimax window 1 is not the weekly window')
-  if (weekly.unit !== 'day' || weekly.count !== 7) {
-    throw new Error(`minimax weekly window length wrong: ${weekly.unit} ${weekly.count}`)
+  if (!Object.is(actual, expect)) {
+    throw new Error(
+      `${where}: expected ${path} = ${JSON.stringify(expect)}, got ${JSON.stringify(actual)}`,
+    )
   }
-  if (weekly.remainingPercent !== 66) throw new Error('minimax weekly percent mismatch')
-  if (weekly.resetAt !== minimax.weeklyEnd) throw new Error('minimax weekly reset mismatch')
-  // A coding-plan key reports no request counts, so no used/total is invented.
-  if (session.total !== undefined) throw new Error('minimax invented a total')
 }
 
-const zhipu = byName['zhipu quota']
-if (zhipu.kind !== KIND_QUOTA) throw new Error('zhipu kind mismatch')
-if (zhipu.windows?.length !== 2) {
-  throw new Error(`zhipu should report two windows, got ${zhipu.windows?.length}`)
-}
-{
-  const session = zhipu.windows.find((window) => window.id === 'session')
-  const weekly = zhipu.windows.find((window) => window.id === 'weekly')
-  if (!session || !weekly) throw new Error('zhipu windows are not session + weekly')
-  if (session.unit !== 'hour' || session.count !== 5) {
-    throw new Error(`zhipu session window length wrong: ${session.unit} ${session.count}`)
+/**
+ * Read one dotted path, including array indices such as `windows[0].total`.
+ * @param {unknown} value Root value.
+ * @param {string} path Dotted path.
+ * @returns {unknown} The value at the path, or undefined.
+ */
+function valueAt(value, path) {
+  let current = value
+  for (const segment of path.split('.')) {
+    const match = /^([^[\]]+)(?:\[(\d+)\])?$/.exec(segment)
+    if (!match) return undefined
+    if (current === null || typeof current !== 'object') return undefined
+    current = /** @type {Record<string, unknown>} */ (current)[match[1]]
+    if (match[2] !== undefined) {
+      if (!Array.isArray(current)) return undefined
+      current = current[Number(match[2])]
+    }
   }
-  // `usage` is the quota and `currentValue` is what was spent.
-  if (session.total !== 2000) throw new Error(`zhipu session total should be 2000, got ${session.total}`)
-  if (session.used !== 0) throw new Error(`zhipu session used should be 0, got ${session.used}`)
-  if (session.remainingPercent !== 100) throw new Error('zhipu session percent mismatch')
-  if (weekly.total !== 10000) throw new Error(`zhipu weekly total should be 10000, got ${weekly.total}`)
-  if (weekly.used !== 10071) throw new Error(`zhipu weekly used should be 10071, got ${weekly.used}`)
-  if (weekly.unit !== 'week') throw new Error(`zhipu long window unit should be week, got ${weekly.unit}`)
-  if (weekly.remainingPercent !== 0) throw new Error('zhipu weekly percent mismatch')
-  if (weekly.resetAt === undefined) throw new Error('zhipu weekly reset missing')
-  // The exhausted window is the binding constraint on the account.
-  if (zhipu.percent !== 0) throw new Error('zhipu binding percent should be the exhausted window')
+  return current
 }
 
-// --- console links must not point at retired pages ------------------------
+// --- fixtures ---------------------------------------------------------------
+const cases = []
+for (const adapter of PROVIDER_ADAPTERS) {
+  for (const fixture of adapter.fixtures) {
+    const where = `${adapter.id} / ${fixture.name}`
+    const route = fixture.route ?? adapter.routes[0]
+    let result
+
+    if (adapter.readWithEnv) {
+      // A host-service adapter reads through services rather than the network.
+      const services = fixture.services ?? {}
+      result = await adapter.readWithEnv({
+        route,
+        apiKey: undefined,
+        ctx: { get: (key) => services[key] },
+        signal: AbortSignal.timeout(5000),
+      })
+    } else {
+      const apiKey = fixture.apiKey ?? 'test-key'
+      const { result: read, seen } = await withFetch(fixture, () =>
+        readEndpointAdapter(adapter, { route, apiKey, signal: AbortSignal.timeout(5000) }),
+      )
+      result = read
+      // The endpoint and the signing style are part of the contract, so check
+      // what the request actually carried.
+      const request = seen[0]
+      if (!request) throw new Error(`${where}: the adapter performed no request`)
+      if (request.url !== adapter.http.endpoint) {
+        throw new Error(`${where}: read ${request.url}, expected ${adapter.http.endpoint}`)
+      }
+      const authorization = request.init?.headers?.authorization
+      const expected = adapter.http.auth === 'bearer' ? `Bearer ${apiKey}` : apiKey
+      if (authorization !== expected) {
+        throw new Error(
+          `${where}: signed with ${JSON.stringify(authorization)}, expected ${JSON.stringify(expected)}`,
+        )
+      }
+    }
+
+    expectSubset(result, fixture.expect, 'reading', where)
+    for (const path of fixture.absent ?? []) {
+      const present = valueAt(result, path)
+      if (present !== undefined) {
+        throw new Error(`${where}: ${path} should be absent, got ${JSON.stringify(present)}`)
+      }
+    }
+    cases.push({
+      adapter: adapter.id,
+      fixture: fixture.name,
+      route,
+      status: result.status,
+      kind: result.kind,
+    })
+  }
+}
+
+// --- every adapter keeps its contract --------------------------------------
+// The route registry already refuses duplicates at import time; these checks
+// cover the metadata a fixture cannot see.
+const routes = new Set()
+for (const adapter of PROVIDER_ADAPTERS) {
+  if (typeof adapter.consoleUrl !== 'string' || !adapter.consoleUrl.startsWith('https://')) {
+    throw new Error(`adapter ${adapter.id} needs an https console link`)
+  }
+  if (typeof adapter.display?.name?.zh !== 'string' || adapter.display.name.zh === '') {
+    throw new Error(`adapter ${adapter.id} needs a zh display name`)
+  }
+  if (typeof adapter.display?.name?.en !== 'string' || adapter.display.name.en === '') {
+    throw new Error(`adapter ${adapter.id} needs an en display name`)
+  }
+  if (typeof adapter.display?.mark?.color !== 'string' || adapter.display.mark.color === '') {
+    throw new Error(`adapter ${adapter.id} needs a brand colour`)
+  }
+  for (const route of adapter.routes) {
+    if (routes.has(route)) throw new Error(`two adapters declare the route ${route}`)
+    routes.add(route)
+  }
+}
+
 // A dead console link is a dead end the user cannot fix, and these paths have
 // already moved once: Zhipu split API keys from plan keys in October 2026 and
 // retired the old usercenter path, and MiniMax redirects off the older host.
-{
-  const urls = PROVIDER_ADAPTERS.map((adapter) => adapter.consoleUrl)
-  if (urls.some((url) => typeof url !== 'string' || !url.startsWith('https://'))) {
-    throw new Error('every adapter needs an https console link')
-  }
-  const retired = ['open.bigmodel.cn/usercenter/apikeys', 'platform.minimaxi.com']
+const retired = ['open.bigmodel.cn/usercenter/apikeys', 'platform.minimaxi.com']
+for (const adapter of PROVIDER_ADAPTERS) {
   for (const fragment of retired) {
-    if (urls.some((url) => url.includes(fragment))) {
-      throw new Error(`a console link still points at the retired path ${JSON.stringify(fragment)}`)
+    if (adapter.consoleUrl.includes(fragment)) {
+      throw new Error(`adapter ${adapter.id} points at the retired path ${JSON.stringify(fragment)}`)
     }
   }
-  // Each brand keeps one destination, so the registry cannot drift per route.
-  const zhipuUrls = new Set(
-    PROVIDER_ADAPTERS.filter((adapter) => adapter.id === 'zhipu-quota').map((a) => a.consoleUrl),
-  )
-  if (zhipuUrls.size !== 1) throw new Error('the zhipu adapter declares more than one console link')
 }
 
+// An unknown route is not an adapter, but the client may still ask.
+if (findAdapter('__none__') !== undefined) throw new Error('an unknown route should not resolve')
+
 console.log(JSON.stringify(cases, null, 2))
-console.log('OK: all provider adapters parse their recorded responses')
+console.log(`OK: ${String(PROVIDER_ADAPTERS.length)} adapters parse their recorded responses`)

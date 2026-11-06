@@ -27,7 +27,10 @@ function strictContext(services) {
 const credentials = {
   MINIMAX_CN_API_KEY: 'sk-cp-test',
   ZAI_API_KEY: 'zhipu-test',
+  ZAI_CODING_CN_API_KEY: 'zhipu-cn-test',
   DEEPSEEK_API_KEY: 'sk-test',
+  KIMI_API_KEY: 'kimi-test',
+  OPENCODE_API_KEY: 'opencode-test',
 }
 
 const ctx = strictContext({
@@ -62,7 +65,23 @@ const responses = {
   },
   'https://open.bigmodel.cn/api/monitor/usage/quota/limit': {
     code: 200,
-    data: { limits: [{ number: 5, usage: 2000, remaining: 2000, percentage: 0 }] },
+    data: { limits: [{ unit: 3, number: 5, usage: 2000, remaining: 2000, percentage: 0 }] },
+  },
+  'https://api.kimi.com/coding/v1/usages': {
+    usage: { limit: '100', used: '40', resetTime: '2026-08-04T11:05:18Z' },
+    limits: [
+      {
+        window: { duration: 300, timeUnit: 'TIME_UNIT_MINUTE' },
+        detail: { limit: '100', used: '25', resetTime: '2026-07-28T16:05:18Z' },
+      },
+    ],
+  },
+  'https://opencode.ai/zen/go/v1/usage': {
+    usage: {
+      rolling: { status: 'ok', percent: 1 },
+      weekly: { status: 'ok', percent: 12 },
+      monthly: { status: 'ok', percent: 35 },
+    },
   },
 }
 
@@ -79,6 +98,99 @@ try {
     const route = adapter.routes[0]
     const view = await service.read(route, { force: true })
     results.push({ adapter: adapter.id, route, status: view.status, kind: view.kind, error: view.error })
+  }
+
+  // --- credential discovery -----------------------------------------------
+  // The harness names the credential for every route it serves; the plugin
+  // must ask it rather than keep a table that rots. These stubs mirror what
+  // `llm.listConfigurableProviders()` and `settings.describe()` answer, and
+  // the stored map only holds what a real Models page would have written.
+  {
+    const llm = {
+      listConfigurableProviders: () => [
+        {
+          provider: 'kimi-coding',
+          displayName: 'Kimi Coding',
+          settingsNs: 'llm-pi-ai',
+          settingsPath: ['providers', 'kimi-coding'],
+          nativeAuth: { env: ['KIMI_API_KEY'] },
+        },
+        {
+          provider: 'zai',
+          displayName: 'Z.ai',
+          settingsNs: 'llm-pi-ai',
+          settingsPath: ['providers', 'zai'],
+          nativeAuth: { env: ['ZAI_API_KEY'] },
+        },
+        {
+          provider: 'zai-coding-cn',
+          displayName: 'Zhipu GLM',
+          settingsNs: 'llm-pi-ai',
+          settingsPath: ['providers', 'zai-coding-cn'],
+          nativeAuth: { env: ['ZAI_CODING_CN_API_KEY'] },
+        },
+      ],
+    }
+    const settings = {
+      describe: () => [
+        {
+          ns: 'llm-pi-ai',
+          // A profile that names its own reference: this must outrank the
+          // catalog default KIMI_API_KEY.
+          value: { providers: { 'kimi-coding': { apiKeyEnv: 'KIMI_CODING_API_KEY' } } },
+        },
+      ],
+    }
+    const stored = {
+      KIMI_CODING_API_KEY: 'sk-kimi-profile',
+      ZAI_CODING_CN_API_KEY: 'zhipu-cn-test',
+    }
+    const chainCtx = strictContext({
+      credentials: {
+        resolve: async (ref) => (stored[ref] ? { value: stored[ref], source: 'test' } : undefined),
+      },
+      llm,
+      settings,
+    })
+    const chainService = new BalanceService({
+      ctx: chainCtx,
+      resolveCredential: async (ref) => stored[ref],
+      options: { ttlMs: 1000, requestTimeoutMs: 5000 },
+    })
+
+    const directory = await chainService.available()
+    const byRoute = Object.fromEntries(directory.map((entry) => [entry.route, entry]))
+
+    // The profile's own apiKeyEnv wins over the catalog default.
+    if (byRoute['kimi-coding']?.configured !== true) {
+      throw new Error('the profile apiKeyEnv was not resolved for kimi-coding')
+    }
+    // The route the plugin used to misaddress: zai-coding-cn stores its own
+    // key, and only that key exists here.
+    if (byRoute['zai-coding-cn']?.configured !== true) {
+      throw new Error('zai-coding-cn did not resolve its own credential')
+    }
+    // zai must not answer for zai-coding-cn's key.
+    if (byRoute.zai?.configured !== false) {
+      throw new Error('zai should be unconfigured when only the CN plan key exists')
+    }
+    // The metadata the browser names and draws routes with travels with the list.
+    if (byRoute['kimi-coding'].name?.zh !== 'Kimi Coding') {
+      throw new Error('the route list did not carry the display name')
+    }
+    if (byRoute['kimi-coding'].color !== '#636ff6') {
+      throw new Error('the route list did not carry the brand colour')
+    }
+    if (byRoute['kimi-coding'].iconHint !== 'kimi') {
+      throw new Error('the route list did not carry the artwork hint')
+    }
+
+    // The reading itself uses the discovered credential.
+    const kimi = await chainService.read('kimi-coding', { force: true })
+    if (kimi.status !== 'ready' || kimi.percent !== 60) {
+      throw new Error(`kimi-coding did not read through its discovered credential: ${JSON.stringify(kimi)}`)
+    }
+    console.log('credentials: route credentials come from the harness, per route')
   }
 } finally {
   globalThis.fetch = originalFetch

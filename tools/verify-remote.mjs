@@ -46,6 +46,9 @@ function createService() {
     defaultProvider() {
       return 'deepseek-account'
     },
+    async status(route) {
+      return { provider: route, state: 'operational', url: 'https://status.deepseek.com' }
+    },
     activeRoutes: new Set(['deepseek-account']),
     async refreshAll() {
       publish('deepseek-account', await this.read('deepseek-account'))
@@ -112,6 +115,15 @@ if (fallback?.provider !== 'deepseek-account') {
   throw new Error(`the default provider was not reported, got ${JSON.stringify(fallback)}`)
 }
 
+// --- the platform status reaches the browser ------------------------------
+const status = await controller.status('deepseek-account')
+if (status?.state !== 'operational') {
+  throw new Error(`the status reading was not forwarded, got ${JSON.stringify(status)}`)
+}
+if (status?.url !== 'https://status.deepseek.com') {
+  throw new Error('the status reading lost its source page')
+}
+
 // --- an aborted stream releases its subscription ---------------------------
 if ((service.subscribe('probe', () => {}) ?? false) !== undefined) {
   // subscribe still works after the stream above ended
@@ -124,16 +136,17 @@ console.log('namespace:', controller.typertRemote.namespace)
 console.log('frames:', JSON.stringify(frames.map((frame) => frame.amount)))
 console.log('refresh amount:', refreshed.amount)
 console.log('default provider:', fallback.provider)
+console.log('status:', status.state, status.url)
 
 // --- the real service exposes what `watch` uses ---------------------------
 // The controller reaches `ctx.modelAllowance.subscribe`, so the shipped service
 // must provide it; the stub above cannot prove that.
 const { default: ModelAllowanceService } = await import('../index.js')
-for (const method of ['read', 'track', 'subscribe', 'defaultProvider', 'refreshAll']) {
+for (const method of ['read', 'track', 'subscribe', 'defaultProvider', 'refreshAll', 'status']) {
   if (typeof ModelAllowanceService.prototype[method] !== 'function') {
     throw new Error(`ModelAllowanceService is missing ${method}()`)
   }
 }
-console.log('ModelAllowanceService exposes:', 'read, track, subscribe, defaultProvider, refreshAll')
+console.log('ModelAllowanceService exposes:', 'read, track, subscribe, defaultProvider, refreshAll, status')
 
 console.log('OK: the Remote controller opens, streams, and refreshes')
