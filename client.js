@@ -31,6 +31,15 @@ window.__ModuleLoader__.load({
      */
     function createBalanceContribution() {
       const providerSchema = z.string().min(1)
+      const windowSchema = z.object({
+        id: z.string(),
+        unit: z.enum(['hour', 'day', 'month', 'unknown']),
+        count: z.number().optional(),
+        used: z.number().optional(),
+        total: z.number().optional(),
+        remainingPercent: z.number().optional(),
+        resetAt: z.number().optional(),
+      })
       const balanceViewSchema = z.object({
         provider: z.string(),
         status: z.enum(['ready', 'unsupported', 'unconfigured', 'failed']),
@@ -42,6 +51,7 @@ window.__ModuleLoader__.load({
         percent: z.number().optional(),
         remainingMs: z.number().optional(),
         resetsAt: z.number().optional(),
+        windows: z.array(windowSchema).optional(),
         consoleUrl: z.string().optional(),
         updatedAt: z.number().optional(),
         error: z.string().optional(),
@@ -123,6 +133,20 @@ window.__ModuleLoader__.load({
       'detail.refreshing': '刷新中…',
       'detail.console': '打开厂商控制台',
       'detail.error': '无法读取厂商余额。',
+      'window.hour': '{count} 小时',
+      'window.day': '每 {count} 天',
+      'window.month': '每月',
+      'window.unknown': '当前窗口',
+      'window.usedOfTotal': '已用 {used} / {total}',
+      'window.usedPercent': '已用 {percent}%',
+      'window.leftPercent': '剩余 {percent}%',
+      'window.resetAt': '{time} 重置',
+      'window.resetIn': '{duration}后',
+      'window.noReset': '无重置时间',
+      'duration.daysHours': '{days} 天 {hours} 小时',
+      'duration.hoursMinutes': '{hours} 小时 {minutes} 分',
+      'duration.minutes': '{minutes} 分钟',
+      'duration.lessThanMinute': '不到 1 分钟',
     }
 
     /** English dictionary. */
@@ -146,6 +170,20 @@ window.__ModuleLoader__.load({
       'detail.refreshing': 'Refreshing…',
       'detail.console': 'Open provider console',
       'detail.error': 'Could not read the provider balance.',
+      'window.hour': '{count}-hour window',
+      'window.day': 'Every {count} days',
+      'window.month': 'Monthly',
+      'window.unknown': 'Current window',
+      'window.usedOfTotal': 'Used {used} / {total}',
+      'window.usedPercent': 'Used {percent}%',
+      'window.leftPercent': '{percent}% left',
+      'window.resetAt': 'resets {time}',
+      'window.resetIn': 'in {duration}',
+      'window.noReset': 'no reset time',
+      'duration.daysHours': '{days}d {hours}h',
+      'duration.hoursMinutes': '{hours}h {minutes}m',
+      'duration.minutes': '{minutes}m',
+      'duration.lessThanMinute': 'under a minute',
     }
 
     /**
@@ -173,11 +211,16 @@ window.__ModuleLoader__.load({
       // near the trailing edge, so the panel opens leftwards instead of
       // running off the side of the composer.
       '.dsh-model-balance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
-      'min-width:210px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);',
+      'min-width:250px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);',
       'border-radius:10px;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);',
       'box-shadow:0 8px 24px rgb(0 0 0 / 18%);font-size:12px}',
       '.dsh-model-balance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
       '.dsh-model-balance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
+      '.dsh-model-balance-usage{font-variant-numeric:tabular-nums}',
+      '.dsh-model-balance-window{margin-top:8px;padding-top:8px;',
+      'border-top:1px solid var(--dsw-alias-border-l1)}',
+      '.dsh-model-balance-reset{color:var(--dsw-alias-label-secondary);font-size:11px;',
+      'padding-top:1px;font-variant-numeric:tabular-nums}',
       '.dsh-model-balance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-balance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
       'font-size:11px;word-break:break-word}',
@@ -243,24 +286,116 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Format a remaining duration in milliseconds as a compact, readable span.
+     * Format a span in milliseconds as a readable duration.
      *
-     * A plan key reports its allowance in milliseconds, so an hour-scale number
-     * reads better as hours and minutes than as a raw millisecond count.
+     * A plan window is hours or days away, so a raw millisecond count says
+     * nothing; the units come from the locale.
      *
-     * @param {number} ms Remaining milliseconds.
+     * @param {number} ms Duration in milliseconds.
+     * @param {(key: string, params?: object) => string} t Translator.
      * @returns {string} The readable duration.
      */
-    function formatDuration(ms) {
+    function formatDuration(ms, t) {
       if (!Number.isFinite(ms) || ms < 0) return '—'
-      const totalMinutes = Math.floor(ms / 60_000)
+      // Round rather than floor: a window 4d 2h 59m 59s away is four days and
+      // three hours for every practical purpose, and flooring would report it
+      // a whole unit short for the final minute of every window.
+      const totalMinutes = Math.round(ms / 60_000)
       const days = Math.floor(totalMinutes / 1440)
       const hours = Math.floor((totalMinutes % 1440) / 60)
       const minutes = totalMinutes % 60
-      if (days > 0) return `${days}d ${hours}h`
-      if (hours > 0) return `${hours}h ${minutes}m`
-      if (minutes > 0) return `${minutes}m`
-      return `${Math.floor(ms / 1000)}s`
+      if (days > 0) return t('duration.daysHours', { days, hours })
+      if (hours > 0) return t('duration.hoursMinutes', { hours, minutes })
+      if (minutes > 0) return t('duration.minutes', { minutes })
+      return t('duration.lessThanMinute')
+    }
+
+    /**
+     * Format a reset timestamp: the clock time when it is today, otherwise the
+     * date and time.
+     * @param {number} epochMs Reset instant.
+     * @returns {string} The formatted instant.
+     */
+    function formatResetAt(epochMs) {
+      const at = new Date(epochMs)
+      const now = new Date()
+      if (at.toDateString() === now.toDateString()) {
+        return at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+      return at.toLocaleString([], {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    }
+
+    /**
+     * Group digits so a five-figure quota stays readable.
+     * @param {number} value The number.
+     * @returns {string} The formatted number.
+     */
+    function formatNumber(value) {
+      return Number.isInteger(value) ? value.toLocaleString() : String(value)
+    }
+
+    /**
+     * Name a metering window.
+     * @param {object} window The window.
+     * @param {(key: string, params?: object) => string} t Translator.
+     * @returns {string} The window title.
+     */
+    function windowTitle(window, t) {
+      if (window.unit === 'hour' && window.count) return t('window.hour', { count: window.count })
+      if (window.unit === 'day' && window.count) return t('window.day', { count: window.count })
+      if (window.unit === 'month') return t('window.month')
+      return t('window.unknown')
+    }
+
+    /**
+     * The usage half of a window row.
+     *
+     * A plan that reports a quota gets "used / total"; one that reports only a
+     * percentage gets the consumed share instead, rather than a fabricated
+     * total.
+     *
+     * @param {object} window The window.
+     * @param {(key: string, params?: object) => string} t Translator.
+     * @returns {string} The usage text.
+     */
+    function windowUsage(window, t) {
+      if (typeof window.total === 'number' && typeof window.used === 'number') {
+        return t('window.usedOfTotal', {
+          used: formatNumber(window.used),
+          total: formatNumber(window.total),
+        })
+      }
+      if (typeof window.remainingPercent === 'number') {
+        return t('window.usedPercent', { percent: Math.round(100 - window.remainingPercent) })
+      }
+      return '—'
+    }
+
+    /**
+     * The remaining share and reset line of a window.
+     * @param {object} window The window.
+     * @param {number} now Current instant, so the countdown ticks.
+     * @param {(key: string, params?: object) => string} t Translator.
+     * @returns {string} The reset text.
+     */
+    function windowReset(window, now, t) {
+      const parts = []
+      if (typeof window.remainingPercent === 'number') {
+        parts.push(t('window.leftPercent', { percent: Math.round(window.remainingPercent) }))
+      }
+      if (typeof window.resetAt === 'number') {
+        parts.push(t('window.resetAt', { time: formatResetAt(window.resetAt) }))
+        const left = window.resetAt - now
+        if (left > 0) parts.push(t('window.resetIn', { duration: formatDuration(left, t) }))
+      } else {
+        parts.push(t('window.noReset'))
+      }
+      return parts.join(' · ')
     }
 
     /**
@@ -280,6 +415,10 @@ window.__ModuleLoader__.load({
       const [open, setOpen] = React.useState(false)
       const [refreshing, setRefreshing] = React.useState(false)
       const rootRef = React.useRef(null)
+
+      // The countdowns below are relative to "now", so the open panel re-reads
+      // the clock on a slow tick. Only the open panel pays for it.
+      const [now, setNow] = React.useState(() => Date.now())
 
       // The panel has no close button: a click anywhere outside it dismisses it,
       // and Escape does the same for keyboard users. The listener is on the
@@ -301,6 +440,16 @@ window.__ModuleLoader__.load({
           document.removeEventListener('pointerdown', onPointerDown, true)
           document.removeEventListener('keydown', onKeyDown)
         }
+      }, [open])
+
+      // Refresh the countdown baseline while the panel is open. Thirty seconds
+      // is enough resolution for a window that resets hours from now, and the
+      // tick stops as soon as the panel closes.
+      React.useEffect(() => {
+        if (!open) return
+        setNow(Date.now())
+        const timer = setInterval(() => setNow(Date.now()), 30_000)
+        return () => clearInterval(timer)
       }, [open])
 
       React.useEffect(() => {
@@ -405,11 +554,22 @@ window.__ModuleLoader__.load({
           if (view.kind === 'amount' && typeof view.amount === 'number') {
             return t('badge.amount', { amount: formatAmount(view.amount, view.currency) })
           }
-          if (typeof view.percent === 'number') {
-            return t('badge.quotaPercent', { percent: Math.round(view.percent) })
+          // With several windows the badge speaks for the one closest to its
+          // limit; the panel breaks the rest down.
+          const windows = Array.isArray(view.windows) ? view.windows : []
+          const binding = windows.reduce((current, candidate) => {
+            const a = current?.remainingPercent ?? Number.POSITIVE_INFINITY
+            const b = candidate.remainingPercent ?? Number.POSITIVE_INFINITY
+            return b < a ? candidate : current
+          }, null)
+          const percent = binding?.remainingPercent ?? view.percent
+          if (typeof percent === 'number') {
+            return t('badge.quotaPercent', { percent: Math.round(percent) })
           }
           if (typeof view.remainingMs === 'number') {
-            return t('badge.quotaDuration', { duration: formatDuration(view.remainingMs) })
+            return t('badge.quotaDuration', {
+              duration: formatDuration(view.remainingMs, t),
+            })
           }
           if (typeof view.remaining === 'number' && typeof view.total === 'number') {
             return t('badge.quotaRatio', { remaining: view.remaining, total: view.total })
@@ -474,15 +634,33 @@ window.__ModuleLoader__.load({
                     h('span', null, formatAmount(view.amount, view.currency)),
                   )
                 : null,
-              typeof view?.remainingMs === 'number'
+              // A metered plan reports one block per window: the allowance it
+              // enforces and when it resets.
+              ...(Array.isArray(view?.windows) && view.windows.length > 0
+                ? view.windows.map((window, index) =>
+                    h(
+                      'div',
+                      { className: 'dsh-model-balance-window', key: `w-${String(index)}` },
+                      h(
+                        'div',
+                        { className: 'dsh-model-balance-row' },
+                        h('span', null, windowTitle(window, t)),
+                        h('span', { className: 'dsh-model-balance-usage' }, windowUsage(window, t)),
+                      ),
+                      h('div', { className: 'dsh-model-balance-reset' }, windowReset(window, now, t)),
+                    ),
+                  )
+                : []),
+              // A single scalar reading has no windows to break down.
+              !Array.isArray(view?.windows) && typeof view?.remainingMs === 'number'
                 ? h(
                     'div',
                     { className: 'dsh-model-balance-row' },
                     h('span', null, t('detail.remaining')),
-                    h('span', null, formatDuration(view.remainingMs)),
+                    h('span', null, formatDuration(view.remainingMs, t)),
                   )
                 : null,
-              typeof view?.remaining === 'number'
+              !Array.isArray(view?.windows) && typeof view?.remaining === 'number'
                 ? h(
                     'div',
                     { className: 'dsh-model-balance-row' },
@@ -490,7 +668,7 @@ window.__ModuleLoader__.load({
                     h('span', null, String(view.remaining)),
                   )
                 : null,
-              typeof view?.total === 'number'
+              !Array.isArray(view?.windows) && typeof view?.total === 'number'
                 ? h(
                     'div',
                     { className: 'dsh-model-balance-row' },

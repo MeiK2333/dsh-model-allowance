@@ -51,14 +51,29 @@ async function withFetch(responseBody, run) {
 }
 
 // --- MiniMax coding plan: real recorded response ---------------------------
+// The plan meters a 5-hour window and a 7-day window, and reports both as
+// percentages plus the closing timestamp of each.
 {
   const adapter = findAdapter('minimax-cn')
+  const intervalStart = 1793937039924
+  const intervalEnd = intervalStart + 5 * 3_600_000
+  const weeklyStart = 1793727425969
+  const weeklyEnd = weeklyStart + 7 * 86_400_000
   const { result, seen } = await withFetch(
     {
       model_remains: [
         {
+          start_time: intervalStart,
+          end_time: intervalEnd,
           remains_time: 16380448,
+          current_interval_total_count: 0,
+          current_interval_usage_count: 0,
           current_interval_remaining_percent: 82,
+          weekly_start_time: weeklyStart,
+          weekly_end_time: weeklyEnd,
+          weekly_remains_time: 393566493,
+          current_weekly_total_count: 0,
+          current_weekly_usage_count: 0,
           current_weekly_remaining_percent: 66,
         },
       ],
@@ -71,12 +86,17 @@ async function withFetch(responseBody, run) {
     status: result.status,
     kind: result.kind,
     percent: result.percent,
-    remainingMs: result.remainingMs,
+    windows: result.windows,
     auth: seen.init.headers.authorization,
+    intervalEnd,
+    weeklyEnd,
   })
 }
 
 // --- Zhipu quota: real recorded response -----------------------------------
+// `unit` is a length code and `number` counts them: unit 3 + 5 is the 5-hour
+// window, unit 6 + 1 is the monthly one. The quota is `usage` and
+// `currentValue` is what has been spent.
 {
   const adapter = findAdapter('zai')
   const { result } = await withFetch(
@@ -84,11 +104,21 @@ async function withFetch(responseBody, run) {
       code: 200,
       data: {
         limits: [
-          { type: 'CREDIT_LIMIT', number: 5, usage: 2000, remaining: 2000, percentage: 0 },
           {
             type: 'CREDIT_LIMIT',
+            unit: 3,
+            number: 5,
+            usage: 2000,
+            currentValue: 0,
+            remaining: 2000,
+            percentage: 0,
+          },
+          {
+            type: 'CREDIT_LIMIT',
+            unit: 6,
             number: 1,
             usage: 10000,
+            currentValue: 10071,
             remaining: 0,
             percentage: 100,
             nextResetTime: 1794305132998,
@@ -103,10 +133,8 @@ async function withFetch(responseBody, run) {
     name: 'zhipu quota',
     status: result.status,
     kind: result.kind,
-    remaining: result.remaining,
-    total: result.total,
     percent: result.percent,
-    resetsAt: result.resetsAt,
+    windows: result.windows,
   })
 }
 
@@ -150,15 +178,60 @@ const byName = Object.fromEntries(cases.map((entry) => [entry.name, entry]))
 if (byName['deepseek api-key'].amount !== 46.71) throw new Error('deepseek amount mismatch')
 if (byName['deepseek api-key'].kind !== KIND_AMOUNT) throw new Error('deepseek kind mismatch')
 if (byName['deepseek api-key'].auth !== 'Bearer sk-test') throw new Error('deepseek auth mismatch')
-if (byName['minimax-cn token plan'].kind !== KIND_QUOTA) throw new Error('minimax kind mismatch')
-if (byName['minimax-cn token plan'].percent !== 82) throw new Error('minimax percent mismatch')
-if (byName['zhipu quota'].remaining !== 0) throw new Error('zhipu remaining mismatch')
-// The nearly spent limit is the binding constraint, so it is reported.
-if (byName['zhipu quota'].percent !== 0) throw new Error('zhipu percent mismatch')
 if (byName['deepseek-account (host service)'].amount !== 46.71) {
   throw new Error('account wallet sum mismatch')
 }
 if (byName['unknown route'].adapter !== null) throw new Error('unknown route should not resolve')
+
+const minimax = byName['minimax-cn token plan']
+if (minimax.kind !== KIND_QUOTA) throw new Error('minimax kind mismatch')
+if (minimax.percent !== 82) throw new Error('minimax percent mismatch')
+if (minimax.windows?.length !== 2) {
+  throw new Error(`minimax should report two windows, got ${minimax.windows?.length}`)
+}
+{
+  const [session, weekly] = minimax.windows
+  if (session.id !== 'session') throw new Error('minimax window 0 is not the session window')
+  if (session.unit !== 'hour' || session.count !== 5) {
+    throw new Error(`minimax session window length wrong: ${session.unit} ${session.count}`)
+  }
+  if (session.remainingPercent !== 82) throw new Error('minimax session percent mismatch')
+  if (session.resetAt !== minimax.intervalEnd) throw new Error('minimax session reset mismatch')
+
+  // The plan's long window is seven days. Calling it a month would be wrong.
+  if (weekly.id !== 'weekly') throw new Error('minimax window 1 is not the weekly window')
+  if (weekly.unit !== 'day' || weekly.count !== 7) {
+    throw new Error(`minimax weekly window length wrong: ${weekly.unit} ${weekly.count}`)
+  }
+  if (weekly.remainingPercent !== 66) throw new Error('minimax weekly percent mismatch')
+  if (weekly.resetAt !== minimax.weeklyEnd) throw new Error('minimax weekly reset mismatch')
+  // A coding-plan key reports no request counts, so no used/total is invented.
+  if (session.total !== undefined) throw new Error('minimax invented a total')
+}
+
+const zhipu = byName['zhipu quota']
+if (zhipu.kind !== KIND_QUOTA) throw new Error('zhipu kind mismatch')
+if (zhipu.windows?.length !== 2) {
+  throw new Error(`zhipu should report two windows, got ${zhipu.windows?.length}`)
+}
+{
+  const session = zhipu.windows.find((window) => window.id === 'session')
+  const monthly = zhipu.windows.find((window) => window.id === 'monthly')
+  if (!session || !monthly) throw new Error('zhipu windows are not session + monthly')
+  if (session.unit !== 'hour' || session.count !== 5) {
+    throw new Error(`zhipu session window length wrong: ${session.unit} ${session.count}`)
+  }
+  // `usage` is the quota and `currentValue` is what was spent.
+  if (session.total !== 2000) throw new Error(`zhipu session total should be 2000, got ${session.total}`)
+  if (session.used !== 0) throw new Error(`zhipu session used should be 0, got ${session.used}`)
+  if (session.remainingPercent !== 100) throw new Error('zhipu session percent mismatch')
+  if (monthly.total !== 10000) throw new Error(`zhipu monthly total should be 10000, got ${monthly.total}`)
+  if (monthly.used !== 10071) throw new Error(`zhipu monthly used should be 10071, got ${monthly.used}`)
+  if (monthly.remainingPercent !== 0) throw new Error('zhipu monthly percent mismatch')
+  if (monthly.resetAt === undefined) throw new Error('zhipu monthly reset missing')
+  // The exhausted window is the binding constraint on the account.
+  if (zhipu.percent !== 0) throw new Error('zhipu binding percent should be the exhausted window')
+}
 
 console.log(JSON.stringify(cases, null, 2))
 console.log('OK: all provider adapters parse their recorded responses')

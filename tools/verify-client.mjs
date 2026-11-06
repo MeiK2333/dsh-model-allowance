@@ -63,6 +63,19 @@ globalThis.document = {
 }
 globalThis.Node = class Node {}
 
+// The open panel ticks a countdown. A real interval would hold the process
+// open for its period, so record and drop the timer instead.
+const intervalHandles = []
+globalThis.setInterval = (callback) => {
+  const handle = { callback }
+  intervalHandles.push(handle)
+  return handle
+}
+globalThis.clearInterval = (handle) => {
+  const index = intervalHandles.indexOf(handle)
+  if (index >= 0) intervalHandles.splice(index, 1)
+}
+
 // --- Fake zod: only the codec shape is exercised ----------------------------
 const zodChain = () => {
   const chain = {}
@@ -368,4 +381,108 @@ console.log(
   streamed.slice(streamed.indexOf('<button'), streamed.indexOf('</button>') + 9),
 )
 if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not render')
+
+// --- Third scenario: a coding plan with two metering windows ----------------
+// Both windows must show their own usage and their own reset countdown, which
+// a single remaining percentage cannot express.
+{
+  const now = Date.now()
+  const planView = {
+    provider: 'zai',
+    status: 'ready',
+    kind: 'quota',
+    percent: 0,
+    updatedAt: now,
+    consoleUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+    windows: [
+      {
+        id: 'session',
+        unit: 'hour',
+        count: 5,
+        used: 0,
+        total: 2000,
+        remainingPercent: 100,
+      },
+      {
+        id: 'monthly',
+        unit: 'month',
+        count: 1,
+        used: 10071,
+        total: 10000,
+        remainingPercent: 0,
+        resetAt: now + (4 * 24 * 3600 + 3 * 3600) * 1000,
+      },
+    ],
+  }
+
+  let planSlot
+  let planMount
+  const planCtx = {
+    effect: (fn) => fn(),
+    locale: ctx.locale,
+    remote: {
+      $mount: async (contribution) => {
+        planMount = contribution.package
+        return () => {}
+      },
+      $stream: undefined,
+    },
+    get: (key) =>
+      key === 'remote.balance'
+        ? {
+            balance: async () => ({ ok: true, value: planView }),
+            refresh: async () => ({ ok: true, value: planView }),
+          }
+        : undefined,
+    slots: {
+      inject: (_key, callback) => callback(),
+      register: (options, Component) => {
+        planSlot = { options, Component }
+        return () => {}
+      },
+    },
+  }
+
+  plugin.apply(planCtx)
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  if (!planMount) throw new Error('plan scenario did not mount the namespace')
+
+  hookState = []
+  hookCursor = 0
+  const planProviders = { lastUsed: { provider: 'zai', model: 'glm-4.6' }, next: null }
+  const planBadge = () =>
+    render(planSlot.Component({ useProjection: (key) => (key === 'modelSelection' ? planProviders : undefined) }))
+
+  planBadge()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+
+  // The badge speaks for the window closest to its limit.
+  hookCursor = 0
+  const planClosed = planBadge()
+  if (!planClosed.includes('剩余 0%')) {
+    throw new Error('badge should report the binding window')
+  }
+
+  // Open the card and read both window blocks.
+  hookState[2] = true
+  hookCursor = 0
+  const planOpen = planBadge()
+  const body = planOpen.slice(planOpen.indexOf('dsh-model-balance-panel"'))
+  console.log('plan card:', body)
+
+  for (const expected of [
+    '5 小时',            // short window title
+    '已用 0 / 2,000',    // short window usage
+    '剩余 100%',         // short window remaining
+    '无重置时间',        // short window has no reset in this payload
+    '每月',              // long window title
+    '已用 10,071 / 10,000', // long window usage, digits grouped
+    '剩余 0%',           // long window remaining
+    '重置',              // long window reset time
+    '4 天 3 小时后',     // long window countdown, from resetAt minus now
+  ]) {
+    if (!body.includes(expected)) throw new Error(`plan card is missing ${JSON.stringify(expected)}`)
+  }
+}
+
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')

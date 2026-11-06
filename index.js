@@ -152,6 +152,9 @@ class ModelBalanceService extends Service {
               ` amount=${view.amount ?? '-'} percent=${view.percent ?? '-'}` +
               ` error=${view.error ?? '-'}`,
           )
+          if (Array.isArray(view.windows) && view.windows.length > 0) {
+            await logDebug(`  windows=${JSON.stringify(view.windows)}`)
+          }
         } catch (error) {
           await logDebug(`adapter=${adapter.id} route=${route} THREW ${describeError(error)}`)
         }

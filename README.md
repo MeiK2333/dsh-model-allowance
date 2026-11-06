@@ -3,11 +3,34 @@
 在 DSH Web 界面的输入框工具行显示**当前会话所用模型的厂商余额或剩余额度**。
 
 ```
-输入框:  [◉ ¥46.71]  [权限] [计划]   ……   [模型 ▾] [发送]
+输入框:  [权限] [计划]   ……   [◉ 剩余 0%] [模型 ▾] [发送]
 ```
 
-点击徽章展开详情：厂商、余额/剩余、总量、更新时间，以及「刷新」和「打开厂商控制台」。
-卡片没有关闭按钮——**点击卡片以外的任何位置**或按 `Esc` 即收起。
+点击徽章展开详情，然后点卡片以外的任何位置或按 `Esc` 收起。
+
+订阅制（GLM / MiniMax）按**窗口**逐条展示，每个窗口各自的用量与重置：
+
+```
+厂商      zai
+─────────────────────────────
+5 小时              已用 0 / 2,000
+剩余 100% · 无重置时间
+每月            已用 10,071 / 10,000
+剩余 0% · 11/10 16:28 重置 · 4 天 3 小时后
+─────────────────────────────
+[刷新]  [打开厂商控制台]
+```
+
+余额型（DeepSeek）则是一行金额：
+
+```
+厂商      deepseek-account
+余额      ¥46.71
+更新时间  13:28
+```
+
+徽章本身只显示**最紧的那个窗口**——即剩余百分比最低的那个。卡片里才展开全部窗口，
+因为一个数字表达不了「五小时窗已用尽、周窗还剩一半」。
 
 ---
 
@@ -26,8 +49,8 @@ DSH 内置的「账户」设置页只显示 **DeepSeek 官方账号**余额。�
 |---|---|---|---|
 | `deepseek-account` | Host 内置 `ctx.deepseekAccount.getBalance()` | 金额（CNY/USD） | DSH 账号 |
 | `deepseek` | `GET https://api.deepseek.com/user/balance` | 金额（CNY） | `DEEPSEEK_API_KEY` |
-| `minimax-cn` | `GET https://api.minimaxi.com/v1/token_plan/remains` | 额度（剩余百分比 / 时长） | `MINIMAX_CN_API_KEY` |
-| `zai` / `zai-coding-cn` | `GET https://open.bigmodel.cn/api/monitor/usage/quota/limit` | 配额（remaining / total） | `ZAI_API_KEY` |
+| `minimax-cn` | `GET https://api.minimaxi.com/v1/token_plan/remains` | 双窗口额度 | `MINIMAX_CN_API_KEY` |
+| `zai` / `zai-coding-cn` | `GET https://open.bigmodel.cn/api/monitor/usage/quota/limit` | 双窗口配额 | `ZAI_API_KEY` |
 
 凭证**不新增配置**：插件复用 `dsh-llm-pi-ai` 已声明的 `apiKeyEnv` 引用，
 通过 `ctx.credentials.resolve()` 解析同一把 Key。
@@ -36,6 +59,25 @@ DSH 内置的「账户」设置页只显示 **DeepSeek 官方账号**余额。�
 > 不是充值余额；智谱只返回配额。所以 UI 用 `kind` 区分「金额」和「额度」，
 > 文案也不同。用 `GET` + `Bearer` 才是订阅额度的正确调用方式
 > （第三方常见的 `POST {key}` 形式对本类 Key 返回 404）。
+
+### 两个窗口的真实形状
+
+两家都按两个窗口计量，但字段含义不同，两边都不是「一个数字」能概括的：
+
+| | 短窗 | 长窗 | 额度字段 | 重置字段 |
+|---|---|---|---|---|
+| MiniMax | 5 小时 | **7 天** | 仅百分比（`*_remaining_percent`） | `end_time` / `weekly_end_time` |
+| 智谱 | 5 小时（`unit:3,number:5`） | 1 个月（`unit:6,number:1`） | `usage`=总量、`currentValue`=已用 | `nextResetTime` |
+
+三个容易踩错的点：
+
+- **MiniMax 的长窗是 7 天，不是一个月。** `weekly_end_time - weekly_start_time`
+  正好 604800000 ms。按日历月渲染是错的，所以窗口标题按实际时长生成
+  （`7 天` 而不是 `每月`）。
+- **智谱的 `number` 是窗口长度，不是额度。** 额度是 `usage`，已用是 `currentValue`；
+  把 `number` 当额度会把 5 小时看成「额度 5」。
+- **MiniMax 的 `*_count` 字段对 coding-plan Key 恒为 0**，只有百分比是真的。
+  所以适配器不编造总量，UI 退化为「已用 18%」而不是「已用 0 / 0」。
 
 未注册的 provider 路由显示「无余额接口」，不报错。
 
