@@ -231,12 +231,13 @@ function render(node) {
   const rendered = (children ?? []).map(render).join('')
   if (typeof type === 'function') return render(type({ ...props, children }))
   // Surface the attributes the assertions read: the bar's fill width and tone,
-  // and the switcher's selected tab.
+  // the switcher's selection, and the accessible name a mark carries.
   const extra = []
   if (props.style?.width) extra.push(`style="width:${String(props.style.width)}"`)
-  for (const name of ['data-tone', 'data-active']) {
+  for (const name of ['data-tone', 'data-active', 'data-variant', 'aria-selected', 'aria-expanded']) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
+  if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
   const suffix = extra.length > 0 ? ` ${extra.join(' ')}` : ''
   return `<${type} class="${props.className ?? ''}"${suffix}>${rendered}</${type}>`
 }
@@ -626,12 +627,17 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   if (readRoutes[0] !== 'zai') {
     throw new Error(`the card should open on the model's provider, read ${JSON.stringify(readRoutes)}`)
   }
+  // The marks are letters; the full name rides in the accessible name.
   for (const name of ['DeepSeek 账号', 'MiniMax', '智谱 GLM']) {
-    if (!body.includes(name)) throw new Error(`switcher is missing ${name}`)
+    if (!body.includes(`title="${name}"`)) throw new Error(`switcher is missing ${name}`)
   }
   // `deepseek` has no key configured here, so it must not be offered.
-  if (body.includes('DeepSeek API')) {
+  if (body.includes('title="DeepSeek API"')) {
     throw new Error('switcher offered a provider without a credential')
+  }
+  // Every mark sits on one row: the strip must not wrap.
+  if (!body.includes('class="dsh-model-balance-switcher"')) {
+    throw new Error('the switcher strip was not rendered')
   }
 
   // --- picking another provider re-reads it --------------------------------
@@ -653,10 +659,11 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     if (Array.isArray(node)) return node.map(textIn).join('')
     return textIn(node.children)
   }
-  /** Find one switcher tab by its visible label. */
+  /** Find one switcher mark by the provider name it announces. */
   const tabNamed = (tree, label) =>
     buttonsIn(tree).find(
-      (button) => button.props.className === 'dsh-model-balance-tab' && textIn(button) === label,
+      (button) =>
+        button.props.className === 'dsh-model-balance-tab' && button.props.title === label,
     )
 
   const miniMaxTab = tabNamed(planTree(), 'MiniMax')
@@ -685,6 +692,63 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   planBadge()
   if (!readRoutes.includes('zai')) throw new Error('switching back did not read zai')
   console.log('switcher: picked Zhipu GLM again and the card re-read it')
+
+  // --- a narrow strip overflows into a menu instead of wrapping ------------
+  // Feeding a width the marks cannot all fit in proves the split: one mark
+  // stays, the rest move behind the button, and the active provider is never
+  // the one that disappears.
+  {
+    hookState[10] = 60
+    hookState[11] = { current: { clientWidth: 60 } }
+    const narrowTree = planTree()
+    const narrow = render(narrowTree)
+    const tabs = buttonsIn(narrowTree).filter(
+      (button) => button.props.className === 'dsh-model-balance-tab',
+    )
+    if (tabs.length !== 1) {
+      throw new Error(`a narrow strip should keep one mark, rendered ${String(tabs.length)}`)
+    }
+    if (!narrow.includes('dsh-model-balance-more')) {
+      throw new Error('a narrow strip should offer the overflow button')
+    }
+    // The provider being read survives the cut.
+    if (tabs[0].props.title !== '智谱 GLM') {
+      throw new Error(`the cut dropped the active provider, kept ${String(tabs[0].props.title)}`)
+    }
+
+    const moreButton = buttonsIn(narrowTree).find(
+      (button) => button.props.className === 'dsh-model-balance-more',
+    )
+    moreButton.props.onClick()
+    const openedTree = planTree()
+    const opened = render(openedTree)
+    if (!opened.includes('dsh-model-balance-menu')) {
+      throw new Error('the overflow menu did not open')
+    }
+    for (const hidden of ['DeepSeek 账号', 'MiniMax']) {
+      if (!opened.includes(hidden)) {
+        throw new Error(`the overflow menu is missing ${hidden}`)
+      }
+    }
+    console.log('switcher: a narrow strip kept the active mark and listed the rest in a menu')
+
+    // Choosing from the menu switches the reading like a mark does.
+    const item = buttonsIn(openedTree).find(
+      (button) =>
+        button.props.className === 'dsh-model-balance-menu-item' &&
+        textIn(button).includes('MiniMax'),
+    )
+    if (!item) throw new Error('the MiniMax menu item was not rendered')
+    readRoutes.length = 0
+    item.props.onClick()
+    planBadge()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    planBadge()
+    if (!readRoutes.includes('minimax-cn')) {
+      throw new Error('picking from the menu did not read minimax-cn')
+    }
+    console.log('switcher: picking from the menu read the provider')
+  }
 }
 
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')

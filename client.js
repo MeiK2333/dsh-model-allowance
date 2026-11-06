@@ -143,6 +143,7 @@ window.__ModuleLoader__.load({
       'detail.refreshing': '刷新中…',
       'detail.console': '打开厂商控制台',
       'detail.error': '无法读取厂商余额。',
+      'detail.moreProviders': '更多厂商',
       'window.title.hour': '{count} 小时额度',
       'window.title.day': '{count} 天额度',
       'window.title.week': '每周额度',
@@ -182,6 +183,7 @@ window.__ModuleLoader__.load({
       'detail.refreshing': 'Refreshing…',
       'detail.console': 'Open provider console',
       'detail.error': 'Could not read the provider balance.',
+      'detail.moreProviders': 'More providers',
       'window.title.hour': '{count}-hour quota',
       'window.title.day': '{count}-day quota',
       'window.title.week': 'Weekly quota',
@@ -231,17 +233,43 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
       '.dsh-model-balance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
       '.dsh-model-balance-usage{font-variant-numeric:tabular-nums}',
-      '.dsh-model-balance-switcher{display:flex;flex-wrap:wrap;gap:4px;',
-      'padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
-      '.dsh-model-balance-tab{padding:3px 8px;border:1px solid transparent;border-radius:999px;',
-      'background:transparent;color:var(--dsw-alias-label-secondary);font-size:12px;',
-      'line-height:1.2;cursor:pointer;white-space:nowrap}',
-      '.dsh-model-balance-tab:hover{color:var(--dsw-alias-label-primary);',
-      'border-color:var(--dsw-alias-border-l2)}',
-      '.dsh-model-balance-tab[data-active="true"]{color:var(--dsw-alias-label-primary);',
-      'border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-model-balance-switcher-wrap{position:relative;padding-bottom:8px;',
+      'margin-bottom:4px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+      '.dsh-model-balance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
+      'gap:4px;overflow:hidden}',
+      // A mark is artwork: a letter on the vendor hue, filled for a signed-in
+      // account and outlined for a stored key.
+      '.dsh-model-balance-tab{display:inline-flex;align-items:center;justify-content:center;',
+      'width:22px;height:22px;flex:none;padding:0;border:1px solid transparent;border-radius:6px;',
+      'background:transparent;font-size:11px;font-weight:600;line-height:1;cursor:pointer;',
+      'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.62}',
+      '.dsh-model-balance-tab[data-variant="solid"]{background:var(--provider-mark);color:#fff}',
+      '.dsh-model-balance-tab[data-variant="outline"]{border-color:var(--provider-mark)}',
+      '.dsh-model-balance-tab:hover{opacity:.88}',
+      '.dsh-model-balance-tab[data-active="true"]{opacity:1;',
+      'box-shadow:0 0 0 2px var(--dsw-alias-bg-overlay),0 0 0 3px var(--provider-mark)}',
       '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
       'outline-offset:1px}',
+      '.dsh-model-balance-more{display:inline-flex;align-items:center;justify-content:center;',
+      'width:22px;height:22px;flex:none;margin-left:auto;padding:0;border-radius:6px;',
+      'border:1px solid var(--dsw-alias-border-l1);background:transparent;cursor:pointer;',
+      'color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1}',
+      '.dsh-model-balance-more:hover{color:var(--dsw-alias-label-primary);',
+      'border-color:var(--dsw-alias-border-l2)}',
+      '.dsh-model-balance-menu{position:absolute;top:calc(100% + 2px);right:0;z-index:30;',
+      'min-width:150px;padding:4px;border:1px solid var(--dsw-alias-border-l1);',
+      'border-radius:8px;background:var(--dsw-alias-bg-overlay);',
+      'box-shadow:0 8px 24px rgb(0 0 0 / 18%)}',
+      '.dsh-model-balance-menu-item{display:flex;align-items:center;gap:8px;width:100%;',
+      'padding:4px 6px;border:0;border-radius:6px;background:transparent;',
+      'color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}',
+      '.dsh-model-balance-menu-item:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-model-balance-menu-mark{display:inline-flex;align-items:center;',
+      'justify-content:center;width:18px;height:18px;flex:none;border-radius:5px;',
+      'font-size:10px;font-weight:600;line-height:1;',
+      'color:var(--provider-mark,var(--dsw-alias-label-primary))}',
+      '.dsh-model-balance-menu-mark[data-variant="solid"]{background:var(--provider-mark);',
+      'color:#fff}',
       '.dsh-model-balance-window{margin-top:10px;padding-top:10px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-window-head{display:flex;justify-content:space-between;',
@@ -406,6 +434,38 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * The mark drawn for one provider in the switcher.
+     *
+     * These are original monograms, not vendor logos: a letter on the vendor's
+     * hue, with a filled badge for a signed-in account and an outlined one for
+     * a key the user holds. Both DeepSeek routes therefore read as DeepSeek
+     * while still being tellable apart, and the full name stays in the title
+     * and accessible name.
+     */
+    const PROVIDER_MARKS = {
+      'deepseek-account': { letter: 'D', color: '#4d6bfe', variant: 'solid' },
+      deepseek: { letter: 'D', color: '#4d6bfe', variant: 'outline' },
+      'minimax-cn': { letter: 'M', color: '#0f9f92', variant: 'solid' },
+      zai: { letter: 'Z', color: '#7c5cf0', variant: 'solid' },
+      'zai-coding-cn': { letter: 'Z', color: '#7c5cf0', variant: 'solid' },
+    }
+
+    /**
+     * The mark for one route, falling back to the route's first letter.
+     * @param {string} route Provider route.
+     * @returns {{letter: string, color: string, variant: string}} The mark.
+     */
+    function providerMark(route) {
+      return (
+        PROVIDER_MARKS[route] ?? {
+          letter: route.slice(0, 1).toUpperCase(),
+          color: '#6b7280',
+          variant: 'solid',
+        }
+      )
+    }
+
+    /**
      * Name a metering window.
      * @param {object} window The window.
      * @param {(key: string, params?: object) => string} t Translator.
@@ -527,6 +587,13 @@ window.__ModuleLoader__.load({
       const [available, setAvailable] = React.useState([])
       const lastModelProvider = React.useRef(null)
 
+      // The switcher is a single row of marks. When they cannot all fit, the
+      // tail moves into a menu behind a button on the right, so the strip never
+      // wraps or clips. Width is measured rather than assumed.
+      const [menuOpen, setMenuOpen] = React.useState(false)
+      const [stripWidth, setStripWidth] = React.useState(0)
+      const stripRef = React.useRef(null)
+
       // Dropping the override belongs to the model *changing*, not to every
       // render, so the previous value is compared rather than reset blindly.
       React.useEffect(() => {
@@ -534,6 +601,20 @@ window.__ModuleLoader__.load({
         lastModelProvider.current = provider
         setPicked(null)
       })
+
+      // Track the strip's width so the row can decide how many marks fit. A
+      // host without ResizeObserver simply shows them all.
+      React.useEffect(() => {
+        if (!open) return
+        const node = stripRef.current
+        if (!node) return
+        const measure = () => setStripWidth(node.clientWidth ?? 0)
+        measure()
+        if (typeof ResizeObserver !== 'function') return
+        const observer = new ResizeObserver(measure)
+        observer.observe(node)
+        return () => observer.disconnect()
+      }, [open])
 
       // The panel has no close button: a click anywhere outside it dismisses it,
       // and Escape does the same for keyboard users. The listener is on the
@@ -727,6 +808,58 @@ window.__ModuleLoader__.load({
       const tone =
         view?.status === 'ready' ? 'ready' : view?.status === 'failed' ? 'failed' : 'idle'
 
+      // How many marks fit on one row. Each mark is `MARK_SIZE` plus the gap;
+      // the menu button, when it appears, needs its own slot. An unmeasured
+      // strip (no host observer) keeps every mark visible.
+      const MARK_SIZE = 22
+      const MARK_GAP = 4
+      const MENU_SIZE = 22
+      const perMark = MARK_SIZE + MARK_GAP
+      let visibleCount = available.length
+      if (stripWidth > 0 && available.length * perMark - MARK_GAP > stripWidth) {
+        visibleCount = Math.max(1, Math.floor((stripWidth - MENU_SIZE - MARK_GAP) / perMark))
+        visibleCount = Math.min(visibleCount, available.length - 1)
+      }
+      let shown = available.slice(0, visibleCount)
+      let overflow = available.slice(visibleCount)
+      // The provider being read stays visible; it is the one the card is about.
+      const activeIndex = overflow.findIndex((entry) => entry.route === activeProvider)
+      if (activeIndex >= 0 && shown.length > 0) {
+        const displaced = shown[shown.length - 1]
+        shown = [...shown.slice(0, -1), overflow[activeIndex]]
+        overflow = [
+          ...overflow.slice(0, activeIndex),
+          displaced,
+          ...overflow.slice(activeIndex + 1),
+        ]
+      }
+
+      /** One provider mark. */
+      const markButton = (entry) => {
+        const mark = providerMark(entry.route)
+        const name = providerName(entry.route, t)
+        return h(
+          'button',
+          {
+            type: 'button',
+            key: entry.route,
+            role: 'tab',
+            className: 'dsh-model-balance-tab',
+            'data-variant': mark.variant,
+            'data-active': entry.route === activeProvider ? 'true' : 'false',
+            'aria-selected': entry.route === activeProvider ? 'true' : 'false',
+            'aria-label': name,
+            title: name,
+            style: { '--provider-mark': mark.color },
+            onClick: () => {
+              setPicked(entry.route)
+              setMenuOpen(false)
+            },
+          },
+          mark.letter,
+        )
+      }
+
       return h(
         'div',
         {
@@ -762,27 +895,68 @@ window.__ModuleLoader__.load({
               // with one there is nothing to switch, so it just names it.
               available.length > 1
                 ? h(
+                    // The clipping strip and the menu are siblings: the strip
+                    // hides what does not fit, and the menu would be clipped
+                    // with it if it lived inside.
                     'div',
-                    {
-                      className: 'dsh-model-balance-switcher',
-                      role: 'tablist',
-                      'aria-label': t('detail.provider'),
-                    },
-                    ...available.map((entry) =>
-                      h(
-                        'button',
-                        {
-                          type: 'button',
-                          key: entry.route,
-                          role: 'tab',
-                          className: 'dsh-model-balance-tab',
-                          'aria-selected': entry.route === activeProvider ? 'true' : 'false',
-                          'data-active': entry.route === activeProvider ? 'true' : 'false',
-                          onClick: () => setPicked(entry.route),
-                        },
-                        providerName(entry.route, t),
-                      ),
+                    { className: 'dsh-model-balance-switcher-wrap' },
+                    h(
+                      'div',
+                      {
+                        ref: stripRef,
+                        className: 'dsh-model-balance-switcher',
+                        role: 'tablist',
+                        'aria-label': t('detail.provider'),
+                        'data-overflow': overflow.length > 0 ? 'true' : 'false',
+                      },
+                      ...shown.map(markButton),
+                      overflow.length > 0
+                        ? h(
+                            'button',
+                            {
+                              type: 'button',
+                              className: 'dsh-model-balance-more',
+                              'aria-haspopup': 'menu',
+                              'aria-expanded': menuOpen ? 'true' : 'false',
+                              'aria-label': t('detail.moreProviders'),
+                              title: t('detail.moreProviders'),
+                              onClick: () => setMenuOpen((value) => !value),
+                            },
+                            '⋯',
+                          )
+                        : null,
                     ),
+                    menuOpen && overflow.length > 0
+                      ? h(
+                          'div',
+                          { className: 'dsh-model-balance-menu', role: 'menu' },
+                          ...overflow.map((entry) =>
+                            h(
+                              'button',
+                              {
+                                type: 'button',
+                                key: entry.route,
+                                role: 'menuitem',
+                                className: 'dsh-model-balance-menu-item',
+                                onClick: () => {
+                                  setPicked(entry.route)
+                                  setMenuOpen(false)
+                                },
+                              },
+                              h(
+                                'span',
+                                {
+                                  className: 'dsh-model-balance-menu-mark',
+                                  'data-variant': providerMark(entry.route).variant,
+                                  style: { '--provider-mark': providerMark(entry.route).color },
+                                },
+                                providerMark(entry.route).letter,
+                              ),
+                              h('span', null, providerName(entry.route, t)),
+                            ),
+                          ),
+                        )
+                      : null,
                   )
                 : h(
                     'div',
