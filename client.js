@@ -337,8 +337,14 @@ window.__ModuleLoader__.load({
       'border-radius:10px;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);',
       'box-shadow:0 8px 24px rgb(0 0 0 / 18%);font-size:12px}',
       '.dsh-model-allowance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
-      '.dsh-model-allowance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
-      '.dsh-model-allowance-usage{font-variant-numeric:tabular-nums}',
+      // Label first, value second, matching every other pair in the card
+      // (schedule title/state, status/reading time): the label carries the
+      // emphasis and the value reads as its detail. Reversed, the balance row
+      // stood out as the one pair laid out the other way round.
+      '.dsh-model-allowance-row>span:first-child{color:var(--dsw-alias-label-primary)}',
+      '.dsh-model-allowance-row>span:last-child{color:var(--dsw-alias-label-secondary)}',
+      '.dsh-model-allowance-usage{font-variant-numeric:tabular-nums;',
+      'color:var(--dsw-alias-label-secondary)}',
       // The row cancels the panel's own horizontal padding so the divider under
       // it runs edge to edge, then puts the same padding back so the first mark
       // lines up with the labels below. Without this the marks sit further from
