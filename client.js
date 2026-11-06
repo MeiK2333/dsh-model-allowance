@@ -350,8 +350,14 @@ window.__ModuleLoader__.load({
       // behind a heavy blur — and the shadow is its own elevation scale. The
       // overlay token reads as a mask over the page behind, not as a panel
       // surface: on it this card came out a flat grey slab.
+      // The floor is set for the layout, not for the content: with it removed
+      // the card collapses to 248px, so 300px is the slack that lets a label
+      // and its value read as two columns instead of one run-on line. The cap
+      // is the harness's own idiom for a floating surface, so a narrow window
+      // shrinks the card rather than pushing it off the composer.
       '.dsh-model-allowance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
-      'box-sizing:border-box;min-width:250px;padding:8px 10px 10px;border:0;',
+      'box-sizing:border-box;min-width:300px;max-width:calc(100vw - 24px);',
+      'padding:8px 10px 10px;border:0;',
       'border-radius:var(--dsw-radius-lg);background:var(--dsw-specific-menu);',
       'backdrop-filter:var(--dsw-menu-backdrop-filter);',
       'box-shadow:var(--dsw-elevation-prominent);color:var(--dsw-alias-label-primary);',
