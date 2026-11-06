@@ -1,10 +1,12 @@
 import { formatNumber } from './format.js'
+import { activeLanguage } from './locales.js'
 
 /**
  * One metering window as the Host publishes it.
  * @typedef {object} ClientWindow
  * @property {string} id Window identity.
  * @property {'hour'|'day'|'week'|'month'|'unknown'} unit Length unit.
+ * @property {{zh?: string, en?: string}} [label] Vendor-specific display name.
  * @property {number} [count] How many units long the window is.
  * @property {number} [used] Allowance already spent.
  * @property {number} [total] Allowance included in the window.
@@ -14,11 +16,18 @@ import { formatNumber } from './format.js'
 
 /**
  * Name a metering window.
+ *
+ * A plan can meter two windows in the same unit — Kimi reports a monthly total
+ * and a monthly code quota — so a vendor-supplied label wins over the generic
+ * unit name.
+ *
  * @param {ClientWindow} window The window.
  * @param {(key: string, params?: object) => string} t Translator.
  * @returns {string} The window title.
  */
 export function windowTitle(window, t) {
+  const label = window.label?.[activeLanguage()] ?? window.label?.en ?? window.label?.zh
+  if (typeof label === 'string' && label !== '') return label
   if (window.unit === 'hour' && window.count) {
     return t('window.title.hour', { count: window.count })
   }

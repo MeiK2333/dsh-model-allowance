@@ -882,6 +882,8 @@ var STYLES_JOINED = STYLES.join("");
 
 // src/client/windows.js
 function windowTitle(window, t) {
+  const label = window.label?.[activeLanguage()] ?? window.label?.en ?? window.label?.zh;
+  if (typeof label === "string" && label !== "") return label;
   if (window.unit === "hour" && window.count) {
     return t("window.title.hour", { count: window.count });
   }
@@ -1624,6 +1626,7 @@ function createBalanceContribution() {
   const windowSchema = z.object({
     id: z.string(),
     unit: z.enum(["hour", "day", "week", "month", "unknown"]),
+    label: z.object({ zh: z.string().optional(), en: z.string().optional() }).optional(),
     count: z.number().optional(),
     used: z.number().optional(),
     total: z.number().optional(),

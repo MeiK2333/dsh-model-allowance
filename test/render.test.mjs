@@ -12,6 +12,7 @@ globalThis.document = { documentElement: { lang: 'zh-CN' } }
 const { formatAmount, formatDuration } = await import('../src/client/format.js')
 const { scheduleView, formatCountdown } = await import('../src/client/schedule.js')
 const { markOf, providerIcon } = await import('../src/client/icons.js')
+const { windowTitle } = await import('../src/client/windows.js')
 
 const t = (key, params = {}) => {
   const dictionary = {
@@ -75,6 +76,25 @@ test('the provider mark renders a whole-pixel svg', () => {
   const height = Number(/height="(\d+)"/.exec(html)?.[1])
   assert.ok(Number.isInteger(width) && width % 2 === 0)
   assert.ok(Number.isInteger(height) && height % 2 === 0)
+})
+
+test('a vendor label distinguishes windows that share a unit', () => {
+  assert.equal(
+    windowTitle(
+      { id: 'monthly-total', unit: 'month', label: { zh: '每月总额度', en: 'Monthly total' } },
+      t,
+    ),
+    '每月总额度',
+  )
+  assert.equal(
+    windowTitle(
+      { id: 'monthly-code', unit: 'month', label: { zh: '每月代码额度', en: 'Monthly code' } },
+      t,
+    ),
+    '每月代码额度',
+  )
+  // A plain monthly window still falls back to the generic label.
+  assert.equal(windowTitle({ id: 'monthly', unit: 'month' }, t), 'window.title.month')
 })
 
 test('money and duration formatting stay readable at the badge edges', () => {
