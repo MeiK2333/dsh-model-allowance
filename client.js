@@ -152,7 +152,6 @@ window.__ModuleLoader__.load({
       'window.usedPercent': '{percent}% 已使用',
       'window.resetIn': '{duration} 后重置',
       'window.resetAtLabel': '重置时间 {time}',
-      'window.noReset': '无重置时间',
       'countdown.days': '{days} 天 {clock}',
       'duration.daysHours': '{days} 天 {hours} 小时',
       'duration.hoursMinutes': '{hours} 小时 {minutes} 分',
@@ -194,7 +193,6 @@ window.__ModuleLoader__.load({
       'window.usedPercent': '{percent}% used',
       'window.resetIn': 'resets in {duration}',
       'window.resetAtLabel': 'resets {time}',
-      'window.noReset': 'no reset time',
       'countdown.days': '{days}d {clock}',
       'duration.daysHours': '{days}d {hours}h',
       'duration.hoursMinutes': '{hours}h {minutes}m',
@@ -811,12 +809,6 @@ window.__ModuleLoader__.load({
                     const filled =
                       consumed === undefined ? 0 : Math.min(100, Math.max(0, consumed))
                     const usage = windowUsage(window, t)
-                    const countdown =
-                      typeof window.resetAt === 'number'
-                        ? t('window.resetIn', {
-                            duration: formatCountdown(window.resetAt - now, t),
-                          })
-                        : t('window.noReset')
                     return h(
                       'div',
                       { className: 'dsh-model-balance-window', key: `w-${String(index)}` },
@@ -855,18 +847,26 @@ window.__ModuleLoader__.load({
                               style: { width: `${String(filled)}%` },
                             }),
                           ),
-                      h(
-                        'div',
-                        { className: 'dsh-model-balance-foot' },
-                        h('span', null, countdown),
-                        typeof window.resetAt === 'number'
-                          ? h(
+                      // A window the account has not started spending yet has no
+                      // reset to report, and saying so would be a line of noise.
+                      typeof window.resetAt === 'number'
+                        ? h(
+                            'div',
+                            { className: 'dsh-model-balance-foot' },
+                            h(
+                              'span',
+                              null,
+                              t('window.resetIn', {
+                                duration: formatCountdown(window.resetAt - now, t),
+                              }),
+                            ),
+                            h(
                               'span',
                               null,
                               t('window.resetAtLabel', { time: formatResetAt(window.resetAt) }),
-                            )
-                          : null,
-                      ),
+                            ),
+                          )
+                        : null,
                     )
                   })
                 : []),

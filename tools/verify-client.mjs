@@ -538,7 +538,6 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     '5 小时额度',           // short window title
     '0 / 2,000',            // countable units beside the title
     '0% 已使用',            // consumed share
-    '无重置时间',           // short window has no reset in this payload
     '每月额度',             // long window title
     '10,071 / 10,000',      // long window units, digits grouped
     '100% 已使用',          // long window consumed share
@@ -559,6 +558,27 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   // The countdown is a clock, so it has HH:MM:SS shape, not prose.
   if (!/\d{2}:\d{2}:\d{2} 后重置/.test(body)) {
     throw new Error('the countdown should render as a ticking clock')
+  }
+
+  // --- a window with no reset shows no reset line at all -------------------
+  // The 5-hour window has not started here, so the Host reports no resetAt.
+  // The card must drop the whole footer rather than print a placeholder.
+  {
+    const windows = body.split('dsh-model-balance-window"').slice(1)
+    const sessionBlock = windows.find((block) => block.includes('5 小时额度'))
+    if (!sessionBlock) throw new Error('the session window block was not rendered')
+    const sessionOnly = sessionBlock.slice(0, sessionBlock.indexOf('</div></div>'))
+    if (sessionOnly.includes('dsh-model-balance-foot')) {
+      throw new Error('a window without a reset should not render the reset footer')
+    }
+    if (sessionOnly.includes('无重置时间')) {
+      throw new Error('the card still prints a no-reset placeholder')
+    }
+    // The window that does have a reset keeps its footer.
+    const monthlyBlock = windows.find((block) => block.includes('每月额度'))
+    if (!monthlyBlock?.includes('dsh-model-balance-foot')) {
+      throw new Error('the window with a reset lost its footer')
+    }
   }
 
   // --- the switcher lists what this installation can actually read ---------
