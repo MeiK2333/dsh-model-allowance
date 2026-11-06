@@ -14,7 +14,8 @@ DSH 自带的账户页只显示 DeepSeek 官方账号余额。会话切到 MiniM
 
 - 徽标位于模型选择器旁，跟随当前会话的模型：DeepSeek 显示余额（如 `¥46.71`），
   Coding Plan 显示剩余百分比或剩余时长；多窗口套餐以最短窗口（编程套餐的
-  5 小时窗）为准，任一窗口耗尽即显示 `剩余 0%`
+  5 小时窗）为准，任一窗口耗尽即显示 `剩余 0%`；MiniMax 按会话模型匹配
+  `model_remains` 条目，未匹配时优先 `general` 计划
 - 每轮对话结束自动刷新，并短暂显示读数的变化（如 `↓0.90`）
 - 点击徽章查看详情：分窗口进度条、重置倒计时、手动刷新、直达厂商控制台
 - 可切换查看本机已配置的其他厂商；未配置凭证的厂商不会出现
@@ -34,7 +35,7 @@ DSH 自带的账户页只显示 DeepSeek 官方账号余额。会话切到 MiniM
 | MiniMax Coding Plan | 5 小时窗 + 每周窗剩余额度  | `MINIMAX_CN_API_KEY`        |
 | 智谱 Coding Plan    | 5 小时窗 + 每周窗剩余配额  | `ZAI_API_KEY` / `ZAI_CODING_CN_API_KEY` |
 | Kimi for Coding     | 每周窗 + 5 小时窗剩余额度  | `KIMI_API_KEY`              |
-| OpenCode Go         | 5 小时窗 + 每周窗 + 每月窗 | `OPENCODE_API_KEY`          |
+| OpenCode Go         | 5 小时窗 + 每周窗 + 每月窗 | `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` |
 
 插件复用 DSH 已有的凭证配置：它会向 harness 询问每条厂商路由用的是哪个凭证，
 这些 Key 只要配过，装完即用；profile 里自定义了 `apiKeyEnv` 的路由也能覆盖。
@@ -53,6 +54,25 @@ git+https://github.com/MeiK2333/dsh-model-allowance.git
 ```
 
 安装后刷新页面。
+
+## 开发
+
+```bash
+npm ci
+npm test          # node:test 单元测试 + 集成验证脚本
+npm run typecheck # 对 Host 半侧和 Client 纯逻辑模块执行 tsc --checkJs
+npm run lint      # Biome
+npm run build     # 从 src/client 重新生成 client.js
+npm run check:dist # client.js 与源码不一致时失败
+```
+
+浏览器半侧在 `src/client/` 下编写，由 `tools/build-client.mjs` 构建为
+`client.js`。DSH 直接安装该包，所以构建产物需要提交；`check:dist` 保证它
+不会悄悄过期。
+
+各厂商的 fixture 随适配器一起维护；当 DeepSeek 的法定节假日列表不再覆盖
+当前年份时，`npm test` 会失败——下一份通知发布后更新
+`lib/providers/deepseek.js` 的 `SCHEDULE.holidays` 即可。
 
 ## 兼容性
 

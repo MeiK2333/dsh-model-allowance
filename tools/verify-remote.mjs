@@ -15,11 +15,16 @@ function createService() {
     for (const listener of listeners.get(route) ?? []) listener(view)
   }
   let reads = 0
+  let lastModel
   return {
     publish,
-    async read(route) {
+    get lastModel() {
+      return lastModel
+    },
+    async read(route, options = {}) {
       reads += 1
-      return {
+      lastModel = options.model
+      const view = {
         provider: route,
         status: 'ready',
         kind: 'amount',
@@ -27,16 +32,21 @@ function createService() {
         currency: 'CNY',
         updatedAt: Date.now(),
       }
+      // The real service publishes the reading it is about to return; the
+      // controller must not yield that opening reading twice.
+      publish(route, view)
+      return view
     },
-    subscribe(route, listener) {
+    subscribe(route, model, listener) {
+      const callback = typeof model === 'function' ? model : listener
       let set = listeners.get(route)
       if (!set) {
         set = new Set()
         listeners.set(route, set)
       }
-      set.add(listener)
+      set.add(callback)
       return () => {
-        set?.delete(listener)
+        set?.delete(callback)
         if (set && set.size === 0) listeners.delete(route)
       }
     },
@@ -81,12 +91,18 @@ if (controller.name !== 'balanceController') {
 if (controller.typertRemote?.namespace !== 'balance') {
   throw new Error(`unexpected namespace ${controller.typertRemote?.namespace}`)
 }
+const capabilities = await controller.capabilities()
+if (capabilities?.modelScoped !== true) {
+  throw new Error(
+    `the controller did not advertise model-scoped reads: ${JSON.stringify(capabilities)}`,
+  )
+}
 
 // --- watch opens with the current reading, then forwards pushes ------------
 const abort = new AbortController()
 const frames = []
 const consumer = (async () => {
-  for await (const frame of controller.watch('deepseek-account', abort.signal)) {
+  for await (const frame of controller.watch('deepseek-account', undefined, abort.signal)) {
     frames.push(frame)
     if (frames.length === 2) abort.abort()
   }
@@ -107,6 +123,14 @@ await consumer
 if (frames.length !== 2) throw new Error(`expected 2 frames, got ${frames.length}`)
 if (frames[0].amount !== 46.71) throw new Error('opening frame is not the current reading')
 if (frames[1].amount !== 40) throw new Error('pushed reading was not forwarded')
+
+// --- the session model travels with the read -------------------------------
+const read = await controller.balance('deepseek-account', 'deepseek-flash')
+if (read?.amount === undefined) throw new Error('balance did not return a reading')
+if (service.lastModel !== 'deepseek-flash') {
+  throw new Error(`the model did not reach the service, got ${JSON.stringify(service.lastModel)}`)
+}
+console.log('model: the session model reached the service')
 
 // --- refresh bypasses the cache -------------------------------------------
 service.read = async (route) => ({
@@ -161,11 +185,22 @@ console.log('status:', status.state, status.url)
 // The controller reaches `ctx.modelAllowance.subscribe`, so the shipped service
 // must provide it; the stub above cannot prove that.
 const { default: ModelAllowanceService } = await import('../index.js')
-for (const method of ['read', 'track', 'subscribe', 'defaultProvider', 'refreshAll', 'status', 'schedule']) {
+for (const method of [
+  'read',
+  'track',
+  'subscribe',
+  'defaultProvider',
+  'refreshAll',
+  'status',
+  'schedule',
+]) {
   if (typeof ModelAllowanceService.prototype[method] !== 'function') {
     throw new Error(`ModelAllowanceService is missing ${method}()`)
   }
 }
-console.log('ModelAllowanceService exposes:', 'read, track, subscribe, defaultProvider, refreshAll, status, schedule')
+console.log(
+  'ModelAllowanceService exposes:',
+  'read, track, subscribe, defaultProvider, refreshAll, status, schedule',
+)
 
 console.log('OK: the Remote controller opens, streams, and refreshes')

@@ -18,7 +18,9 @@ plan allowance.
 - A badge beside the model selector follows the session's model: a money
   balance (e.g. `¥46.71`) for DeepSeek, remaining percent or time for coding plans.
   A plan with several windows speaks through the shortest one (the 5-hour
-  window on coding plans), and shows `0%` as soon as any window runs out
+  window on coding plans), and shows `0%` as soon as any window runs out.
+  MiniMax reports one bucket per model; the session's model picks the bucket,
+  with the canonical `general` plan as the fallback
 - Refreshes automatically after every turn, briefly showing the change
   (e.g. `↓0.90`)
 - Click the badge for details: per-window progress bars, reset countdowns,
@@ -44,7 +46,7 @@ plan allowance.
 | MiniMax coding plan   | 5-hour + weekly allowance      | `MINIMAX_CN_API_KEY`        |
 | Zhipu coding plan     | 5-hour + weekly quota          | `ZAI_API_KEY` / `ZAI_CODING_CN_API_KEY` |
 | Kimi for Coding       | weekly + 5-hour allowance      | `KIMI_API_KEY`              |
-| OpenCode Go           | 5-hour + weekly + monthly      | `OPENCODE_API_KEY`          |
+| OpenCode Go           | 5-hour + weekly + monthly      | `OPENCODE_API_KEY` / `OPENCODE_GO_API_KEY` |
 
 The plugin reuses the credentials DSH already has: it asks the harness which
 credential each provider route uses, so if these keys are configured, it works
@@ -66,6 +68,26 @@ git+https://github.com/MeiK2333/dsh-model-allowance.git
 ```
 
 Refresh the page after installing.
+
+## Development
+
+```bash
+npm ci
+npm test          # node:test unit tests plus the integration verifiers
+npm run typecheck # tsc --checkJs over the Host half and the Client's pure modules
+npm run lint      # Biome
+npm run build     # regenerate client.js from src/client
+npm run check:dist # fail when client.js is out of date with its source
+```
+
+The browser half is authored under `src/client/` and built into `client.js` by
+`tools/build-client.mjs`. The built file is committed because DSH installs the
+package directly; `check:dist` keeps it honest.
+
+Provider fixtures are part of each adapter, and `npm test` fails when
+DeepSeek's statutory-holiday list no longer covers the current year — extend
+`SCHEDULE.holidays` in `lib/providers/deepseek.js` when the next notice is
+published.
 
 ## Compatibility
 

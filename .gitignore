@@ -7,3 +7,4 @@ node_modules/
 .sharp3/
 .preview/
 .tmp*/
+*.tgz

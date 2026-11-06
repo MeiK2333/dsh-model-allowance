@@ -7,8 +7,9 @@
  * fetched once however many routes share it, and that a source this plugin
  * cannot read answers `unknown` instead of throwing.
  */
-import { StatusService } from '../lib/status.js'
+
 import { findAdapter, PROVIDER_ADAPTERS } from '../lib/providers.js'
+import { StatusService } from '../lib/status.js'
 
 const originalFetch = globalThis.fetch
 let fetches = 0
@@ -163,7 +164,8 @@ for (const testCase of cases) {
   if (view.provider !== testCase.route) {
     throw new Error(`${testCase.name}: the reading does not name its route`)
   }
-  if (view.url !== source.url) throw new Error(`${testCase.name}: the reading does not carry the page`)
+  if (view.url !== source.url)
+    throw new Error(`${testCase.name}: the reading does not carry the page`)
   results.push({ case: testCase.name, state: view.state, summary: view.summary })
 }
 
@@ -176,7 +178,8 @@ for (const testCase of cases) {
   const service = new StatusService({ ctx: {}, options: { ttlMs: 60_000, timeoutMs: 2000 } })
   await service.read('deepseek')
   await service.read('deepseek-account')
-  if (fetches !== 1) throw new Error(`two routes sharing a page fetched it ${String(fetches)} times`)
+  if (fetches !== 1)
+    throw new Error(`two routes sharing a page fetched it ${String(fetches)} times`)
   console.log('status: two routes sharing a status page fetched it once')
 }
 
@@ -185,7 +188,8 @@ for (const testCase of cases) {
   stubFetch({})
   const service = new StatusService({ ctx: {} })
   const view = await service.read('zai')
-  if (view.state !== 'unknown') throw new Error('a route without a status source should answer unknown')
+  if (view.state !== 'unknown')
+    throw new Error('a route without a status source should answer unknown')
   if (fetches !== 0) throw new Error('a route without a status source made a request')
   const missing = await service.read('__none__')
   if (missing.state !== 'unknown') throw new Error('an unknown route should answer unknown')
@@ -205,13 +209,40 @@ for (const testCase of cases) {
   console.log('status: an unreachable source answers unknown')
 }
 
+// --- a failed source is remembered briefly --------------------------------
+// Without a negative cache, a down status page is fetched again on every badge
+// mount and every clock tick; the short failure window keeps that bounded.
+{
+  const source = findAdapter('minimax-cn').status
+  stubFetch({
+    [source.endpoint]: { contentType: 'application/json', status: 500, body: '{}' },
+  })
+  const service = new StatusService({
+    ctx: {},
+    options: { ttlMs: 1000, failureTtlMs: 60_000, timeoutMs: 2000 },
+  })
+  const first = await service.read('minimax-cn')
+  const second = await service.read('minimax-cn')
+  if (first.state !== 'unknown' || second.state !== 'unknown') {
+    throw new Error('a failing source should answer unknown')
+  }
+  if (fetches !== 1) {
+    throw new Error(`a cached failure was fetched ${String(fetches)} times`)
+  }
+  console.log('status: a failed source is remembered instead of refetched')
+}
+
 // --- every adapter that declares a source declares a usable one ------------
 for (const adapter of PROVIDER_ADAPTERS) {
   if (adapter.status === undefined) continue
-  if (!adapter.status.endpoint.startsWith('https://')) throw new Error(`${adapter.id} has a non-https status endpoint`)
-  if (!adapter.status.url.startsWith('https://')) throw new Error(`${adapter.id} has a non-https status page`)
+  if (!adapter.status.endpoint.startsWith('https://'))
+    throw new Error(`${adapter.id} has a non-https status endpoint`)
+  if (!adapter.status.url.startsWith('https://'))
+    throw new Error(`${adapter.id} has a non-https status page`)
 }
-const withStatus = PROVIDER_ADAPTERS.filter((adapter) => adapter.status !== undefined).map((adapter) => adapter.id)
+const withStatus = PROVIDER_ADAPTERS.filter((adapter) => adapter.status !== undefined).map(
+  (adapter) => adapter.id,
+)
 console.log('status sources:', withStatus.join(', '))
 
 globalThis.fetch = originalFetch

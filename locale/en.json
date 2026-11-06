@@ -2,28 +2,5 @@
   "meta": {
     "title": "Model Allowance",
     "description": "Shows the current conversation model's provider balance or remaining allowance in the composer."
-  },
-  "badge": {
-    "loading": "Loading…",
-    "amount": "{amount}",
-    "quotaPercent": "{percent}% left",
-    "quotaRatio": "{remaining} / {total}",
-    "quotaDuration": "{duration} left",
-    "unsupported": "No balance API",
-    "unconfigured": "No credential",
-    "failed": "Unavailable",
-    "noSelection": "Select a model"
-  },
-  "detail": {
-    "title": "Provider balance",
-    "provider": "Provider",
-    "amount": "Balance",
-    "remaining": "Remaining",
-    "total": "Total",
-    "updated": "Updated",
-    "refresh": "Refresh",
-    "refreshing": "Refreshing…",
-    "console": "Open provider console",
-    "error": "Could not read the provider balance."
   }
 }

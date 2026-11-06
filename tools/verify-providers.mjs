@@ -8,8 +8,10 @@
  * adapter live here: https console links, no retired console paths, complete
  * display metadata, and globally unique routes.
  */
-import { findAdapter, PROVIDER_ADAPTERS } from '../lib/providers.js'
+
+import { holidayCoverage } from '../lib/providers/schedule.js'
 import { readEndpointAdapter } from '../lib/providers/shared.js'
+import { findAdapter, PROVIDER_ADAPTERS } from '../lib/providers.js'
 
 /**
  * Stub fetch with one recorded response, and record the request it answered.
@@ -51,7 +53,9 @@ function expectSubset(actual, expect, path, where) {
   if (Array.isArray(expect)) {
     if (!Array.isArray(actual) || actual.length !== expect.length) {
       const got = Array.isArray(actual) ? actual.length : typeof actual
-      throw new Error(`${where}: expected ${String(expect.length)} entries at ${path}, got ${String(got)}`)
+      throw new Error(
+        `${where}: expected ${String(expect.length)} entries at ${path}, got ${String(got)}`,
+      )
     }
     expect.forEach((entry, index) => {
       expectSubset(actual[index], entry, `${path}[${String(index)}]`, where)
@@ -116,11 +120,17 @@ for (const adapter of PROVIDER_ADAPTERS) {
         apiKey: undefined,
         ctx: { get: (key) => services[key] },
         signal: AbortSignal.timeout(5000),
+        model: fixture.model,
       })
     } else {
       const apiKey = fixture.apiKey ?? 'test-key'
       const { result: read, seen } = await withFetch(fixture, () =>
-        readEndpointAdapter(adapter, { route, apiKey, signal: AbortSignal.timeout(5000) }),
+        readEndpointAdapter(adapter, {
+          route,
+          apiKey,
+          signal: AbortSignal.timeout(5000),
+          model: fixture.model,
+        }),
       )
       result = read
       // The endpoint and the signing style are part of the contract, so check
@@ -186,7 +196,9 @@ const retired = ['open.bigmodel.cn/usercenter/apikeys', 'platform.minimaxi.com']
 for (const adapter of PROVIDER_ADAPTERS) {
   for (const fragment of retired) {
     if (adapter.consoleUrl.includes(fragment)) {
-      throw new Error(`adapter ${adapter.id} points at the retired path ${JSON.stringify(fragment)}`)
+      throw new Error(
+        `adapter ${adapter.id} points at the retired path ${JSON.stringify(fragment)}`,
+      )
     }
   }
 }
@@ -214,6 +226,24 @@ if (findAdapter('__none__') !== undefined) throw new Error('an unknown route sho
   // Zhipu's rule has no holiday exception.
   if (zhipu.holidays.length !== 0) throw new Error('zhipu should not declare holidays')
   console.log('schedule: deepseek and zhipu declare their peak windows')
+}
+
+// --- a holiday list must cover the current year ---------------------------
+// The list is vendor data that changes annually. Failing here is the reminder
+// to extend it; a stale list silently prices every holiday as a peak day.
+{
+  const thisYear = new Date().getFullYear()
+  for (const adapter of PROVIDER_ADAPTERS) {
+    const coverage = holidayCoverage(adapter.schedule ?? { holidays: [] })
+    if (coverage === undefined) continue
+    if (coverage.to < thisYear) {
+      throw new Error(
+        `adapter ${adapter.id} holiday data ends in ${String(coverage.to)}; ` +
+          `extend it for ${String(thisYear)} before the next holiday`,
+      )
+    }
+  }
+  console.log(`schedule: holiday data covers ${String(thisYear)}`)
 }
 
 console.log(JSON.stringify(cases, null, 2))

@@ -26,6 +26,7 @@
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
+    "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
@@ -41,14 +42,44 @@
     "LICENSE"
   ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-conversation"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
     }
   },
   "engines": {
     "dsh": ">=0.2.1-rc.5 <0.3.0"
+  },
+  "scripts": {
+    "build": "node tools/build-client.mjs",
+    "check:dist": "node tools/build-client.mjs --check",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "pretest": "npm run check:dist",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node --test \"test/*.test.mjs\"",
+    "test:integration": "node tools/verify-all.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.5",
+    "@deepseek-ai/cordis": "^4.1.0",
+    "@deepseek-ai/dsh-typert-protocol": "^0.2.2-rc.1",
+    "@deepseek-ai/schemastery": "^3.19.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^7.0.2",
+    "zod": "^4.6.7"
   }
 }

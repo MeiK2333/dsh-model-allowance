@@ -6,6 +6,9 @@
  * mistake, so this context is a proxy that refuses any property it was not
  * given — exactly like the real thing.
  */
+
+import { Context } from '@deepseek-ai/cordis'
+import ModelAllowanceService from '../index.js'
 import { BalanceService } from '../lib/balance.js'
 import { PROVIDER_ADAPTERS } from '../lib/providers.js'
 
@@ -35,7 +38,8 @@ const credentials = {
 
 const ctx = strictContext({
   credentials: {
-    resolve: async (ref) => (credentials[ref] ? { value: credentials[ref], source: 'test' } : undefined),
+    resolve: async (ref) =>
+      credentials[ref] ? { value: credentials[ref], source: 'test' } : undefined,
   },
   deepseekAccount: {
     async getBalance() {
@@ -97,7 +101,13 @@ try {
   for (const adapter of PROVIDER_ADAPTERS) {
     const route = adapter.routes[0]
     const view = await service.read(route, { force: true })
-    results.push({ adapter: adapter.id, route, status: view.status, kind: view.kind, error: view.error })
+    results.push({
+      adapter: adapter.id,
+      route,
+      status: view.status,
+      kind: view.kind,
+      error: view.error,
+    })
   }
 
   // --- credential discovery -----------------------------------------------
@@ -188,7 +198,9 @@ try {
     // The reading itself uses the discovered credential.
     const kimi = await chainService.read('kimi-coding', { force: true })
     if (kimi.status !== 'ready' || kimi.percent !== 60) {
-      throw new Error(`kimi-coding did not read through its discovered credential: ${JSON.stringify(kimi)}`)
+      throw new Error(
+        `kimi-coding did not read through its discovered credential: ${JSON.stringify(kimi)}`,
+      )
     }
     console.log('credentials: route credentials come from the harness, per route')
   }
@@ -235,7 +247,9 @@ for (const result of results) {
     amount = 45.81
     const swept = await service.read(route, { force: true })
     if (swept.consumption?.kind !== 'amount') {
-      throw new Error(`a sweep should report its movement, got ${JSON.stringify(swept.consumption)}`)
+      throw new Error(
+        `a sweep should report its movement, got ${JSON.stringify(swept.consumption)}`,
+      )
     }
     if (Math.abs(swept.consumption.delta + 0.9) > 1e-9) {
       throw new Error(`the movement should be -0.9, got ${String(swept.consumption.delta)}`)
@@ -257,9 +271,10 @@ for (const result of results) {
     // display precision instead of announcing nothing.
     const still = await service.read(route, { force: true })
     if (still.consumption?.delta !== 0) {
-      throw new Error(`an unchanged reading should report zero, got ${JSON.stringify(still.consumption)}`)
+      throw new Error(
+        `an unchanged reading should report zero, got ${JSON.stringify(still.consumption)}`,
+      )
     }
-
 
     // A failed read clears the anchor: the gap it spans says nothing about
     // what the next reading is compared with.
@@ -280,6 +295,121 @@ for (const result of results) {
     stop()
     globalThis.fetch = originalFetch
   }
+}
+
+// --- one route meters several models separately ----------------------------
+// MiniMax reports a bucket per model, so its cache key includes the model.
+// Other routes stay route-scoped: the DeepSeek balance is the same whichever
+// model asks for it.
+{
+  const route = 'minimax-cn'
+  let percent = 10
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      model_remains: [{ model_name: 'general', current_interval_remaining_percent: percent }],
+      base_resp: { status_code: 0 },
+    }),
+  })
+  try {
+    service.invalidateAll()
+    const first = await service.read(route, { force: true, model: 'model-a' })
+    if (first.percent !== 10) throw new Error('the first model did not read')
+    percent = 20
+    const cached = await service.read(route, { model: 'model-a' })
+    if (cached.percent !== 10) {
+      throw new Error(`model-a should reuse its reading, got ${JSON.stringify(cached.percent)}`)
+    }
+    const other = await service.read(route, { model: 'model-b' })
+    if (other.percent !== 20) {
+      throw new Error(`model-b should read its own value, got ${JSON.stringify(other.percent)}`)
+    }
+    if (service.peek(route, 'model-a')?.percent !== 10) {
+      throw new Error('peek did not address the model-specific reading')
+    }
+    console.log('service: readings are cached per route and model')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+}
+
+// --- a service-backed read is bounded by the request timeout --------------
+// The account service cannot be cancelled, so the service races it against
+// the timeout instead of leaving the in-flight entry alive forever.
+{
+  const hanging = new BalanceService({
+    ctx: strictContext({
+      credentials: { resolve: async () => undefined },
+      deepseekAccount: { getBalance: () => new Promise(() => {}) },
+    }),
+    resolveCredential: async () => undefined,
+    options: { ttlMs: 1000, requestTimeoutMs: 50 },
+  })
+  // AbortSignal.timeout() is unref'd in Node, and the hanging promise holds no
+  // handle, so this test needs its own timer to keep the event loop alive long
+  // enough for the timeout to fire.
+  const keepAlive = setTimeout(() => {}, 1000)
+  let view
+  try {
+    view = await hanging.read('deepseek-account', { force: true })
+  } finally {
+    clearTimeout(keepAlive)
+  }
+  if (view.status !== 'failed' || view.error !== 'timeout') {
+    throw new Error(`a hanging account read should time out, got ${JSON.stringify(view)}`)
+  }
+  console.log('service: a service-backed read is bounded by its timeout')
+}
+
+// --- sweep only what a browser is still watching --------------------------
+// A read keeps its key in the sweep for one cache lifetime; a released stream
+// keeps it for one more, then the key is pruned. Previously every route ever
+// read stayed in the set forever.
+{
+  const ctx = new Context()
+  ctx.reflect.provide('credentials', { resolve: async () => undefined })
+  const allowance = new ModelAllowanceService(ctx, {
+    debug: false,
+    ttlMs: 40,
+    requestTimeoutMs: 1000,
+  })
+  const calls = []
+  allowance.balance.read = async (route, options = {}) => {
+    calls.push({ route, model: options.model, force: options.force === true })
+    return { provider: route, status: 'ready', kind: 'quota', percent: 50, updatedAt: Date.now() }
+  }
+
+  await ctx.modelAllowance.read('minimax-cn', { model: 'model-a' })
+  await ctx.modelAllowance.read('minimax-cn', { model: 'model-b' })
+  if (allowance.active.size !== 2) {
+    throw new Error(`two read keys should be active, got ${String(allowance.active.size)}`)
+  }
+  calls.length = 0
+  await allowance.refreshAll()
+  if (calls.length !== 2) {
+    throw new Error(`the sweep should refresh two readings, refreshed ${String(calls.length)}`)
+  }
+  if (!calls.every((call) => call.force)) throw new Error('the sweep must force its reads')
+
+  // A held stream keeps its key alive past the cache lifetime.
+  const release = allowance.track('minimax-cn', 'model-c')
+  await new Promise((resolve) => setTimeout(resolve, 70))
+  calls.length = 0
+  await allowance.refreshAll()
+  if (!calls.some((call) => call.route === 'minimax-cn')) {
+    throw new Error('a held stream should keep its route in the sweep')
+  }
+
+  // Releasing it starts the grace period; after it expires the key is pruned.
+  release()
+  await new Promise((resolve) => setTimeout(resolve, 70))
+  calls.length = 0
+  await allowance.refreshAll()
+  if (calls.length !== 0) {
+    throw new Error(`an idle sweep should make no requests, made ${String(calls.length)}`)
+  }
+  console.log('service: the sweep follows live streams instead of remembering every route')
 }
 
 console.log('OK: every adapter reads through a Cordis-strict context')

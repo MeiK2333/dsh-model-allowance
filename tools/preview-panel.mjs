@@ -47,11 +47,7 @@ function themeSource() {
   return fs.readFileSync(extracted, 'utf8')
 }
 
-const client = fs.readFileSync(path.join(repo, 'client.js'), 'utf8')
-const start = client.indexOf('const STYLES = [')
-const open = client.indexOf('[', start)
-const close = client.indexOf("].join('')", open)
-const STYLES = eval(client.slice(open, close + 1)).join('')
+const { STYLES } = await import('../src/client/styles.js')
 
 const theme = themeSource()
 const literals = [...theme.matchAll(/"((?:[^"\\]|\\.)*--dsw-[^"]*)"/g)].map((match) =>

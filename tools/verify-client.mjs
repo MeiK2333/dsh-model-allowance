@@ -8,6 +8,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import * as z from 'zod'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const bundlePath = path.join(here, '..', 'client.js')
@@ -21,7 +22,8 @@ const React = {
   createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
   useState(initial) {
     const index = hookCursor++
-    if (!(index in hookState)) hookState[index] = typeof initial === 'function' ? initial() : initial
+    if (!(index in hookState))
+      hookState[index] = typeof initial === 'function' ? initial() : initial
     return [
       hookState[index],
       (next) => {
@@ -78,21 +80,6 @@ globalThis.clearInterval = (handle) => {
   const index = intervalHandles.indexOf(handle)
   if (index >= 0) intervalHandles.splice(index, 1)
 }
-
-// --- Fake zod: only the codec shape is exercised ----------------------------
-const zodChain = () => {
-  const chain = {}
-  for (const name of ['min', 'max', 'optional', 'describe', 'readonly', 'nullable']) {
-    chain[name] = () => chain
-  }
-  return chain
-}
-const z = new Proxy(
-  {},
-  {
-    get: () => () => zodChain(),
-  },
-)
 
 // --- Capture the module registration ---------------------------------------
 let registration
@@ -266,7 +253,15 @@ function render(node) {
     if (props.style.width) style.push(`width:${String(props.style.width)}`)
     extra.push(`style="${style.join(';')}"`)
   }
-  for (const name of ['data-tone', 'data-service', 'data-phase', 'data-first', 'data-active', 'aria-selected', 'aria-expanded']) {
+  for (const name of [
+    'data-tone',
+    'data-service',
+    'data-phase',
+    'data-first',
+    'data-active',
+    'aria-selected',
+    'aria-expanded',
+  ]) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
   if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
@@ -367,14 +362,17 @@ if (!settled.includes('data-service="operational"')) {
     }
     // The reading time comes before both buttons and carries the new wording.
     const updated = /更新于 \d{2}:\d{2}:\d{2}/.exec(footer)
-    if (!updated) throw new Error(`the footer is missing the reading time: ${JSON.stringify(footer)}`)
+    if (!updated)
+      throw new Error(`the footer is missing the reading time: ${JSON.stringify(footer)}`)
     const refreshAt = footer.indexOf('title="刷新"')
     const clockAt = footer.indexOf(updated[0])
     if (refreshAt < 0) throw new Error('the footer is missing the refresh button')
-    if (clockAt > refreshAt) throw new Error('the reading time should sit left of the refresh button')
+    if (clockAt > refreshAt)
+      throw new Error('the reading time should sit left of the refresh button')
     // Both controls are compact icon buttons.
     const iconButtons = footer.split('class="dsh-model-allowance-icon-button"').length - 1
-    if (iconButtons !== 2) throw new Error(`expected 2 icon buttons, rendered ${String(iconButtons)}`)
+    if (iconButtons !== 2)
+      throw new Error(`expected 2 icon buttons, rendered ${String(iconButtons)}`)
     if (!footer.includes('title="控制台"')) {
       throw new Error('the footer is missing the console button')
     }
@@ -383,7 +381,10 @@ if (!settled.includes('data-service="operational"')) {
       throw new Error('the icon buttons should draw a glyph, not a label')
     }
   }
-  console.log('panel opened:', opened.slice(opened.indexOf('<div class="dsh-model-allowance-panel"')))
+  console.log(
+    'panel opened:',
+    opened.slice(opened.indexOf('<div class="dsh-model-allowance-panel"')),
+  )
 
   // A click inside keeps it open.
   for (const listener of documentListeners.get('pointerdown') ?? []) {
@@ -462,7 +463,7 @@ const streamCtx = {
           balance: async () => ({ ok: false, error: { message: 'unary should not run' } }),
           refresh: async () => ({ ok: true, value: {} }),
           defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
-          watch: (_provider, _signal) => ({ async *[Symbol.asyncIterator]() {} }),
+          watch: (_provider, _model, _signal) => ({ async *[Symbol.asyncIterator]() {} }),
         }
       : undefined,
   slots: {
@@ -599,9 +600,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
             kind: 'quota',
             percent: 58,
             updatedAt: now,
-            windows: [
-              { id: 'weekly', unit: 'day', count: 7, remainingPercent: 58 },
-            ],
+            windows: [{ id: 'weekly', unit: 'day', count: 7, remainingPercent: 58 }],
           }
         : planView,
   })
@@ -725,18 +724,21 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     if (!footer.includes('class="dsh-model-allowance-status-tip"')) {
       throw new Error('the warning mark should carry the reason in a tooltip')
     }
-    console.log('status: the card showed the platform state in the footer, left of the reading time')
+    console.log(
+      'status: the card showed the platform state in the footer, left of the reading time',
+    )
   }
 
   for (const expected of [
-    '5 小时额度',           // short window title
-    '0 / 2,000',            // countable units beside the title
-    '0% 已使用',            // consumed share
-    '每周额度',             // long window title
-    '10,071 / 10,000',      // long window units, digits grouped
-    '100% 已使用',          // long window consumed share
+    '5 小时额度', // short window title
+    '0 / 2,000', // countable units beside the title
+    '0% 已使用', // consumed share
+    '每周额度', // long window title
+    '10,071 / 10,000', // long window units, digits grouped
+    '100% 已使用', // long window consumed share
   ]) {
-    if (!body.includes(expected)) throw new Error(`plan card is missing ${JSON.stringify(expected)}`)
+    if (!body.includes(expected))
+      throw new Error(`plan card is missing ${JSON.stringify(expected)}`)
   }
 
   // Only the boundaries between windows are drawn: the first block has the
@@ -749,7 +751,8 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     const windows = body.split('class="dsh-model-allowance-window"').length - 1
     const marked = body.split('data-first="true"').length - 1
     if (windows !== 3) throw new Error(`expected three window blocks, got ${String(windows)}`)
-    if (marked !== 1) throw new Error(`exactly one window should be the first, got ${String(marked)}`)
+    if (marked !== 1)
+      throw new Error(`exactly one window should be the first, got ${String(marked)}`)
   }
 
   // --- the bars carry the numbers and turn colour -------------------------
@@ -782,7 +785,9 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     const weeklyFoot = footerText(weeklyBlock)
     // More than a day out keeps the `dd.` prefix, and the countdown precedes
     // the target instant, which carries no label of its own.
-    if (!/^\d{2}\.\d{2}:\d{2}:\d{2} 后重置\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(weeklyFoot ?? '')) {
+    if (
+      !/^\d{2}\.\d{2}:\d{2}:\d{2} 后重置\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(weeklyFoot ?? '')
+    ) {
       throw new Error(`unexpected multi-day reset line: ${JSON.stringify(weeklyFoot)}`)
     }
 
@@ -791,7 +796,9 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     if (!nearBlock) throw new Error('the near-reset window block was not rendered')
     const nearFoot = footerText(nearBlock)
     if (!/^\d{2}:\d{2}:\d{2} 后重置\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(nearFoot ?? '')) {
-      throw new Error(`a window inside a day should drop the dd. prefix: ${JSON.stringify(nearFoot)}`)
+      throw new Error(
+        `a window inside a day should drop the dd. prefix: ${JSON.stringify(nearFoot)}`,
+      )
     }
   }
 
@@ -818,7 +825,9 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
 
   // --- the switcher lists what this installation can actually read ---------
   if (readRoutes[0] !== 'zai') {
-    throw new Error(`the card should open on the model's provider, read ${JSON.stringify(readRoutes)}`)
+    throw new Error(
+      `the card should open on the model's provider, read ${JSON.stringify(readRoutes)}`,
+    )
   }
   // The marks are letters; the full name rides in the accessible name.
   for (const name of ['DeepSeek 账号', 'MiniMax', '智谱 GLM']) {
@@ -841,7 +850,9 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
         }
       }
     }
-    console.log(`icon boxes: ${boxes.map(([, w, h]) => `${w}x${h}`).join(' ')} — all whole and even`)
+    console.log(
+      `icon boxes: ${boxes.map(([, w, h]) => `${w}x${h}`).join(' ')} — all whole and even`,
+    )
   }
   // `deepseek` has no key configured here, so it must not be offered.
   if (body.includes('title="DeepSeek API"')) {
@@ -1201,7 +1212,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
                 consoleUrl: 'https://platform.deepseek.com/top_up',
               },
             }),
-            refresh: async (route) => ({ ok: true, value: {} }),
+            refresh: async () => ({ ok: true, value: {} }),
             list: async () => ({ ok: true, value: [] }),
             status: async (route) => ({
               ok: true,
