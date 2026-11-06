@@ -1,6 +1,6 @@
 {
   "name": "dsh-model-allowance",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Shows the current conversation model's provider balance or remaining allowance in the composer.",
   "license": "MIT",
