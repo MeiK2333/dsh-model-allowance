@@ -128,8 +128,18 @@ class ModelBalanceService extends Service {
         return this.balance.read(route, { force: true, baseline }).then((view) => {
           if (report && this.config.debug === true) {
             const consumption = view.consumption
+            const measure =
+              typeof view.amount === 'number'
+                ? `after=${String(view.amount)}`
+                : `after%=${String(view.percent)}`
+            const from =
+              typeof baseline?.amount === 'number'
+                ? `before=${String(baseline.amount)}`
+                : baseline == null
+                  ? 'before=none'
+                  : `before%=${String(baseline.percent)}`
             void logDebug(
-              `turn cost route=${route} status=${view.status}` +
+              `turn cost route=${route} status=${view.status} ${from} ${measure}` +
                 (consumption === undefined
                   ? ' consumption=-'
                   : ` consumption=${consumption.kind}:${String(consumption.delta)}`),
