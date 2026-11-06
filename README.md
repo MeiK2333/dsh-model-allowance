@@ -25,15 +25,30 @@
               更新于 14:29:52  [⟳] [▭]
 ```
 
-图标是**各家的真实 logo**，画在 22px 的中性芯片里：
+图标是**各家的真实 logo**，画在 26px 的中性芯片里：
 
-| 厂商 | 图标 | 来源 |
+| 厂商 | 图标 | 当前来源 |
 |---|---|---|
 | DeepSeek | 鲸鱼 | [Simple Icons](https://simpleicons.org/)（CC0-1.0） |
 | MiniMax | 声波 | Simple Icons（CC0-1.0） |
 | 智谱 | 六边形星 | `cdn.bigmodel.cn` 官方文字标的图形部分 |
 
 三家图标均为其所有者的商标，此处仅用于标识 provider。
+
+### 各家官方的图标资产（2026-11 探测）
+
+`tools/probe-icons.mjs` 会扫描各家站点声明的图标与 logo 并逐个校验（状态、格式、尺寸、是否带透明），
+`tools/probe-icon-sheet.mjs` 把它们下载下来拼成一张对照图。结论：
+
+| 厂商 | 官方资产 | 结论 |
+|---|---|---|
+| DeepSeek | `fe-static.deepseek.com/chat/favicon.svg` — **SVG 50×50**，单 path，纯色 `#4D6BFE`<br>`fe-static.deepseek.com/platform/favicon.svg` — 同图形但**纯黑**<br>`fe-static.deepseek.com/chat/icon-180.png` — PNG 180×180 | **有现成的正方形图标 SVG**，可直接内联 |
+| MiniMax | `mintcdn.com/minimax-zh/…/logo/light.svg` — **SVG 129×32 文字标**，声波是第 1 条 path 加一条渐变<br>`agent.minimax.cn/assets/logo/{favicon_v2,apple-touch_v2}.png` — 96×96 / 1024×1024 | **没有独立的声波图标**；正方形 PNG 是**水母吉祥物**，不是品牌标记。只能从文字标里取图形 |
+| 智谱 | `cdn.bigmodel.cn/static/logo/light.svg` — **SVG 123×25 文字标**，六边形是前 5 条 path<br>`bigmodel.cn/static/images/favicon.png` — 90×90<br>`docs.bigmodel.cn/…/favicon/android-chrome-192x192.png` — 192×192 | 正方形 PNG 是**黑底白 Z 的方块**（应用磁贴），不是六边形；192 那张是六边形但**栅格且发虚**。矢量源只有文字标 |
+
+也就是说：**三家都有矢量资产，但只有 DeepSeek 提供的是独立正方形图标**，
+另外两家需要从文字标里裁出图形（智谱已经这么做）。
+
 
 **按墨迹高度统一缩放**，不按 viewBox 高度。DeepSeek 和 MiniMax 的图形在 24 高的画布里
 上下各有留白（实际墨迹 17.8 / 20.2），智谱的则占满 24。若统一 viewBox 高度，智谱会画出
