@@ -309,13 +309,13 @@ window.__ModuleLoader__.load({
       // The footer is one right-aligned cluster: the reading time sits directly
       // left of the two icon buttons.
       '.dsh-model-balance-actions{display:flex;align-items:center;',
-      'justify-content:flex-end;gap:6px;margin-top:8px;padding-top:8px;',
+      'justify-content:flex-end;gap:8px;margin-top:8px;padding-top:8px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-updated{color:var(--dsw-alias-label-secondary);font-size:11px;',
       'font-variant-numeric:tabular-nums;white-space:nowrap;margin-right:2px}',
       '.dsh-model-balance-icon-button{display:inline-flex;align-items:center;',
-      'justify-content:center;box-sizing:border-box;width:22px;height:22px;flex:none;padding:0;',
-      'border:1px solid var(--dsw-alias-border-l1);border-radius:6px;background:transparent;',
+      'justify-content:center;box-sizing:border-box;width:26px;height:26px;flex:none;padding:0;',
+      'border:1px solid var(--dsw-alias-border-l1);border-radius:7px;background:transparent;',
       'color:var(--dsw-alias-label-secondary);cursor:pointer;text-decoration:none}',
       '.dsh-model-balance-icon-button:hover{color:var(--dsw-alias-label-primary);',
       'border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
@@ -468,31 +468,35 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The credits glyph: a plain dollar sign.
+     * The console glyph: a window with its title bar.
      *
-     * A coin with a dollar inside was tried first and collapsed into a blob at
-     * this size, while a bare sign stays legible at fourteen pixels.
+     * A terminal prompt and a monitor on a stand were drawn alongside this one
+     * and compared at true size; the prompt's chevron and cursor merged into a
+     * smudge, and the monitor read as a display rather than as the console the
+     * button opens.
      *
      * @param {number} size Rendered size in pixels.
      * @returns {object} The icon element.
      */
-    function creditsGlyph(size) {
+    function consoleGlyph(size) {
       return h(
         'svg',
         { viewBox: '0 0 20 20', width: size, height: size, 'aria-hidden': 'true', focusable: 'false' },
-        h('path', {
-          d: 'M10 3.2v13.6',
+        h('rect', {
+          x: 3.4,
+          y: 4.2,
+          width: 13.2,
+          height: 11.6,
+          rx: 2,
           fill: 'none',
           stroke: 'currentColor',
-          strokeWidth: 1.7,
-          strokeLinecap: 'round',
+          strokeWidth: 1.6,
         }),
         h('path', {
-          d: 'M13.6 6.4c0-1.6-1.5-2.4-3.6-2.4s-3.6.8-3.6 2.4c0 1.4 1.3 2 3.6 2.5 2.3.5 3.6 1.1 3.6 2.5 0 1.6-1.5 2.4-3.6 2.4s-3.6-.8-3.6-2.4',
+          d: 'M3.4 8.1h13.2',
           fill: 'none',
           stroke: 'currentColor',
-          strokeWidth: 1.7,
-          strokeLinecap: 'round',
+          strokeWidth: 1.6,
         }),
       )
     }
@@ -1291,7 +1295,7 @@ window.__ModuleLoader__.load({
                     title: refreshing ? t('detail.refreshing') : t('detail.refresh'),
                     'aria-label': refreshing ? t('detail.refreshing') : t('detail.refresh'),
                   },
-                  refreshGlyph(14),
+                  refreshGlyph(16),
                 ),
                 view?.consoleUrl
                   ? h(
@@ -1304,7 +1308,7 @@ window.__ModuleLoader__.load({
                         title: t('detail.console'),
                         'aria-label': t('detail.console'),
                       },
-                      creditsGlyph(15),
+                      consoleGlyph(16),
                     )
                   : null,
               ),
