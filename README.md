@@ -27,11 +27,13 @@
 
 图标是**各家的真实 logo**，画在 26px 的中性芯片里：
 
-| 厂商 | 图标 | 当前来源 |
+| 厂商 | 图标 | 来源 |
 |---|---|---|
-| DeepSeek | 鲸鱼 | [Simple Icons](https://simpleicons.org/)（CC0-1.0） |
-| MiniMax | 声波 | Simple Icons（CC0-1.0） |
-| 智谱 | 六边形星 | `cdn.bigmodel.cn` 官方文字标的图形部分 |
+| DeepSeek | 鲸鱼 | `fe-static.deepseek.com/chat/favicon.svg` — 官方正方形图标，`#4D6BFE` |
+| MiniMax | 声波 | `mintcdn.com/minimax-zh/…/logo/light.svg` — 官方文字标的首条 path，保留品牌渐变 |
+| 智谱 | 六边形星 | `cdn.bigmodel.cn/static/logo/light.svg` — 官方文字标的图形部分 |
+
+三家都是**厂商自己的矢量资产**，不再依赖第三方图标库。
 
 三家图标均为其所有者的商标，此处仅用于标识 provider。
 
@@ -47,19 +49,19 @@
 | 智谱 | `cdn.bigmodel.cn/static/logo/light.svg` — **SVG 123×25 文字标**，六边形是前 5 条 path<br>`bigmodel.cn/static/images/favicon.png` — 90×90<br>`docs.bigmodel.cn/…/favicon/android-chrome-192x192.png` — 192×192 | 正方形 PNG 是**黑底白 Z 的方块**（应用磁贴），不是六边形；192 那张是六边形但**栅格且发虚**。矢量源只有文字标 |
 
 也就是说：**三家都有矢量资产，但只有 DeepSeek 提供的是独立正方形图标**，
-另外两家需要从文字标里裁出图形（智谱已经这么做）。
+另外两家需要从文字标里裁出图形（智谱和 MiniMax 都已这么做）。
 
-
-**按墨迹高度统一缩放**，不按 viewBox 高度。DeepSeek 和 MiniMax 的图形在 24 高的画布里
-上下各有留白（实际墨迹 17.8 / 20.2），智谱的则占满 24。若统一 viewBox 高度，智谱会画出
-比另两个高三分之一的效果，看起来像"这个图标太大、没对齐"。现在三者墨迹高度都是 14px，
-上下留白一致：
+**按墨迹高度统一缩放**，不按 viewBox 高度。三个 viewBox 都已裁到各自的图形边界，
+所以墨迹填满画布（`ICON_GEOMETRY` 里 `vbW/vbH` 与 `inkW/inkH` 相等，保留两套字段是因为
+缩放规则约束的是墨迹而不是文件）。统一到 14px 墨迹高度后：
 
 ```
-deepseek  18.9 × 13.9
-minimax   16.7 × 14.0
+deepseek  18.6 × 14.0
+minimax   16.6 × 14.0
 zhipu     12.3 × 14.0
 ```
+
+三者的上下留白一致，横向宽度按各自比例自然展开。
 
 （几何中心本来就都是居中的——`tools/measure-chips.mjs` 可量出偏移为 0.00；
 问题是视觉重量，不是位置。）
@@ -369,13 +371,19 @@ Copy-Item .deps/dsh/node_modules/@deepseek-ai node_modules -Recurse
 
 ### 看图标长什么样
 
-`tools/preview-marks.mjs` 把三个厂商图标渲染成一张 PNG（含 22px 芯片内的真实比例、
-明暗两种底色），用来在不打开界面的情况下检查图标是否糊成一团。它用 `sharp` 栅格化，
-需要先把 `sharp` 及其依赖从 DSH 里取到 `.sharp/node_modules/`（已被 gitignore）：
+`tools/preview-centering.mjs` 把三个厂商图标画进真实尺寸的芯片里并放大，带可选的十字线，
+用来检查图标是否居中、是否糊。`tools/measure-chips.mjs` 从渲染结果里量出每个图标相对
+芯片中心的偏移。两者都用 `sharp` 栅格化，需要先把 `sharp` 及其依赖从 DSH 取到
+`.sharp/node_modules/`（已被 gitignore）：
 
 ```powershell
-node tools/preview-marks.mjs   # -> .preview/provider-marks.png
+node tools/preview-centering.mjs --crosshair   # -> .preview/chip-centering.png
+node tools/preview-centering.mjs               # -> .preview/chip-clean.png
+node tools/measure-chips.mjs                   # 读 chip-clean.png，打印偏移
 ```
+
+工具的路径、几何和渐变都**从 `client.js` 读取**，不是副本。解析按字段名而不是位置，
+所以几何结构变化时不会静默失配——之前那次失配就是按位置解析造成的。
 
 图标路径数据是从 `client.js` 里读出来的，所以预览的就是插件实际绘制的那份，
 不是另一份拷贝。
