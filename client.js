@@ -181,12 +181,24 @@ var ZHIPU_PATHS = [
     fill: "#5a84ee"
   }
 ];
+var KIMI_PATHS = [
+  "M21.7202 0.939941C22.9502 0.939941 23.9502 1.93994 23.9502 3.16994C23.9502 4.39994 22.9502 5.39994 21.7202 5.39994H19.7502C19.6002 5.39994 19.4902 5.27994 19.4902 5.13994V3.16994C19.4902 1.93994 20.4902 0.939941 21.7202 0.939941Z",
+  "M9.39 13.9501L17.82 5.59012C17.98 5.43012 17.89 5.12012 17.68 5.12012H13.14C13.14 5.12012 13.04 5.14012 13 5.18012L3.92 14.1901C3.78 14.3301 3.57 14.2101 3.57 13.9801V5.39012C3.57 5.24012 3.47 5.12012 3.35 5.12012H0.219999C0.0999993 5.12012 0 5.24012 0 5.39012V23.9201C0 24.0701 0.0999993 24.1901 0.219999 24.1901H3.35C3.47 24.1901 3.57 24.0701 3.57 23.9201V20.1401C3.57 20.0601 3.6 19.9801 3.65 19.9301L6.47 17.1401C6.54 17.0701 6.63 17.0601 6.71 17.1101L14.24 22.6501C15.47 23.4801 16.85 23.9901 18.25 24.1401C18.37 24.1501 18.48 24.0301 18.48 23.8701V20.3101C18.48 20.1701 18.4 20.0601 18.29 20.0501C17.47 19.9201 16.66 19.6001 15.94 19.1101L9.42 14.3901C9.28 14.3001 9.27 14.0701 9.39 13.9501Z"
+];
+var OPENCODE_PATHS = [
+  { d: "M180 240H60V120H180V240Z", opacity: 0.5 },
+  { d: "M180 60H60V240H180V60ZM240 300H0V0H240V300Z", opacity: 1 }
+];
 var ICON_GEOMETRY = {
   // DeepSeek's square icon draws 1..49.35 across and 7..43.35 down.
   deepseek: { x: 1, y: 7, vbW: 48.35, vbH: 36.35, inkW: 48.35, inkH: 36.35 },
   // MiniMax's waveform occupies 0..37.02 by 0..31.10 of the wordmark.
   minimax: { x: 0, y: 0, vbW: 37.023, vbH: 31.097, inkW: 37.023, inkH: 31.097 },
-  zhipu: { x: 0, y: 0, vbW: 21.052, vbH: 24, inkW: 21.052, inkH: 24 }
+  zhipu: { x: 0, y: 0, vbW: 21.052, vbH: 24, inkW: 21.052, inkH: 24 },
+  // Kimi's K-only glyph draws 0..23.95 across and 0.94..24.19 down.
+  kimi: { x: 0, y: 0.94, vbW: 23.95, vbH: 23.25, inkW: 23.95, inkH: 23.25 },
+  // OpenCode's logo draws its 240x300 frame from the origin.
+  opencode: { x: 0, y: 0, vbW: 240, vbH: 300, inkW: 240, inkH: 300 }
 };
 function markOf(entry, route) {
   const color = typeof entry?.color === "string" && entry.color !== "" ? entry.color : "#6b7280";
@@ -238,6 +250,19 @@ function providerIcon(route, inkHeight, mark) {
         fill: `url(#${MINIMAX_GRADIENT.id})`
       })
     ];
+  } else if (mark.icon === "kimi") {
+    content = KIMI_PATHS.map(
+      (d, index) => (0, import_react.createElement)("path", { key: `kimi-${String(index)}`, d, fill: "currentColor" })
+    );
+  } else if (mark.icon === "opencode") {
+    content = OPENCODE_PATHS.map(
+      (path, index) => (0, import_react.createElement)("path", {
+        key: `opencode-${String(index)}`,
+        d: path.d,
+        fill: "currentColor",
+        fillOpacity: path.opacity
+      })
+    );
   } else {
     content = [(0, import_react.createElement)("path", { key: "mark", d: DEEPSEEK_PATH, fill: "currentColor" })];
   }

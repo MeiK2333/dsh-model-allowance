@@ -78,6 +78,23 @@ test('the provider mark renders a whole-pixel svg', () => {
   assert.ok(Number.isInteger(height) && height % 2 === 0)
 })
 
+test('Kimi and OpenCode use their official marks instead of a letter', () => {
+  for (const [route, hint] of [
+    ['kimi-coding', 'kimi'],
+    ['opencode-go', 'opencode'],
+  ]) {
+    const html = renderToStaticMarkup(
+      providerIcon(route, 14, markOf({ color: '#64748b', iconHint: hint }, route)),
+    )
+    assert.match(html, /<svg/)
+    assert.doesNotMatch(html, /tab-letter/)
+    const width = Number(/width="(\d+)"/.exec(html)?.[1])
+    const height = Number(/height="(\d+)"/.exec(html)?.[1])
+    assert.ok(Number.isInteger(width) && width % 2 === 0)
+    assert.ok(Number.isInteger(height) && height % 2 === 0)
+  }
+})
+
 test('a vendor label distinguishes windows that share a unit', () => {
   assert.equal(
     windowTitle(
