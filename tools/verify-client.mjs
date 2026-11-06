@@ -260,7 +260,7 @@ function render(node) {
   // the switcher's selection, and the accessible name a mark carries.
   const extra = []
   if (props.style?.width) extra.push(`style="width:${String(props.style.width)}"`)
-  for (const name of ['data-tone', 'data-service', 'data-phase', 'data-active', 'aria-selected', 'aria-expanded']) {
+  for (const name of ['data-tone', 'data-service', 'data-phase', 'data-first', 'data-active', 'aria-selected', 'aria-expanded']) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
   if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
@@ -724,6 +724,19 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     '100% 已使用',          // long window consumed share
   ]) {
     if (!body.includes(expected)) throw new Error(`plan card is missing ${JSON.stringify(expected)}`)
+  }
+
+  // Only the boundaries between windows are drawn: the first block has the
+  // switcher's divider above it already, and a second line there read as a
+  // stray bar.
+  if (!body.includes('class="dsh-model-allowance-window" data-first="true"')) {
+    throw new Error('the first window should not draw a divider above it')
+  }
+  {
+    const windows = body.split('class="dsh-model-allowance-window"').length - 1
+    const marked = body.split('data-first="true"').length - 1
+    if (windows !== 3) throw new Error(`expected three window blocks, got ${String(windows)}`)
+    if (marked !== 1) throw new Error(`exactly one window should be the first, got ${String(marked)}`)
   }
 
   // --- the bars carry the numbers and turn colour -------------------------

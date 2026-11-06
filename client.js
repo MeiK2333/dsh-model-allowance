@@ -395,6 +395,10 @@ window.__ModuleLoader__.load({
       '.dsh-model-allowance-menu-mark svg{display:block}',
       '.dsh-model-allowance-window{margin-top:10px;padding-top:10px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
+      // The first window has no boundary above it: the switcher already ends
+      // in a divider, and a bare provider row should not be underlined.
+      '.dsh-model-allowance-window[data-first="true"]{margin-top:0;padding-top:8px;',
+      'border-top:0}',
       '.dsh-model-allowance-window-head{display:flex;justify-content:space-between;',
       'align-items:baseline;gap:12px}',
       '.dsh-model-allowance-window-title{font-weight:500;color:var(--dsw-alias-label-primary)}',
@@ -1866,7 +1870,15 @@ window.__ModuleLoader__.load({
                     const usage = windowUsage(window, t)
                     return h(
                       'div',
-                      { className: 'dsh-model-allowance-window', key: `w-${String(index)}` },
+                      {
+                        className: 'dsh-model-allowance-window',
+                        key: `w-${String(index)}`,
+                        // The first block needs no divider: the switcher above
+                        // it already ends in one, and a bare provider row does
+                        // not deserve a line either. Only the boundaries
+                        // *between* windows are drawn.
+                        'data-first': index === 0 ? 'true' : undefined,
+                      },
                       h(
                         'div',
                         { className: 'dsh-model-allowance-window-head' },
