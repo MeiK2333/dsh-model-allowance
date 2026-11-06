@@ -352,9 +352,10 @@ Host 的 `@Remote` 标记通过 `markRemote()` 在构造期写入原型——这
 ## 安装
 
 ```powershell
-# 通过 Plugin Manager 安装本地目录
-# target: <本仓库绝对路径>
+git clone https://github.com/MeiK2333/dsh-model-allowance.git
 ```
+
+然后用 Plugin Manager 安装**本地目录**，`target` 填克隆出来的绝对路径。
 
 安装后需要**刷新页面**（Host 改动需要重启 DSH）才能加载新的模块代。
 
@@ -463,3 +464,9 @@ adapter=minimax-token-plan route=minimax-cn status=ready kind=quota percent=0 er
 - 同一 provider 会重新查询的地方没有做跨进程共享缓存；多开 DSH 会各查各的。
 - `minimax`（国际站）路由未实现：本地该 Key 与 CN 区是同一把，国际站返回
   `invalid api key`。需要时可照 `minimax-cn` 的适配器加一条。
+
+---
+
+## 许可
+
+[MIT](LICENSE)。三家厂商图标是其所有者的商标，仅用于标识对应的 provider。

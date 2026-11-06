@@ -3,7 +3,26 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Shows the current conversation model's provider balance or quota in the composer.",
+  "description": "Shows the current conversation model's provider balance or remaining allowance in the composer.",
+  "license": "MIT",
+  "author": "MeiK2333",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MeiK2333/dsh-model-allowance.git"
+  },
+  "homepage": "https://github.com/MeiK2333/dsh-model-allowance#readme",
+  "bugs": {
+    "url": "https://github.com/MeiK2333/dsh-model-allowance/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "balance",
+    "quota",
+    "allowance",
+    "composer"
+  ],
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -17,7 +36,8 @@
     "lib/*.js",
     "locale/*.json",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
