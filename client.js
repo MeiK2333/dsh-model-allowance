@@ -227,14 +227,16 @@ window.__ModuleLoader__.load({
       // near the trailing edge, so the panel opens leftwards instead of
       // running off the side of the composer.
       '.dsh-model-balance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;',
-      'min-width:250px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);',
+      'min-width:250px;padding:8px 12px 10px;border:1px solid var(--dsw-alias-border-l1);',
       'border-radius:10px;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);',
       'box-shadow:0 8px 24px rgb(0 0 0 / 18%);font-size:12px}',
       '.dsh-model-balance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
       '.dsh-model-balance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
       '.dsh-model-balance-usage{font-variant-numeric:tabular-nums}',
-      '.dsh-model-balance-switcher-wrap{position:relative;padding-bottom:8px;',
-      'margin-bottom:4px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+      // The row bleeds past the content padding so the marks sit closer to the
+      // card edge, and the divider under them runs the full width.
+      '.dsh-model-balance-switcher-wrap{position:relative;margin:-2px -12px 6px;',
+      'padding:0 8px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-switcher{display:flex;flex-wrap:nowrap;align-items:center;',
       'gap:4px;overflow:hidden}',
       // Each mark is the vendor's own artwork in its own colour on a neutral
@@ -242,7 +244,7 @@ window.__ModuleLoader__.load({
       // two DeepSeek routes tell each other apart by chip: filled for the
       // signed-in account, outlined for a stored key.
       '.dsh-model-balance-tab{display:inline-flex;align-items:center;justify-content:center;',
-      'width:22px;height:22px;flex:none;padding:0;border:1px solid transparent;border-radius:6px;',
+      'width:26px;height:26px;flex:none;padding:0;border:1px solid transparent;border-radius:7px;',
       'background:transparent;line-height:1;cursor:pointer;',
       'color:var(--provider-mark,var(--dsw-alias-label-primary));opacity:.66}',
       '.dsh-model-balance-tab[data-variant="solid"]{background:var(--dsw-alias-bg-layer-2);',
@@ -260,7 +262,7 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-tab svg{display:block}',
       '.dsh-model-balance-tab-letter{font-size:11px;font-weight:600;line-height:1}',
       '.dsh-model-balance-more{display:inline-flex;align-items:center;justify-content:center;',
-      'width:22px;height:22px;flex:none;margin-left:auto;padding:0;border-radius:6px;',
+      'width:26px;height:26px;flex:none;margin-left:auto;padding:0;border-radius:7px;',
       'border:1px solid var(--dsw-alias-border-l1);background:transparent;cursor:pointer;',
       'color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1}',
       '.dsh-model-balance-more:hover{color:var(--dsw-alias-label-primary);',
@@ -274,7 +276,7 @@ window.__ModuleLoader__.load({
       'color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}',
       '.dsh-model-balance-menu-item:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.dsh-model-balance-menu-mark{display:inline-flex;align-items:center;',
-      'justify-content:center;width:18px;height:18px;flex:none;border-radius:5px;',
+      'justify-content:center;width:20px;height:20px;flex:none;border-radius:5px;',
       'line-height:1;background:var(--dsw-alias-bg-layer-2);',
       'color:var(--provider-mark,var(--dsw-alias-label-primary))}',
       '.dsh-model-balance-menu-mark svg{display:block}',
@@ -899,9 +901,9 @@ window.__ModuleLoader__.load({
       // How many marks fit on one row. Each mark is `MARK_SIZE` plus the gap;
       // the menu button, when it appears, needs its own slot. An unmeasured
       // strip (no host observer) keeps every mark visible.
-      const MARK_SIZE = 22
+      const MARK_SIZE = 26
       const MARK_GAP = 4
-      const MENU_SIZE = 22
+      const MENU_SIZE = 26
       const perMark = MARK_SIZE + MARK_GAP
       let visibleCount = available.length
       if (stripWidth > 0 && available.length * perMark - MARK_GAP > stripWidth) {
@@ -944,7 +946,7 @@ window.__ModuleLoader__.load({
               setMenuOpen(false)
             },
           },
-          providerIcon(entry.route, 14),
+          providerIcon(entry.route, 17),
         )
       }
 
@@ -1038,7 +1040,7 @@ window.__ModuleLoader__.load({
                                   'data-variant': providerMark(entry.route).variant,
                                   style: { '--provider-mark': providerMark(entry.route).color },
                                 },
-                                providerIcon(entry.route, 12),
+                                providerIcon(entry.route, 13),
                               ),
                               h('span', null, providerName(entry.route, t)),
                             ),

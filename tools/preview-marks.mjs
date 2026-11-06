@@ -58,7 +58,7 @@ const rowHeight = 150
 // holding a 14px glyph, magnified four times so the true proportions are
 // readable without guessing.
 const chipScale = 4
-const chipRowHeight = 100
+const chipRowHeight = 124
 const chipBandHeight = chipRowHeight * panels.length + 20
 const height = rowHeight * panels.length + chipBandHeight + 60
 
@@ -87,12 +87,12 @@ const chipChips = panels
     const rowY = chipY + rowIndex * chipRowHeight
     const chips = ['deepseek', 'minimax', 'zhipu']
       .map((provider, index) => {
-        const chipSize = 22 * chipScale
-        const iconSize = 14 * chipScale
+        const chipSize = 26 * chipScale
+        const iconSize = 17 * chipScale
         const x = 40 + index * 90
         const inset = (chipSize - iconSize) / 2
         return `
-          <rect x="${x}" y="${rowY}" width="${chipSize}" height="${chipSize}" rx="${6 * chipScale}"
+          <rect x="${x}" y="${rowY}" width="${chipSize}" height="${chipSize}" rx="${7 * chipScale}"
             fill="${bg}" stroke="${border}" stroke-width="1"/>
           ${markup(provider, iconSize, COLORS[provider]).replace('<svg', `<svg x="${x + inset}" y="${rowY + inset}"`)}
         `
