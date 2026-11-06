@@ -144,6 +144,7 @@ window.__ModuleLoader__.load({
       'detail.console': '控制台',
       'detail.error': '无法读取厂商余额。',
       'detail.moreProviders': '更多厂商',
+      'badge.consumption': '本轮消耗',
       'window.title.hour': '{count} 小时额度',
       'window.title.day': '{count} 天额度',
       'window.title.week': '每周额度',
@@ -184,6 +185,7 @@ window.__ModuleLoader__.load({
       'detail.console': 'Console',
       'detail.error': 'Could not read the provider balance.',
       'detail.moreProviders': 'More providers',
+      'badge.consumption': 'Change over the last turn',
       'window.title.hour': '{count}-hour quota',
       'window.title.day': '{count}-day quota',
       'window.title.week': 'Weekly quota',
@@ -223,6 +225,14 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-root[data-tone="failed"] .dsh-model-balance-dot{',
       'background:var(--dsw-alias-state-error-primary)}',
       '.dsh-model-balance-root[data-loading="true"] .dsh-model-balance-dot{opacity:.5}',
+      // The turn's difference rides beside the value for a few seconds. It is
+      // quieter than the value so the balance stays the thing being read, and
+      // it fades in rather than popping.
+      '.dsh-model-balance-delta{margin-left:-2px;font-size:11px;',
+      'color:var(--dsw-alias-label-secondary);animation:dsh-model-balance-fade 200ms ease-out}',
+      '.dsh-model-balance-delta[data-direction="up"]{',
+      'color:var(--dsw-alias-state-success-primary)}',
+      '@keyframes dsh-model-balance-fade{from{opacity:0}to{opacity:1}}',
       // Anchored to its own right edge: the badge sits next to the model seat
       // near the trailing edge, so the panel opens leftwards instead of
       // running off the side of the composer.
@@ -431,6 +441,45 @@ window.__ModuleLoader__.load({
      */
     function formatNumber(value) {
       return Number.isInteger(value) ? value.toLocaleString() : String(value)
+    }
+
+    /** How long a finished turn's difference stays on the badge. */
+    const CONSUMPTION_MS = 10 * 1000
+
+    /**
+     * Whether a reading's difference is still worth showing.
+     *
+     * A difference with nothing to say — none at all, or a magnitude that
+     * rounds away at display precision — is treated as absent, so the badge
+     * does not flicker through a `↓0.00` that carries no information.
+     *
+     * @param {{kind: string, delta: number, at: number} | undefined} consumption The difference.
+     * @param {number} now The current instant.
+     * @returns {boolean} True while it should be shown.
+     */
+    function consumptionFreshAt(consumption, now) {
+      if (!consumption) return false
+      if (!Number.isFinite(consumption.delta)) return false
+      if (formatDelta(consumption) === '') return false
+      return now - consumption.at < CONSUMPTION_MS
+    }
+
+    /**
+     * The magnitude of a difference, without its sign.
+     * @param {{kind: string, delta: number}} consumption The difference.
+     * @returns {string} The formatted magnitude, or an empty string when it
+     *   rounds away.
+     */
+    function formatDelta(consumption) {
+      const magnitude = Math.abs(consumption.delta)
+      if (consumption.kind === 'percent') {
+        const points = Math.round(magnitude)
+        return points === 0 ? '' : `${String(points)}%`
+      }
+      // Matches how the balance itself is rendered: two decimals once they mean
+      // something, four while the amounts are fractional cents.
+      const value = magnitude >= 0.01 ? magnitude.toFixed(2) : magnitude.toFixed(4)
+      return Number(value) === 0 ? '' : value
     }
 
     /**
@@ -891,15 +940,17 @@ window.__ModuleLoader__.load({
         }
       }, [open])
 
-      // Refresh the countdown baseline while the panel is open. The countdown
-      // shows seconds, so this ticks every second — but only while the panel is
-      // open, and the interval stops the moment it closes.
+      // Refresh the clock while the panel is open, and while a difference from
+      // the last turn is being shown — the card must fall back to the plain
+      // value on its own, with no other render to trigger it. Once the
+      // difference expires this effect re-runs and the interval stops.
+      const showingDifference = consumptionFreshAt(view?.consumption, now)
       React.useEffect(() => {
-        if (!open) return
+        if (!open && !showingDifference) return
         setNow(Date.now())
         const timer = setInterval(() => setNow(Date.now()), 1000)
         return () => clearInterval(timer)
-      }, [open])
+      }, [open, showingDifference, view?.consumption?.at])
 
       // Ask which providers exist here when the card first opens. The answer is
       // stable for a session unless a credential changes, so this is not polled.
@@ -1134,6 +1185,19 @@ window.__ModuleLoader__.load({
           },
           h('span', { className: 'dsh-model-balance-dot', 'aria-hidden': true }),
           h('span', { className: 'dsh-model-balance-label' }, label),
+          // What the last turn cost, for a few seconds after it lands. The arrow
+          // follows the number shown beside it: down means the balance fell.
+          showingDifference
+            ? h(
+                'span',
+                {
+                  className: 'dsh-model-balance-delta',
+                  'data-direction': view.consumption.delta < 0 ? 'down' : 'up',
+                  title: t('badge.consumption'),
+                },
+                `${view.consumption.delta < 0 ? '↓' : '↑'}${formatDelta(view.consumption)}`,
+              )
+            : null,
         ),
         open
           ? h(

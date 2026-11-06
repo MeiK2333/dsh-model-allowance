@@ -47,6 +47,12 @@ class ModelBalanceService extends Service {
     /** Routes a subscriber asked about, so polling touches only live providers. */
     this.activeRoutes = new Set()
 
+    /**
+     * The reading each route showed when the current turn began.
+     * @type {Map<string, import('./lib/providers.js').BalanceView>}
+     */
+    this.baselines = new Map()
+
     // The Remote controller is a service of its own; it registers under the
     // `balanceController` key and exposes the `balance` wire namespace.
     this.controller = new BalanceController(ownerContext)
@@ -103,12 +109,47 @@ class ModelBalanceService extends Service {
 
   /**
    * Refresh every tracked provider.
+   * @param {{withConsumption?: boolean}} [options] When `withConsumption`,
+   *   each reading is compared with the one captured when the turn began.
    * @returns {Promise<void>} Resolves when the refreshes settle.
    */
-  async refreshAll() {
+  async refreshAll(options = {}) {
+    const report = options.withConsumption === true
     await Promise.all(
-      [...this.activeRoutes].map((route) => this.balance.read(route, { force: true })),
+      [...this.activeRoutes].map((route) => {
+        // The armed baseline is the reading from before this turn consumed
+        // anything. Falling back to the cached reading covers a turn whose
+        // start was never seen — the plugin loaded mid-turn, or the host never
+        // announced it. It is less precise, since a sweep may have refreshed
+        // the cache mid-turn, but it keeps the feature working.
+        const baseline = report
+          ? (this.baselines.get(route) ?? this.balance.peek(route))
+          : undefined
+        return this.balance.read(route, { force: true, baseline })
+      }),
     )
+    if (report) this.baselines.clear()
+  }
+
+  /**
+   * Remember what each tracked provider last read, as the baseline for a turn
+   * that is about to start.
+   *
+   * An existing baseline is not replaced. Turns nest — a subagent runs its own
+   * turn inside the one that started it — and re-arming on the inner turn would
+   * measure only the tail of the outer one.
+   *
+   * @returns {void}
+   */
+  armBaselines() {
+    for (const route of this.activeRoutes) {
+      if (this.baselines.has(route)) continue
+      const view = this.balance.peek(route)
+      if (view !== undefined) this.baselines.set(route, view)
+    }
+    if (this.config.debug === true) {
+      void logDebug(`turn start: armed ${String(this.baselines.size)} baseline(s)`)
+    }
   }
 
   /**
@@ -119,16 +160,24 @@ class ModelBalanceService extends Service {
   [Service.init]() {
     const ctx = this.ctx
 
+    // A turn beginning is the only reliable "before" instant: the provider is
+    // not asked, so this costs nothing, and the value is the last reading taken.
+    ctx.on('agent/status', (payload) => {
+      if (payload.status !== 'running') return
+      this.armBaselines()
+    })
+
     // A finished turn consumed provider quota, so the reading it belongs to is
-    // stale.
+    // stale. This is also the moment to report what the turn cost.
     ctx.on('session/event', (_session, event) => {
       if (event.type !== 'turn/end') return
-      this.refreshAll().catch((error) => {
+      this.refreshAll({ withConsumption: true }).catch((error) => {
         console.error('[model-balance] turn refresh failed', { error })
       })
     })
 
-    // A periodic sweep keeps a long-lived session's reading current.
+    // A periodic sweep keeps a long-lived session's reading current. It never
+    // reports a difference: a sweep is not a turn.
     ctx.timer.interval(() => {
       this.refreshAll().catch((error) => {
         console.error('[model-balance] periodic refresh failed', { error })

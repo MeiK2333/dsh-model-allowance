@@ -121,6 +121,9 @@ const registeredSlots = []
 const localeDictionaries = []
 let remoteMount
 
+/** When the fixture's turn difference was measured; the expiry test moves past it. */
+const consumptionAt = Date.now()
+
 const ctx = {
   effect(fn) {
     const dispose = fn()
@@ -165,6 +168,8 @@ const ctx = {
               currency: 'CNY',
               updatedAt: Date.now(),
               consoleUrl: 'https://platform.deepseek.com/top_up',
+              // A turn just ended and consumed 0.9.
+              consumption: { kind: 'amount', delta: -0.9, at: consumptionAt },
             },
           }),
           refresh: async () => ({ ok: true, value: {} }),
@@ -263,6 +268,38 @@ const settled = render(
 )
 console.log('rendered (settled):', settled)
 if (!settled.includes('¥46.71')) throw new Error('badge did not render the DeepSeek amount')
+
+// --- The turn's difference, and its ten-second life -----------------------
+{
+  if (!settled.includes('class="dsh-model-balance-delta"')) {
+    throw new Error('a finished turn should put its difference on the badge')
+  }
+  if (!settled.includes('↓0.90')) {
+    throw new Error(`the badge should show what the turn cost, rendered ${JSON.stringify(settled)}`)
+  }
+
+  // The component re-reads the clock on every render, so expiry cannot be
+  // simulated by poking its state alone: both the state it renders from and the
+  // clock its effect reads have to move.
+  const laterAt = consumptionAt + 11_000
+  const realNow = Date.now
+  Date.now = () => laterAt
+  hookState[5] = laterAt
+  hookCursor = 0
+  const expired = render(
+    registrationEntry.Component({
+      useProjection: (key) => (key === 'modelSelection' ? projectionValue : undefined),
+    }),
+  )
+  Date.now = realNow
+  hookCursor = 0
+
+  if (expired.includes('class="dsh-model-balance-delta"')) {
+    throw new Error('the difference outlived its ten seconds')
+  }
+  if (!expired.includes('¥46.71')) throw new Error('the plain value did not come back')
+  console.log('badge: showed ↓0.90 after the turn, and dropped it ten seconds later')
+}
 
 // --- The detail panel opens with no close button ---------------------------
 {

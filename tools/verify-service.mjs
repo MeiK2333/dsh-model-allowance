@@ -91,4 +91,56 @@ for (const result of results) {
     throw new Error(`${result.adapter} did not read: ${result.error ?? result.status}`)
   }
 }
+
+// --- The difference from the turn's baseline --------------------------------
+// A finished turn is the only read that reports one, and it must be attached to
+// the published reading without being cached, so a later sweep cannot repeat it.
+{
+  const seen = []
+  const route = 'deepseek'
+  const stop = service.subscribe(route, (view) => seen.push(view))
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    status: 200,
+    json: async () => responses[url],
+  })
+  try {
+    const before = service.peek(route)
+    if (before === undefined || typeof before.amount !== 'number') {
+      throw new Error('the cached reading was not available as a baseline')
+    }
+    // Pretend the provider started the turn with a little more money.
+    const baseline = { ...before, amount: before.amount + 0.9 }
+
+    const after = await service.read(route, { force: true, baseline })
+    if (after.consumption?.kind !== 'amount') {
+      throw new Error(`a turn-end read should report its difference, got ${JSON.stringify(after.consumption)}`)
+    }
+    if (Math.abs(after.consumption.delta + 0.9) > 1e-9) {
+      throw new Error(`the difference should be -0.9, got ${String(after.consumption.delta)}`)
+    }
+    if (!Number.isFinite(after.consumption.at)) throw new Error('the difference has no instant')
+
+    // The subscriber sees the annotated reading, so the badge can show it.
+    const published = seen.at(-1)
+    if (published?.consumption === undefined) {
+      throw new Error('the difference was not published to subscribers')
+    }
+    // The cache keeps the plain reading, so a later sweep reports no difference.
+    const cached = service.peek(route)
+    if (cached?.consumption !== undefined) {
+      throw new Error('the difference was cached and would be reported again by a sweep')
+    }
+    // A read with no baseline says nothing about a difference.
+    const plain = await service.read(route, { force: true })
+    if (plain.consumption !== undefined) {
+      throw new Error('a read without a baseline should carry no difference')
+    }
+    console.log('service: turn-end reads report a difference; sweeps do not')
+  } finally {
+    stop()
+    globalThis.fetch = originalFetch
+  }
+}
+
 console.log('OK: every adapter reads through a Cordis-strict context')
