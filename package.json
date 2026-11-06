@@ -27,9 +27,7 @@
       "inject": ["@deepseek-ai/dsh-client-ui-conversation"]
     }
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.5",
-    "@deepseek-ai/schemastery": "~3.18.5",
-    "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.5"
+  "engines": {
+    "dsh": ">=0.2.1-rc.5 <0.3.0"
   }
 }

@@ -208,6 +208,27 @@ Host 的 `@Remote` 标记通过 `markRemote()` 在构造期写入原型——这
 
 安装后需要**刷新页面**（Host 改动需要重启 DSH）才能加载新的模块代。
 
+### 与 DSH 版本的兼容声明
+
+```json
+"engines": { "dsh": ">=0.2.1-rc.5 <0.3.0" }
+```
+
+只有这一处版本声明。**不要改回 `peerDependencies` 钉版本**：DSH 的兼容门
+（`dsh-app-boot` 的 `evaluatePluginCompatibility`）规则是——
+
+1. 存在 `engines.dsh` 时它**独占判定**，`peerDependencies` 完全被忽略；
+2. 否则只检查名字以 `@deepseek-ai/dsh` 或 `@deepseek-ai/dsh-` 开头的 peer，
+   `cordis` / `schemastery` 这类**从来不参与判定**；
+3. 比较用 `semver.satisfies(..., { includePrerelease: true })`，所以预发布区间可用。
+
+早先写成 `"@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.5"` 精确钉版，
+DSH 升到 0.2.2-rc.1 后插件立刻被判不兼容并被禁用。用次版本区间后，
+0.2.x 内的任何 rc 都能继续用，0.3.0 仍会被正确拦下。
+
+已实测通过的组合：**DSH 0.2.1-rc.5 / 0.2.2-rc.1**（cordis 4.0.5 → 4.1.0、
+schemastery 3.18.5 → 3.19.0、typert-protocol 0.2.1-rc.5 → 0.2.2-rc.1）。
+
 ---
 
 ## 验证
