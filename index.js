@@ -94,6 +94,14 @@ class ModelBalanceService extends Service {
   }
 
   /**
+   * List the providers this installation can read.
+   * @returns {Promise<Array<{route: string, configured: boolean}>>} The routes.
+   */
+  async list() {
+    return await this.balance.available()
+  }
+
+  /**
    * Refresh every tracked provider.
    * @returns {Promise<void>} Resolves when the refreshes settle.
    */
@@ -142,6 +150,14 @@ class ModelBalanceService extends Service {
     void (async () => {
       await logDebug(`=== probe: ${PROVIDER_ADAPTERS.length} adapters ===`)
       await logDebug(`deepseekAccount present: ${String(ctx.get('deepseekAccount') !== undefined)}`)
+      try {
+        const routes = await this.list()
+        await logDebug(
+          `available=${JSON.stringify(routes.filter((route) => route.configured).map((route) => route.route))}`,
+        )
+      } catch (error) {
+        await logDebug(`available probe THREW ${describeError(error)}`)
+      }
       for (const adapter of PROVIDER_ADAPTERS) {
         const route = adapter.routes[0]
         try {

@@ -70,9 +70,19 @@ window.__ModuleLoader__.load({
         source: 'json',
         codec: strict(providerSchema, 'Provider route to read.', '@local/dsh-model-balance#provider'),
       }
+      const providerListSchema = z.array(
+        z.object({ route: z.string(), configured: z.boolean() }),
+      )
       return {
         package: '@local/dsh-model-balance',
         methods: {
+          'balance/list': {
+            service: 'balanceController',
+            description: 'List the provider routes this installation can read.',
+            invocation: { kind: 'direct' },
+            parameters: [],
+            result: strict(providerListSchema, 'The routes.', '@local/dsh-model-balance#routes'),
+          },
           'balance/balance': {
             service: 'balanceController',
             description: "Read one provider's balance or remaining allowance.",
@@ -147,6 +157,10 @@ window.__ModuleLoader__.load({
       'duration.hoursMinutes': '{hours} 小时 {minutes} 分',
       'duration.minutes': '{minutes} 分钟',
       'duration.lessThanMinute': '不到 1 分钟',
+      'provider.deepseekAccount': 'DeepSeek 账号',
+      'provider.deepseekApiKey': 'DeepSeek API',
+      'provider.minimaxTokenPlan': 'MiniMax',
+      'provider.zhipuQuota': '智谱 GLM',
     }
 
     /** English dictionary. */
@@ -184,6 +198,10 @@ window.__ModuleLoader__.load({
       'duration.hoursMinutes': '{hours}h {minutes}m',
       'duration.minutes': '{minutes}m',
       'duration.lessThanMinute': 'under a minute',
+      'provider.deepseekAccount': 'DeepSeek account',
+      'provider.deepseekApiKey': 'DeepSeek API',
+      'provider.minimaxTokenPlan': 'MiniMax',
+      'provider.zhipuQuota': 'Zhipu GLM',
     }
 
     /**
@@ -217,6 +235,17 @@ window.__ModuleLoader__.load({
       '.dsh-model-balance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}',
       '.dsh-model-balance-row>span:first-child{color:var(--dsw-alias-label-secondary)}',
       '.dsh-model-balance-usage{font-variant-numeric:tabular-nums}',
+      '.dsh-model-balance-switcher{display:flex;flex-wrap:wrap;gap:4px;',
+      'padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+      '.dsh-model-balance-tab{padding:3px 8px;border:1px solid transparent;border-radius:999px;',
+      'background:transparent;color:var(--dsw-alias-label-secondary);font-size:12px;',
+      'line-height:1.2;cursor:pointer;white-space:nowrap}',
+      '.dsh-model-balance-tab:hover{color:var(--dsw-alias-label-primary);',
+      'border-color:var(--dsw-alias-border-l2)}',
+      '.dsh-model-balance-tab[data-active="true"]{color:var(--dsw-alias-label-primary);',
+      'border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
+      '.dsh-model-balance-tab:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);',
+      'outline-offset:1px}',
       '.dsh-model-balance-window{margin-top:8px;padding-top:8px;',
       'border-top:1px solid var(--dsw-alias-border-l1)}',
       '.dsh-model-balance-reset{color:var(--dsw-alias-label-secondary);font-size:11px;',
@@ -340,12 +369,38 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * Route to locale key for the provider's display name.
+     *
+     * A route without an entry falls back to its own id, so a newly added
+     * adapter is readable before anyone writes copy for it.
+     */
+    const PROVIDER_NAME_KEYS = {
+      'deepseek-account': 'provider.deepseekAccount',
+      deepseek: 'provider.deepseekApiKey',
+      'minimax-cn': 'provider.minimaxTokenPlan',
+      zai: 'provider.zhipuQuota',
+      'zai-coding-cn': 'provider.zhipuQuota',
+    }
+
+    /**
+     * Name a provider route for the switcher.
+     * @param {string} route Provider route.
+     * @param {(key: string, params?: object) => string} t Translator.
+     * @returns {string} The display name.
+     */
+    function providerName(route, t) {
+      const key = PROVIDER_NAME_KEYS[route]
+      if (key === undefined) return route
+      const name = t(key)
+      return name === key ? route : name
+    }
+
+    /**
      * Name a metering window.
      * @param {object} window The window.
      * @param {(key: string, params?: object) => string} t Translator.
      * @returns {string} The window title.
-     */
-    function windowTitle(window, t) {
+     */    function windowTitle(window, t) {
       if (window.unit === 'hour' && window.count) return t('window.hour', { count: window.count })
       if (window.unit === 'day' && window.count) return t('window.day', { count: window.count })
       if (window.unit === 'month') return t('window.month')
@@ -420,6 +475,21 @@ window.__ModuleLoader__.load({
       // the clock on a slow tick. Only the open panel pays for it.
       const [now, setNow] = React.useState(() => Date.now())
 
+      // The card follows the model by default but can be pointed at any other
+      // provider this installation can read. `picked` holds that override and
+      // is cleared whenever the model moves, so the card snaps back to it.
+      const [picked, setPicked] = React.useState(null)
+      const [available, setAvailable] = React.useState([])
+      const lastModelProvider = React.useRef(null)
+
+      // Dropping the override belongs to the model *changing*, not to every
+      // render, so the previous value is compared rather than reset blindly.
+      React.useEffect(() => {
+        if (lastModelProvider.current === provider) return
+        lastModelProvider.current = provider
+        setPicked(null)
+      })
+
       // The panel has no close button: a click anywhere outside it dismisses it,
       // and Escape does the same for keyboard users. The listener is on the
       // document during capture so a click on a control that stops propagation
@@ -452,8 +522,31 @@ window.__ModuleLoader__.load({
         return () => clearInterval(timer)
       }, [open])
 
+      // Ask which providers exist here when the card first opens. The answer is
+      // stable for a session unless a credential changes, so this is not polled.
       React.useEffect(() => {
-        if (!provider) {
+        if (!open) return
+        let cancelled = false
+        ;(async () => {
+          try {
+            const api = await getBalanceApi()
+            if (!api || typeof api.list !== 'function') return
+            const result = await api.list()
+            if (cancelled || !result.ok) return
+            setAvailable(result.value.filter((entry) => entry.configured))
+          } catch (error) {
+            console.error('[model-balance] listing providers failed', { error })
+          }
+        })()
+        return () => {
+          cancelled = true
+        }
+      }, [open])
+
+      const activeProvider = picked ?? provider
+
+      React.useEffect(() => {
+        if (!activeProvider) {
           setView(null)
           setLoading(false)
           return
@@ -465,7 +558,7 @@ window.__ModuleLoader__.load({
         /** One unary read, used when the stream is unavailable or fails. */
         const readOnce = async (api) => {
           try {
-            const result = await api.balance(provider)
+            const result = await api.balance(activeProvider)
             if (cancelled) return
             if (!result.ok) throw new Error('balance reading failed')
             setView(result.value)
@@ -481,7 +574,7 @@ window.__ModuleLoader__.load({
           const api = await getBalanceApi()
           if (cancelled) return
           if (!api) {
-            setView({ provider, status: 'failed', kind: 'quota' })
+            setView({ provider: activeProvider, status: 'failed', kind: 'quota' })
             setLoading(false)
             return
           }
@@ -495,7 +588,7 @@ window.__ModuleLoader__.load({
             try {
               handle = streamFactory({
                 name: 'balance',
-                open: (signal) => api.watch(provider, signal),
+                open: (signal) => api.watch(activeProvider, signal),
                 ended: () => new Error('balance stream ended'),
               })
             } catch (error) {
@@ -513,7 +606,7 @@ window.__ModuleLoader__.load({
                 }
               } catch (error) {
                 if (!cancelled) {
-                  console.error('[model-balance] reading stream failed', { provider, error })
+                  console.error('[model-balance] reading stream failed', { provider: activeProvider, error })
                 }
               } finally {
                 // A stream that produced nothing leaves the badge loading
@@ -531,21 +624,21 @@ window.__ModuleLoader__.load({
           cancelled = true
           handle?.dispose?.()
         }
-      }, [provider, ctx])
+      }, [activeProvider, ctx])
 
       const refresh = React.useCallback(async () => {
         setRefreshing(true)
         try {
           const api = await getBalanceApi()
           if (!api) return
-          const result = await api.refresh(provider)
+          const result = await api.refresh(activeProvider)
           if (result.ok) setView(result.value)
         } catch (error) {
-          console.error('[model-balance] refresh failed', { provider, error })
+          console.error('[model-balance] refresh failed', { provider: activeProvider, error })
         } finally {
           setRefreshing(false)
         }
-      }, [provider, ctx])
+      }, [activeProvider, ctx])
 
       const label = React.useMemo(() => {
         if (!provider) return ''
@@ -620,12 +713,38 @@ window.__ModuleLoader__.load({
                 role: 'dialog',
                 'aria-label': t('detail.title'),
               },
-              h(
-                'div',
-                { className: 'dsh-model-balance-row' },
-                h('span', null, t('detail.provider')),
-                h('span', null, provider),
-              ),
+              // With more than one readable provider the card opens a switcher;
+              // with one there is nothing to switch, so it just names it.
+              available.length > 1
+                ? h(
+                    'div',
+                    {
+                      className: 'dsh-model-balance-switcher',
+                      role: 'tablist',
+                      'aria-label': t('detail.provider'),
+                    },
+                    ...available.map((entry) =>
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          key: entry.route,
+                          role: 'tab',
+                          className: 'dsh-model-balance-tab',
+                          'aria-selected': entry.route === activeProvider ? 'true' : 'false',
+                          'data-active': entry.route === activeProvider ? 'true' : 'false',
+                          onClick: () => setPicked(entry.route),
+                        },
+                        providerName(entry.route, t),
+                      ),
+                    ),
+                  )
+                : h(
+                    'div',
+                    { className: 'dsh-model-balance-row' },
+                    h('span', null, t('detail.provider')),
+                    h('span', null, providerName(activeProvider, t)),
+                  ),
               view?.kind === 'amount' && typeof view.amount === 'number'
                 ? h(
                     'div',

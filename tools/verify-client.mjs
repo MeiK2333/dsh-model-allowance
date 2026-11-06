@@ -266,7 +266,11 @@ if (!settled.includes('¥46.71')) throw new Error('badge did not render the Deep
   hookCursor = 0
   const opened = renderBadge()
 
-  if (!opened.includes('deepseek-account')) throw new Error('panel did not render the provider')
+  // With one readable provider the card names it instead of offering a switcher.
+  if (!opened.includes('DeepSeek 账号')) throw new Error('panel did not render the provider name')
+  if (opened.includes('class="dsh-model-balance-tab"')) {
+    throw new Error('a single readable provider should not render a switcher')
+  }
   if (opened.includes('关闭')) throw new Error('panel still renders a close button')
   if (!opened.includes('刷新')) throw new Error('panel lost its refresh action')
   console.log('panel opened:', opened.slice(opened.indexOf('<div class="dsh-model-balance-panel"')))
@@ -417,6 +421,32 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
 
   let planSlot
   let planMount
+  /** Routes the card asked the Host about, in order. */
+  const readRoutes = []
+  const providerDirectory = [
+    { route: 'deepseek-account', configured: true },
+    { route: 'deepseek', configured: false },
+    { route: 'minimax-cn', configured: true },
+    { route: 'zai', configured: true },
+  ]
+
+  const readFor = (route) => ({
+    ok: true,
+    value:
+      route === 'minimax-cn'
+        ? {
+            provider: 'minimax-cn',
+            status: 'ready',
+            kind: 'quota',
+            percent: 58,
+            updatedAt: now,
+            windows: [
+              { id: 'weekly', unit: 'day', count: 7, remainingPercent: 58 },
+            ],
+          }
+        : planView,
+  })
+
   const planCtx = {
     effect: (fn) => fn(),
     locale: ctx.locale,
@@ -430,8 +460,12 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     get: (key) =>
       key === 'remote.balance'
         ? {
-            balance: async () => ({ ok: true, value: planView }),
-            refresh: async () => ({ ok: true, value: planView }),
+            balance: async (route) => {
+              readRoutes.push(route)
+              return readFor(route)
+            },
+            refresh: async (route) => readFor(route),
+            list: async () => ({ ok: true, value: providerDirectory }),
           }
         : undefined,
     slots: {
@@ -450,8 +484,26 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   hookState = []
   hookCursor = 0
   const planProviders = { lastUsed: { provider: 'zai', model: 'glm-4.6' }, next: null }
-  const planBadge = () =>
-    render(planSlot.Component({ useProjection: (key) => (key === 'modelSelection' ? planProviders : undefined) }))
+  /** Expand function components once, so hooks run a single time. */
+  const expand = (node) => {
+    if (node === null || node === undefined || typeof node !== 'object') return node
+    if (Array.isArray(node)) return node.map(expand)
+    if (typeof node.type === 'function') {
+      return expand(node.type({ ...node.props, children: node.children }))
+    }
+    return { ...node, children: (node.children ?? []).map(expand) }
+  }
+  /** The rendered tree for the current state, with handlers intact. */
+  const planTree = () => {
+    hookCursor = 0
+    return expand(
+      planSlot.Component({
+        useProjection: (key) => (key === 'modelSelection' ? planProviders : undefined),
+      }),
+    )
+  }
+  /** The same tree as markup, for text assertions. */
+  const planBadge = () => render(planTree())
 
   planBadge()
   await new Promise((resolve) => setTimeout(resolve, 20))
@@ -463,8 +515,12 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     throw new Error('badge should report the binding window')
   }
 
-  // Open the card and read both window blocks.
+  // Open the card and read both window blocks. The switcher list arrives from
+  // the Host asynchronously, so sample the render after it settles.
   hookState[2] = true
+  hookCursor = 0
+  planBadge()
+  await new Promise((resolve) => setTimeout(resolve, 20))
   hookCursor = 0
   const planOpen = planBadge()
   const body = planOpen.slice(planOpen.indexOf('dsh-model-balance-panel"'))
@@ -483,6 +539,70 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   ]) {
     if (!body.includes(expected)) throw new Error(`plan card is missing ${JSON.stringify(expected)}`)
   }
+
+  // --- the switcher lists what this installation can actually read ---------
+  if (readRoutes[0] !== 'zai') {
+    throw new Error(`the card should open on the model's provider, read ${JSON.stringify(readRoutes)}`)
+  }
+  for (const name of ['DeepSeek 账号', 'MiniMax', '智谱 GLM']) {
+    if (!body.includes(name)) throw new Error(`switcher is missing ${name}`)
+  }
+  // `deepseek` has no key configured here, so it must not be offered.
+  if (body.includes('DeepSeek API')) {
+    throw new Error('switcher offered a provider without a credential')
+  }
+
+  // --- picking another provider re-reads it --------------------------------
+  /** Collect every button node in a rendered tree. */
+  const buttonsIn = (node, out = []) => {
+    if (node === null || node === undefined || typeof node !== 'object') return out
+    if (Array.isArray(node)) {
+      for (const child of node) buttonsIn(child, out)
+      return out
+    }
+    if (node.type === 'button') out.push(node)
+    for (const child of node.children ?? []) buttonsIn(child, out)
+    return out
+  }
+  /** Flatten an element's text content. */
+  const textIn = (node) => {
+    if (node === null || node === undefined) return ''
+    if (typeof node === 'string' || typeof node === 'number') return String(node)
+    if (Array.isArray(node)) return node.map(textIn).join('')
+    return textIn(node.children)
+  }
+  /** Find one switcher tab by its visible label. */
+  const tabNamed = (tree, label) =>
+    buttonsIn(tree).find(
+      (button) => button.props.className === 'dsh-model-balance-tab' && textIn(button) === label,
+    )
+
+  const miniMaxTab = tabNamed(planTree(), 'MiniMax')
+  if (!miniMaxTab) throw new Error('the MiniMax tab was not rendered')
+  readRoutes.length = 0
+  miniMaxTab.props.onClick()
+  planBadge()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  const afterSwitch = planBadge()
+
+  if (!readRoutes.includes('minimax-cn')) {
+    throw new Error(`switching did not read minimax-cn, read ${JSON.stringify(readRoutes)}`)
+  }
+  if (!afterSwitch.includes('每 7 天')) {
+    throw new Error('switched card did not show the MiniMax weekly window')
+  }
+  console.log('switcher: picked MiniMax and the card re-read it')
+
+  // Switching back restores the other provider.
+  const zaiTab = tabNamed(planTree(), '智谱 GLM')
+  if (!zaiTab) throw new Error('the Zhipu tab disappeared after switching')
+  readRoutes.length = 0
+  zaiTab.props.onClick()
+  planBadge()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  planBadge()
+  if (!readRoutes.includes('zai')) throw new Error('switching back did not read zai')
+  console.log('switcher: picked Zhipu GLM again and the card re-read it')
 }
 
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')
