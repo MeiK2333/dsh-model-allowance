@@ -921,8 +921,10 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   // stays, the rest move behind the button, and the active provider is never
   // the one that disappears.
   {
-    hookState[10] = 60
-    hookState[11] = { current: { clientWidth: 60 } }
+    // Hook indices shifted after entryOf/nameOf were wrapped in useCallback:
+    // 12 = stripWidth state, 13 = stripRef.
+    hookState[12] = 60
+    hookState[13] = { current: { clientWidth: 60 } }
     const narrowTree = planTree()
     const narrow = render(narrowTree)
     const tabs = buttonsIn(narrowTree).filter(

@@ -980,8 +980,11 @@ function BalanceBadge(props) {
   const [directory, setDirectory] = React.useState([]);
   const lastModelProvider = React.useRef(null);
   const available = directory.filter((entry) => entry.configured);
-  const entryOf = (route) => directory.find((entry) => entry.route === route);
-  const nameOf = (route) => pickName(entryOf(route), route);
+  const entryOf = React.useCallback(
+    (route) => directory.find((entry) => entry.route === route),
+    [directory]
+  );
+  const nameOf = React.useCallback((route) => pickName(entryOf(route), route), [entryOf]);
   const markFor = (route) => markOf(entryOf(route), route);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [stripWidth, setStripWidth] = React.useState(0);
