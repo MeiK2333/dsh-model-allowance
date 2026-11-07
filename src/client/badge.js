@@ -58,14 +58,17 @@ export function BalanceBadge(props) {
    * @param {string} route Provider route.
    * @returns {object | undefined} The entry.
    */
-  const entryOf = (route) => directory.find((entry) => entry.route === route)
+  const entryOf = React.useCallback(
+    (route) => directory.find((entry) => entry.route === route),
+    [directory],
+  )
 
   /**
    * Name a route from its metadata, falling back to the route id.
    * @param {string} route Provider route.
    * @returns {string} The display name.
    */
-  const nameOf = (route) => pickName(entryOf(route), route)
+  const nameOf = React.useCallback((route) => pickName(entryOf(route), route), [entryOf])
 
   /**
    * The mark for a route, from its metadata.
