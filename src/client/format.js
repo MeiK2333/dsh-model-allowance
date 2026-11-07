@@ -126,10 +126,14 @@ function formatDelta(consumption) {
     if (magnitude >= 0.05) return `${magnitude.toFixed(1)}%`
     return ''
   }
+  // Filter out floating-point noise: values smaller than 0.00005 round to
+  // 0.0000 at 4 decimal places and carry no meaningful information. This
+  // catches artifacts like -0.00002 from IEEE 754 subtraction.
+  if (magnitude < 0.00005) return ''
   // Matches how the balance itself is rendered: two decimals once they mean
   // something, four while the amounts are fractional cents.
   const value = magnitude >= 0.01 ? magnitude.toFixed(2) : magnitude.toFixed(4)
-  return Number(value) === 0 ? '' : value
+  return value
 }
 
 /**
