@@ -16,6 +16,7 @@ conversation model.
 ### Not supported
 
 - Qwen Token Plan: the vendor publishes no balance API
+- Mimo Token Plan：the vendor publishes no balance API
 
 ## Installation
 

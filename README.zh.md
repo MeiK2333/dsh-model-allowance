@@ -15,6 +15,7 @@
 ### 不支持
 
 - 千问 Token Plan：官方未提供余额接口
+- Mimo Token Plan：官方未提供余额接口
 
 ## 安装
 
