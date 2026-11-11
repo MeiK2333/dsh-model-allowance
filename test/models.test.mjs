@@ -8,7 +8,13 @@
  */
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { currentModelFor, modelsForProvider, providerGroup } from '../src/client/models.js'
+import {
+  currentModelFor,
+  effortChoices,
+  modelsForProvider,
+  providerGroup,
+  providerModelGroup,
+} from '../src/client/models.js'
 
 const CATALOG = {
   default: { provider: 'deepseek', model: 'deepseek-chat' },
@@ -69,6 +75,27 @@ test('a provider with no models offers none', () => {
   assert.deepEqual(modelsForProvider(CATALOG, 'nope'), [])
 })
 
+test('the catalog group is found under the first route that carries models', () => {
+  const catalog = {
+    groups: [
+      { id: 'deepseek', name: 'DeepSeek', models: [] },
+      {
+        id: 'deepseek-official',
+        name: 'DeepSeek official',
+        models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }],
+      },
+    ],
+  }
+  // The card route itself is empty, so the adapter's alias answers, and the
+  // group's own id is what a switch must name.
+  assert.deepEqual(providerModelGroup(catalog, ['deepseek', 'deepseek-official']), {
+    provider: 'deepseek-official',
+    models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }],
+  })
+  assert.equal(providerModelGroup(catalog, ['deepseek']), undefined)
+  assert.equal(providerModelGroup(catalog, []), undefined)
+})
+
 test('the current model is the one the session uses of that provider', () => {
   const selection = { next: { provider: 'minimax-cn', model: 'minimax-m2' } }
   assert.equal(currentModelFor(selection, 'minimax-cn'), 'minimax-m2')
@@ -83,4 +110,41 @@ test('the last used model answers when the session has no pending one', () => {
   const selection = { lastUsed: { provider: 'deepseek', model: 'deepseek-chat' } }
   assert.equal(currentModelFor(selection, 'deepseek'), 'deepseek-chat')
   assert.equal(currentModelFor(undefined, 'deepseek'), undefined)
+})
+
+test('a model without efforts offers no second level', () => {
+  assert.equal(effortChoices(CATALOG.groups[0].models[0]), null)
+  // defaultEffort alone, without a list of efforts, is nothing to choose.
+  assert.equal(effortChoices(CATALOG.groups[1].models[0]), null)
+  assert.equal(effortChoices(undefined), null)
+})
+
+test('efforts become second-level choices with the default marked', () => {
+  const model = {
+    id: 'glm',
+    reasoning: {
+      defaultEffort: 'high',
+      efforts: [
+        { id: 'low', name: 'Low' },
+        { id: 'high', name: 'High' },
+        { id: '' },
+        { name: 'No id' },
+      ],
+    },
+  }
+  assert.deepEqual(effortChoices(model), [
+    { id: 'low', name: 'Low', isDefault: false },
+    { id: 'high', name: 'High', isDefault: true },
+  ])
+})
+
+test('a model with no default of its own offers the provider default first', () => {
+  const model = {
+    id: 'kimi',
+    reasoning: { efforts: [{ id: 'fast', name: 'Fast' }] },
+  }
+  assert.deepEqual(effortChoices(model), [
+    { id: undefined, providerDefault: true },
+    { id: 'fast', name: 'Fast', isDefault: false },
+  ])
 })

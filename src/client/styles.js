@@ -137,6 +137,28 @@ const STYLES = [
   '.dsh-model-allowance-model-item[data-current="true"]{color:var(--dsw-alias-label-secondary)}',
   '.dsh-model-allowance-model-item[disabled]{opacity:.6;cursor:default}',
   '.dsh-model-allowance-model-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  // The trailing side of a model row carries its state label and, for a
+  // model with reasoning efforts, the arrow that says a flyout waits to
+  // the right.
+  '.dsh-model-allowance-model-side{display:inline-flex;align-items:center;gap:4px;flex:none}',
+  '.dsh-model-allowance-model-arrow{color:var(--dsw-alias-label-tertiary);font-size:12px;',
+  'line-height:1}',
+  // The effort flyout opens to the right of the list, on the row the
+  // pointer rests on, as a fourth floating surface of the card.
+  '.dsh-model-allowance-effort-menu{position:absolute;left:calc(100% + 4px);z-index:31;',
+  'display:flex;flex-direction:column;min-width:130px;max-width:220px;padding:4px;border:0;',
+  'border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);',
+  'backdrop-filter:var(--dsw-menu-backdrop-filter);',
+  'box-shadow:var(--dsw-elevation-prominent)}',
+  '.dsh-model-allowance-effort-item{display:flex;align-items:center;justify-content:space-between;',
+  'gap:10px;width:100%;padding:3px 6px;border:0;border-radius:var(--dsw-radius-xs);',
+  'background:0 0;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}',
+  '.dsh-model-allowance-effort-item:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+  // The provider's own default effort is dimmed like the model in use, so
+  // the open submenu points at it before anything is picked.
+  '.dsh-model-allowance-effort-item[data-default="true"],',
+  '.dsh-model-allowance-effort-item[data-current="true"]{color:var(--dsw-alias-label-secondary)}',
+  '.dsh-model-allowance-effort-item[disabled]{opacity:.6;cursor:default}',
   // The trailing label names the state of one model: the one in use, or the
   // one being switched to.
   '.dsh-model-allowance-model-note{flex:none;color:var(--dsw-alias-label-tertiary);font-size:11px}',

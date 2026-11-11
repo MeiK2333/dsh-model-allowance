@@ -339,12 +339,13 @@ var zh = {
   "detail.console": "\u63A7\u5236\u53F0",
   "detail.error": "\u65E0\u6CD5\u8BFB\u53D6\u5382\u5546\u4F59\u989D\u3002",
   "detail.moreProviders": "\u66F4\u591A\u5382\u5546",
-  "detail.switchModelHere": "\u5207\u6362 {name} \u7684\u6A21\u578B",
-  "detail.switchModelThere": "\u5207\u6362\u5230 {name} \u7684\u6A21\u578B",
+  "detail.switchModelHere": "\u5207\u6362 {name}",
+  "detail.switchModelThere": "\u5207\u6362\u5230 {name}",
   "model.title": "\u6A21\u578B",
   "model.loading": "\u52A0\u8F7D\u6A21\u578B\u2026",
   "model.empty": "\u8BE5\u5382\u5546\u6682\u65E0\u53EF\u7528\u6A21\u578B",
   "model.current": "\u5F53\u524D",
+  "model.effortDefault": "\u9ED8\u8BA4",
   "model.switching": "\u5207\u6362\u4E2D\u2026",
   "model.failed": "\u5207\u6362\u5931\u8D25\uFF1A{error}",
   "model.loadFailed": "\u8BFB\u53D6\u6A21\u578B\u5217\u8868\u5931\u8D25\uFF1A{error}",
@@ -402,12 +403,13 @@ var en = {
   "detail.console": "Console",
   "detail.error": "Could not read the provider balance.",
   "detail.moreProviders": "More providers",
-  "detail.switchModelHere": "Switch model of {name}",
-  "detail.switchModelThere": "Switch to a model of {name}",
+  "detail.switchModelHere": "Switch within {name}",
+  "detail.switchModelThere": "Switch to {name}",
   "model.title": "Models",
   "model.loading": "Loading models\u2026",
   "model.empty": "No models available for this provider",
   "model.current": "Current",
+  "model.effortDefault": "Default",
   "model.switching": "Switching\u2026",
   "model.failed": "Switch failed: {error}",
   "model.loadFailed": "Could not read the model list: {error}",
@@ -476,6 +478,30 @@ function modelsForProvider(catalog, provider) {
   const group = providerGroup(catalog, provider);
   const models = Array.isArray(group?.models) ? group.models : [];
   return models.filter((model) => typeof model?.id === "string" && model.id !== "");
+}
+function providerModelGroup(catalog, routes) {
+  const seen = /* @__PURE__ */ new Set();
+  for (const route of routes) {
+    if (typeof route !== "string" || route === "" || seen.has(route)) continue;
+    seen.add(route);
+    const models = modelsForProvider(catalog, route);
+    if (models.length > 0) return { provider: route, models };
+  }
+  return void 0;
+}
+function effortChoices(model) {
+  const reasoning = model?.reasoning;
+  const efforts = Array.isArray(reasoning?.efforts) ? reasoning.efforts : [];
+  if (efforts.length === 0) return null;
+  const entries = efforts.filter((effort) => typeof effort?.id === "string" && effort.id !== "").map((effort) => ({
+    id: effort.id,
+    name: typeof effort.name === "string" && effort.name !== "" ? effort.name : effort.id,
+    isDefault: effort.id === reasoning.defaultEffort
+  }));
+  if (reasoning.defaultEffort === void 0) {
+    entries.unshift({ id: void 0, providerDefault: true });
+  }
+  return entries;
 }
 function currentModelFor(selection, provider) {
   const next = selection?.next ?? selection?.lastUsed;
@@ -867,6 +893,28 @@ var STYLES = [
   '.dsh-model-allowance-model-item[data-current="true"]{color:var(--dsw-alias-label-secondary)}',
   ".dsh-model-allowance-model-item[disabled]{opacity:.6;cursor:default}",
   ".dsh-model-allowance-model-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  // The trailing side of a model row carries its state label and, for a
+  // model with reasoning efforts, the arrow that says a flyout waits to
+  // the right.
+  ".dsh-model-allowance-model-side{display:inline-flex;align-items:center;gap:4px;flex:none}",
+  ".dsh-model-allowance-model-arrow{color:var(--dsw-alias-label-tertiary);font-size:12px;",
+  "line-height:1}",
+  // The effort flyout opens to the right of the list, on the row the
+  // pointer rests on, as a fourth floating surface of the card.
+  ".dsh-model-allowance-effort-menu{position:absolute;left:calc(100% + 4px);z-index:31;",
+  "display:flex;flex-direction:column;min-width:130px;max-width:220px;padding:4px;border:0;",
+  "border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);",
+  "backdrop-filter:var(--dsw-menu-backdrop-filter);",
+  "box-shadow:var(--dsw-elevation-prominent)}",
+  ".dsh-model-allowance-effort-item{display:flex;align-items:center;justify-content:space-between;",
+  "gap:10px;width:100%;padding:3px 6px;border:0;border-radius:var(--dsw-radius-xs);",
+  "background:0 0;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}",
+  ".dsh-model-allowance-effort-item:hover{background:var(--dsw-alias-interactive-bg-hover)}",
+  // The provider's own default effort is dimmed like the model in use, so
+  // the open submenu points at it before anything is picked.
+  '.dsh-model-allowance-effort-item[data-default="true"],',
+  '.dsh-model-allowance-effort-item[data-current="true"]{color:var(--dsw-alias-label-secondary)}',
+  ".dsh-model-allowance-effort-item[disabled]{opacity:.6;cursor:default}",
   // The trailing label names the state of one model: the one in use, or the
   // one being switched to.
   ".dsh-model-allowance-model-note{flex:none;color:var(--dsw-alias-label-tertiary);font-size:11px}",
@@ -1123,6 +1171,7 @@ function BalanceBadge(props) {
   const selection = useProjection("modelSelection");
   const selected = selection?.next?.provider ?? selection?.lastUsed?.provider ?? null;
   const selectedModel = selection?.next?.model ?? selection?.lastUsed?.model ?? void 0;
+  const selectedEffort = selection?.next?.reasoningEffort ?? selection?.lastUsed?.reasoningEffort ?? void 0;
   const sessionId = props.sessionId;
   const [rawView, setView] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
@@ -1147,9 +1196,13 @@ function BalanceBadge(props) {
   const [providerStatus, setProviderStatus] = React.useState(null);
   const [schedule, setSchedule] = React.useState(null);
   const [modelList, setModelList] = React.useState([]);
+  const [modelListRoute, setModelListRoute] = React.useState(null);
+  const [catalogProvider, setCatalogProvider] = React.useState(null);
   const [modelListState, setModelListState] = React.useState("idle");
   const [modelError, setModelError] = React.useState(null);
   const [modelMenuOpen, setModelMenuOpen] = React.useState(false);
+  const [hoverModel, setHoverModel] = React.useState(null);
+  const hoverModelTimer = React.useRef(null);
   const [switchingModel, setSwitchingModel] = React.useState(null);
   const modelWrapRef = React.useRef(null);
   const catalogRef = React.useRef({ value: null, at: 0 });
@@ -1202,7 +1255,10 @@ function BalanceBadge(props) {
   const switchLabel = t(inUse ? "detail.switchModelHere" : "detail.switchModelThere", {
     name: nameOf(activeProvider)
   });
-  const currentModel = currentModelFor(selection, activeProvider);
+  const modelProvider = catalogProvider ?? activeProvider;
+  const currentModel = currentModelFor(selection, modelProvider);
+  const shownModelList = modelListRoute === activeProvider ? modelList : [];
+  const shownModelListState = modelListRoute === activeProvider ? modelListState : "loading";
   const sessionFace = lookupSessionFace(ctx);
   const canSwitch = typeof sessionId === "string" && sessionId !== "" && sessionFace !== void 0 && typeof sessionFace.selectModel === "function";
   const view = rawView?.provider === activeProvider ? rawView : null;
@@ -1425,11 +1481,15 @@ function BalanceBadge(props) {
   }, [activeProvider, activeModel]);
   const showModels = React.useCallback(
     (catalog) => {
-      const models = modelsForProvider(catalog, activeProvider);
+      const routes = [activeProvider, ...entryOf(activeProvider)?.modelRoutes ?? []];
+      const group = providerModelGroup(catalog, routes);
+      const models = group?.models ?? [];
+      setCatalogProvider(group?.provider ?? null);
+      setModelListRoute(activeProvider);
       setModelList(models);
       setModelListState(models.length > 0 ? "ready" : "empty");
     },
-    [activeProvider]
+    [activeProvider, entryOf]
   );
   React.useEffect(() => {
     if (!modelMenuOpen) return void 0;
@@ -1482,7 +1542,7 @@ function BalanceBadge(props) {
     };
   }, [modelMenuOpen]);
   const switchToModel = React.useCallback(
-    async (model) => {
+    async (model, effort) => {
       const face = lookupSessionFace(ctx);
       if (face === void 0 || typeof face.selectModel !== "function") {
         setModelError(t("model.unavailable"));
@@ -1494,10 +1554,9 @@ function BalanceBadge(props) {
       }
       setSwitchingModel(model.id);
       try {
-        const effort = model.reasoning?.defaultEffort;
         const result = await face.selectModel({
           sessionId,
-          provider: activeProvider,
+          provider: catalogProvider ?? activeProvider,
           model: model.id,
           ...typeof effort === "string" && effort !== "" ? { reasoningEffort: effort } : {}
         });
@@ -1516,8 +1575,18 @@ function BalanceBadge(props) {
         setSwitchingModel(null);
       }
     },
-    [ctx, sessionId, activeProvider, t]
+    [ctx, sessionId, activeProvider, catalogProvider, t]
   );
+  const showEffortFlyout = React.useCallback((model, top) => {
+    clearTimeout(hoverModelTimer.current);
+    setHoverModel({ model, top });
+  }, []);
+  const scheduleEffortFlyoutClose = React.useCallback((id) => {
+    clearTimeout(hoverModelTimer.current);
+    hoverModelTimer.current = setTimeout(() => {
+      setHoverModel((current) => current?.model?.id === id ? null : current);
+    }, 150);
+  }, []);
   const label = React.useMemo(() => {
     if (!provider) return "";
     if (!view) return t("badge.loading");
@@ -1939,6 +2008,8 @@ function BalanceBadge(props) {
               "aria-label": switchLabel,
               onClick: () => {
                 setModelError(null);
+                clearTimeout(hoverModelTimer.current);
+                setHoverModel(null);
                 setModelMenuOpen((value) => !value);
               }
             },
@@ -1951,17 +2022,17 @@ function BalanceBadge(props) {
               role: "menu",
               "aria-label": t("model.title")
             },
-            modelListState === "loading" ? (0, import_react3.createElement)(
+            shownModelListState === "loading" ? (0, import_react3.createElement)(
               "div",
               { className: "dsh-model-allowance-model-message" },
               t("model.loading")
             ) : null,
-            modelListState === "empty" ? (0, import_react3.createElement)(
+            shownModelListState === "empty" ? (0, import_react3.createElement)(
               "div",
               { className: "dsh-model-allowance-model-message" },
               t("model.empty")
             ) : null,
-            modelListState === "error" ? (0, import_react3.createElement)(
+            shownModelListState === "error" ? (0, import_react3.createElement)(
               "div",
               {
                 className: "dsh-model-allowance-model-message",
@@ -1969,8 +2040,10 @@ function BalanceBadge(props) {
               },
               modelError ?? t("model.unavailable")
             ) : null,
-            ...modelList.map((model) => {
+            ...shownModelList.map((model) => {
               const isCurrent = model.id === currentModel;
+              const efforts = effortChoices(model);
+              const defaultEffortId = efforts?.find((effort) => effort.isDefault)?.id;
               return (0, import_react3.createElement)(
                 "button",
                 {
@@ -1982,8 +2055,20 @@ function BalanceBadge(props) {
                   className: "dsh-model-allowance-model-item",
                   disabled: switchingModel !== null,
                   title: model.id,
+                  ...efforts === null ? {} : { "aria-haspopup": "menu" },
                   onClick: () => {
-                    void switchToModel(model);
+                    void switchToModel(model, defaultEffortId);
+                  },
+                  ...efforts === null ? {} : {
+                    onMouseEnter: (event) => {
+                      const wrap = modelWrapRef.current;
+                      if (!wrap) return;
+                      const top = event.currentTarget.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
+                      showEffortFlyout(model, top);
+                    },
+                    onMouseLeave: () => {
+                      scheduleEffortFlyoutClose(model.id);
+                    }
                   }
                 },
                 (0, import_react3.createElement)(
@@ -1991,19 +2076,31 @@ function BalanceBadge(props) {
                   { className: "dsh-model-allowance-model-name" },
                   model.name ?? model.id
                 ),
-                switchingModel === model.id ? (0, import_react3.createElement)(
+                (0, import_react3.createElement)(
                   "span",
-                  { className: "dsh-model-allowance-model-note" },
-                  t("model.switching")
-                ) : isCurrent ? (0, import_react3.createElement)(
-                  "span",
-                  { className: "dsh-model-allowance-model-note" },
-                  t("model.current")
-                ) : null
+                  { className: "dsh-model-allowance-model-side" },
+                  switchingModel === model.id ? (0, import_react3.createElement)(
+                    "span",
+                    { className: "dsh-model-allowance-model-note" },
+                    t("model.switching")
+                  ) : isCurrent ? (0, import_react3.createElement)(
+                    "span",
+                    { className: "dsh-model-allowance-model-note" },
+                    t("model.current")
+                  ) : null,
+                  efforts === null ? null : (0, import_react3.createElement)(
+                    "span",
+                    {
+                      className: "dsh-model-allowance-model-arrow",
+                      "aria-hidden": true
+                    },
+                    "\u203A"
+                  )
+                )
               );
             }),
             // A failed switch keeps the list open and says why.
-            modelError && modelListState !== "error" ? (0, import_react3.createElement)(
+            modelError && shownModelListState !== "error" ? (0, import_react3.createElement)(
               "div",
               {
                 className: "dsh-model-allowance-model-message",
@@ -2011,6 +2108,54 @@ function BalanceBadge(props) {
               },
               modelError
             ) : null
+          ) : null,
+          // The effort flyout is a sibling of the list, not a
+          // child: the list scrolls, and a nested panel would be
+          // clipped by it. Sharing the hover with the row keeps
+          // it open while the pointer crosses over.
+          modelMenuOpen && hoverModel !== null && shownModelList.includes(hoverModel.model) ? (0, import_react3.createElement)(
+            "div",
+            {
+              className: "dsh-model-allowance-effort-menu",
+              role: "menu",
+              "aria-label": t("model.title"),
+              style: { top: `${hoverModel.top}px` },
+              onMouseEnter: () => {
+                clearTimeout(hoverModelTimer.current);
+              },
+              onMouseLeave: () => {
+                scheduleEffortFlyoutClose(hoverModel.model.id);
+              }
+            },
+            ...effortChoices(hoverModel.model).map((effort) => {
+              const isCurrentEffort = hoverModel.model.id === currentModel && effort.id === selectedEffort;
+              return (0, import_react3.createElement)(
+                "button",
+                {
+                  type: "button",
+                  key: effort.id ?? "provider-default",
+                  role: "menuitemradio",
+                  "aria-checked": isCurrentEffort ? "true" : "false",
+                  "data-current": isCurrentEffort ? "true" : "false",
+                  "data-default": effort.isDefault ? "true" : "false",
+                  className: "dsh-model-allowance-effort-item",
+                  disabled: switchingModel !== null,
+                  onClick: () => {
+                    void switchToModel(hoverModel.model, effort.id);
+                  }
+                },
+                (0, import_react3.createElement)(
+                  "span",
+                  { className: "dsh-model-allowance-model-name" },
+                  effort.providerDefault ? t("model.effortDefault") : effort.name
+                ),
+                effort.isDefault && !isCurrentEffort ? (0, import_react3.createElement)(
+                  "span",
+                  { className: "dsh-model-allowance-model-note" },
+                  t("model.effortDefault")
+                ) : null
+              );
+            })
           ) : null
         ) : null
       )

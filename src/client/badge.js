@@ -11,7 +11,7 @@ import {
 } from './format.js'
 import { consoleGlyph, markOf, modelGlyph, providerIcon, refreshGlyph } from './icons.js'
 import { pickName, statusLabel } from './locales.js'
-import { currentModelFor, modelsForProvider } from './models.js'
+import { currentModelFor, effortChoices, providerModelGroup } from './models.js'
 import { getBalanceApi, lookupSessionFace, supportsModel } from './namespace.js'
 import { formatCountdown, scheduleView } from './schedule.js'
 import { STYLES } from './styles.js'
@@ -93,6 +93,8 @@ export function BalanceBadge(props) {
   const selection = useProjection('modelSelection')
   const selected = selection?.next?.provider ?? selection?.lastUsed?.provider ?? null
   const selectedModel = selection?.next?.model ?? selection?.lastUsed?.model ?? undefined
+  const selectedEffort =
+    selection?.next?.reasoningEffort ?? selection?.lastUsed?.reasoningEffort ?? undefined
   // The session this badge belongs to. A session-scoped slot carries its
   // id, and the Host's switch needs it.
   const sessionId = props.sessionId
@@ -166,11 +168,23 @@ export function BalanceBadge(props) {
   // the composer's model seat reads, so the two always agree on which
   // models exist.
   const [modelList, setModelList] = React.useState([])
+  // The card route the shown list belongs to, so a list read for another
+  // route never shows against the route now in use.
+  const [modelListRoute, setModelListRoute] = React.useState(null)
+  // The Host provider id the listed models switch under, when it differs
+  // from the card's own route.
+  const [catalogProvider, setCatalogProvider] = React.useState(null)
   // 'idle' before the list was ever opened, then 'loading', 'ready', 'empty'
   // or 'error'.
   const [modelListState, setModelListState] = React.useState('idle')
   const [modelError, setModelError] = React.useState(null)
   const [modelMenuOpen, setModelMenuOpen] = React.useState(false)
+  // The model whose effort choices show in the flyout while the pointer
+  // rests on its row, with the flyout's top offset inside the wrap.
+  const [hoverModel, setHoverModel] = React.useState(null)
+  // Closing the flyout waits a beat, so a pointer travelling from a row
+  // into the flyout does not dismiss it mid-air.
+  const hoverModelTimer = React.useRef(null)
   // The model being switched to, while the Host performs the switch.
   const [switchingModel, setSwitchingModel] = React.useState(null)
   // The wrapper that holds the switch button and its list, so a click on
@@ -252,8 +266,14 @@ export function BalanceBadge(props) {
   })
   // The model the session uses, when it uses one of the card's provider's
   // models. The card can point at another provider, and then none of that
-  // provider's models is the current one.
-  const currentModel = currentModelFor(selection, activeProvider)
+  // provider's models is the current one. The catalog provider names the
+  // group the switch offers, which is the id the session selection carries.
+  const modelProvider = catalogProvider ?? activeProvider
+  const currentModel = currentModelFor(selection, modelProvider)
+  // A list read for another route is not evidence about this one: it reads
+  // as loading until the open of the list answers for the route in use.
+  const shownModelList = modelListRoute === activeProvider ? modelList : []
+  const shownModelListState = modelListRoute === activeProvider ? modelListState : 'loading'
   // The switch needs a session to switch and a host that can perform one.
   // A host without the Session namespace keeps the badge whole: the button
   // is simply not there.
@@ -555,11 +575,18 @@ export function BalanceBadge(props) {
    */
   const showModels = React.useCallback(
     (catalog) => {
-      const models = modelsForProvider(catalog, activeProvider)
+      // A balance route and the Host provider id that lists the same
+      // vendor's models are not always the same id, so the adapter's own
+      // candidates follow the route itself.
+      const routes = [activeProvider, ...(entryOf(activeProvider)?.modelRoutes ?? [])]
+      const group = providerModelGroup(catalog, routes)
+      const models = group?.models ?? []
+      setCatalogProvider(group?.provider ?? null)
+      setModelListRoute(activeProvider)
       setModelList(models)
       setModelListState(models.length > 0 ? 'ready' : 'empty')
     },
-    [activeProvider],
+    [activeProvider, entryOf],
   )
 
   // The catalog is read when the list opens and kept for a minute: a
@@ -627,10 +654,12 @@ export function BalanceBadge(props) {
    * selection a click in the composer's model seat records, and the
    * installation keeps that selection as its default.
    *
-   * @param {{id: string, reasoning?: {defaultEffort?: string}}} model The model to switch to.
+   * @param {{id: string}} model The model to switch to.
+   * @param {string | undefined} effort The reasoning effort the user picked,
+   *   or undefined to leave the choice to the provider.
    */
   const switchToModel = React.useCallback(
-    async (model) => {
+    async (model, effort) => {
       const face = lookupSessionFace(ctx)
       if (face === undefined || typeof face.selectModel !== 'function') {
         setModelError(t('model.unavailable'))
@@ -642,10 +671,9 @@ export function BalanceBadge(props) {
       }
       setSwitchingModel(model.id)
       try {
-        const effort = model.reasoning?.defaultEffort
         const result = await face.selectModel({
           sessionId,
-          provider: activeProvider,
+          provider: catalogProvider ?? activeProvider,
           model: model.id,
           ...(typeof effort === 'string' && effort !== '' ? { reasoningEffort: effort } : {}),
         })
@@ -664,8 +692,21 @@ export function BalanceBadge(props) {
         setSwitchingModel(null)
       }
     },
-    [ctx, sessionId, activeProvider, t],
+    [ctx, sessionId, activeProvider, catalogProvider, t],
   )
+
+  // The flyout is a sibling of the list, so the row and the flyout share
+  // the hover through a delayed close rather than CSS nesting.
+  const showEffortFlyout = React.useCallback((model, top) => {
+    clearTimeout(hoverModelTimer.current)
+    setHoverModel({ model, top })
+  }, [])
+  const scheduleEffortFlyoutClose = React.useCallback((id) => {
+    clearTimeout(hoverModelTimer.current)
+    hoverModelTimer.current = setTimeout(() => {
+      setHoverModel((current) => (current?.model?.id === id ? null : current))
+    }, 150)
+  }, [])
 
   const label = React.useMemo(() => {
     if (!provider) return ''
@@ -1174,6 +1215,10 @@ export function BalanceBadge(props) {
                       'aria-label': switchLabel,
                       onClick: () => {
                         setModelError(null)
+                        // Every open of the list starts with the flyout
+                        // closed.
+                        clearTimeout(hoverModelTimer.current)
+                        setHoverModel(null)
                         setModelMenuOpen((value) => !value)
                       },
                     },
@@ -1187,21 +1232,21 @@ export function BalanceBadge(props) {
                           role: 'menu',
                           'aria-label': t('model.title'),
                         },
-                        modelListState === 'loading'
+                        shownModelListState === 'loading'
                           ? h(
                               'div',
                               { className: 'dsh-model-allowance-model-message' },
                               t('model.loading'),
                             )
                           : null,
-                        modelListState === 'empty'
+                        shownModelListState === 'empty'
                           ? h(
                               'div',
                               { className: 'dsh-model-allowance-model-message' },
                               t('model.empty'),
                             )
                           : null,
-                        modelListState === 'error'
+                        shownModelListState === 'error'
                           ? h(
                               'div',
                               {
@@ -1211,8 +1256,15 @@ export function BalanceBadge(props) {
                               modelError ?? t('model.unavailable'),
                             )
                           : null,
-                        ...modelList.map((model) => {
+                        ...shownModelList.map((model) => {
                           const isCurrent = model.id === currentModel
+                          // A model that takes a reasoning effort carries an
+                          // arrow and offers its choices in a flyout on
+                          // hover; a click takes the model at its default
+                          // effort. Every other model switches on the click
+                          // it already had.
+                          const efforts = effortChoices(model)
+                          const defaultEffortId = efforts?.find((effort) => effort.isDefault)?.id
                           return h(
                             'button',
                             {
@@ -1224,32 +1276,62 @@ export function BalanceBadge(props) {
                               className: 'dsh-model-allowance-model-item',
                               disabled: switchingModel !== null,
                               title: model.id,
+                              ...(efforts === null ? {} : { 'aria-haspopup': 'menu' }),
                               onClick: () => {
-                                void switchToModel(model)
+                                void switchToModel(model, defaultEffortId)
                               },
+                              ...(efforts === null
+                                ? {}
+                                : {
+                                    onMouseEnter: (event) => {
+                                      const wrap = modelWrapRef.current
+                                      if (!wrap) return
+                                      const top =
+                                        event.currentTarget.getBoundingClientRect().top -
+                                        wrap.getBoundingClientRect().top
+                                      showEffortFlyout(model, top)
+                                    },
+                                    onMouseLeave: () => {
+                                      scheduleEffortFlyoutClose(model.id)
+                                    },
+                                  }),
                             },
                             h(
                               'span',
                               { className: 'dsh-model-allowance-model-name' },
                               model.name ?? model.id,
                             ),
-                            switchingModel === model.id
-                              ? h(
-                                  'span',
-                                  { className: 'dsh-model-allowance-model-note' },
-                                  t('model.switching'),
-                                )
-                              : isCurrent
+                            h(
+                              'span',
+                              { className: 'dsh-model-allowance-model-side' },
+                              switchingModel === model.id
                                 ? h(
                                     'span',
                                     { className: 'dsh-model-allowance-model-note' },
-                                    t('model.current'),
+                                    t('model.switching'),
                                   )
-                                : null,
+                                : isCurrent
+                                  ? h(
+                                      'span',
+                                      { className: 'dsh-model-allowance-model-note' },
+                                      t('model.current'),
+                                    )
+                                  : null,
+                              efforts === null
+                                ? null
+                                : h(
+                                    'span',
+                                    {
+                                      className: 'dsh-model-allowance-model-arrow',
+                                      'aria-hidden': true,
+                                    },
+                                    '›',
+                                  ),
+                            ),
                           )
                         }),
                         // A failed switch keeps the list open and says why.
-                        modelError && modelListState !== 'error'
+                        modelError && shownModelListState !== 'error'
                           ? h(
                               'div',
                               {
@@ -1259,6 +1341,59 @@ export function BalanceBadge(props) {
                               modelError,
                             )
                           : null,
+                      )
+                    : null,
+                  // The effort flyout is a sibling of the list, not a
+                  // child: the list scrolls, and a nested panel would be
+                  // clipped by it. Sharing the hover with the row keeps
+                  // it open while the pointer crosses over.
+                  modelMenuOpen && hoverModel !== null && shownModelList.includes(hoverModel.model)
+                    ? h(
+                        'div',
+                        {
+                          className: 'dsh-model-allowance-effort-menu',
+                          role: 'menu',
+                          'aria-label': t('model.title'),
+                          style: { top: `${hoverModel.top}px` },
+                          onMouseEnter: () => {
+                            clearTimeout(hoverModelTimer.current)
+                          },
+                          onMouseLeave: () => {
+                            scheduleEffortFlyoutClose(hoverModel.model.id)
+                          },
+                        },
+                        ...effortChoices(hoverModel.model).map((effort) => {
+                          const isCurrentEffort =
+                            hoverModel.model.id === currentModel && effort.id === selectedEffort
+                          return h(
+                            'button',
+                            {
+                              type: 'button',
+                              key: effort.id ?? 'provider-default',
+                              role: 'menuitemradio',
+                              'aria-checked': isCurrentEffort ? 'true' : 'false',
+                              'data-current': isCurrentEffort ? 'true' : 'false',
+                              'data-default': effort.isDefault ? 'true' : 'false',
+                              className: 'dsh-model-allowance-effort-item',
+                              disabled: switchingModel !== null,
+                              onClick: () => {
+                                void switchToModel(hoverModel.model, effort.id)
+                              },
+                            },
+                            h(
+                              'span',
+                              { className: 'dsh-model-allowance-model-name' },
+                              effort.providerDefault ? t('model.effortDefault') : effort.name,
+                            ),
+                            effort.isDefault && !isCurrentEffort
+                              ? h(
+                                  'span',
+                                  { className: 'dsh-model-allowance-model-note' },
+                                  t('model.effortDefault'),
+                                )
+                              : null,
+                          )
+                        }),
                       )
                     : null,
                 )
