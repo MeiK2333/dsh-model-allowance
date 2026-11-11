@@ -354,6 +354,8 @@ var zh = {
   "status.partialOutage": "\u90E8\u5206\u670D\u52A1\u4E2D\u65AD",
   "status.majorOutage": "\u5927\u9762\u79EF\u4E2D\u65AD",
   "status.maintenance": "\u7EF4\u62A4\u4E2D",
+  "status.loading": "\u72B6\u6001\u52A0\u8F7D\u4E2D\u2026",
+  "status.unsupported": "\u672A\u63D0\u4F9B\u72B6\u6001\u670D\u52A1",
   "status.unknown": "\u72B6\u6001\u672A\u77E5",
   "schedule.peakTitle": "\u9AD8\u5CF0\u65F6\u6BB5",
   "schedule.offPeakTitle": "\u4F4E\u8C37\u65F6\u6BB5",
@@ -415,6 +417,8 @@ var en = {
   "status.partialOutage": "Partial outage",
   "status.majorOutage": "Major outage",
   "status.maintenance": "Maintenance",
+  "status.loading": "Loading status\u2026",
+  "status.unsupported": "No status service provided",
   "status.unknown": "Status unknown",
   "schedule.peakTitle": "Peak hours",
   "schedule.offPeakTitle": "Off-peak",
@@ -454,6 +458,8 @@ var STATUS_LABEL_KEYS = {
   "partial-outage": "status.partialOutage",
   "major-outage": "status.majorOutage",
   maintenance: "status.maintenance",
+  loading: "status.loading",
+  unsupported: "status.unsupported",
   unknown: "status.unknown"
 };
 function statusLabel(state, t) {
@@ -960,6 +966,11 @@ var STYLES = [
   ".dsh-model-allowance-status-help:focus-visible .dsh-model-allowance-status-tip{display:block}",
   ".dsh-model-allowance-status-dot{width:6px;height:6px;border-radius:50%;flex:none;",
   "background:var(--dsw-alias-state-success-primary)}",
+  '.dsh-model-allowance-status[data-state="loading"] .dsh-model-allowance-status-dot,',
+  '.dsh-model-allowance-status[data-state="unsupported"] .dsh-model-allowance-status-dot,',
+  '.dsh-model-allowance-status[data-state="unknown"] .dsh-model-allowance-status-dot{',
+  "background:var(--dsw-alias-state-idle-primary)}",
+  '.dsh-model-allowance-status[data-state="loading"] .dsh-model-allowance-status-dot{opacity:.5}',
   '.dsh-model-allowance-status[data-state="degraded"] .dsh-model-allowance-status-dot,',
   '.dsh-model-allowance-status[data-state="maintenance"] .dsh-model-allowance-status-dot{',
   "background:var(--dsw-alias-state-warn-primary)}",
@@ -1084,6 +1095,28 @@ function barTone(percent) {
 var CATALOG_TTL_MS = 60 * 1e3;
 function describe(error) {
   return error instanceof Error ? error.message : String(error);
+}
+async function readProviderStatus(provider) {
+  try {
+    const api = await getBalanceApi();
+    if (!api || typeof api.status !== "function") {
+      return { provider, state: "unknown", error: "status API unavailable" };
+    }
+    const result = await api.status(provider);
+    if (!result.ok) {
+      const error = typeof result.error?.message === "string" ? result.error.message : typeof result.error === "string" ? result.error : "status reading failed";
+      return { provider, state: "unknown", error };
+    }
+    return result.value;
+  } catch (error) {
+    console.error("[model-allowance] reading provider status failed", { provider, error });
+    return { provider, state: "unknown", error: describe(error) };
+  }
+}
+function statusDisplayState(status) {
+  if (status === null) return "loading";
+  if (status.state === "unknown" && !status.url && !status.error) return "unsupported";
+  return status.state;
 }
 function BalanceBadge(props) {
   const { useProjection, ctx, t } = props;
@@ -1339,15 +1372,8 @@ function BalanceBadge(props) {
     if (!activeProvider) return void 0;
     let cancelled = false;
     const readStatus = async () => {
-      try {
-        const api = await getBalanceApi();
-        if (!api || typeof api.status !== "function") return;
-        const result = await api.status(activeProvider);
-        if (cancelled || !result.ok) return;
-        setProviderStatus(result.value);
-      } catch (error) {
-        console.error("[model-allowance] reading provider status failed", { error });
-      }
+      const status = await readProviderStatus(activeProvider);
+      if (!cancelled) setProviderStatus(status);
     };
     void readStatus();
     const timer = setInterval(readStatus, STATUS_REFRESH_MS);
@@ -1385,10 +1411,8 @@ function BalanceBadge(props) {
         result = await api.refresh(activeProvider, void 0);
       }
       if (result.ok) setView(result.value);
-      if (typeof api.status === "function") {
-        const status = await api.status(activeProvider);
-        if (status.ok) setProviderStatus(status.value);
-      }
+      const status = await readProviderStatus(activeProvider);
+      setProviderStatus(status);
     } catch (error) {
       console.error("[model-allowance] refresh failed", {
         provider: activeProvider,
@@ -1530,7 +1554,8 @@ function BalanceBadge(props) {
     return t("badge.failed");
   }, [view, provider, activeProvider, nameOf, t]);
   if (!provider) return null;
-  const serviceState = providerStatus && providerStatus.provider === activeProvider ? providerStatus.state : "unknown";
+  const currentStatus = providerStatus?.provider === activeProvider ? providerStatus : null;
+  const serviceState = statusDisplayState(currentStatus);
   const MARK_SIZE = 26;
   const MARK_GAP = 4;
   const MENU_SIZE = 26;
@@ -1804,16 +1829,16 @@ function BalanceBadge(props) {
         // The platform status sits at the left edge of the footer, on
         // the same line as the reading time: the card gains no extra
         // row, and the state and the source page stay together.
-        serviceState !== "unknown" ? (0, import_react3.createElement)(
+        (0, import_react3.createElement)(
           "span",
           { className: "dsh-model-allowance-status-wrap" },
           (0, import_react3.createElement)(
-            providerStatus.url ? "a" : "span",
+            currentStatus?.url ? "a" : "span",
             {
               className: "dsh-model-allowance-status",
-              "data-state": providerStatus.state,
-              ...providerStatus.url ? {
-                href: providerStatus.url,
+              "data-state": serviceState,
+              ...currentStatus?.url ? {
+                href: currentStatus.url,
                 target: "_blank",
                 rel: "noreferrer noopener"
               } : {}
@@ -1825,9 +1850,9 @@ function BalanceBadge(props) {
             (0, import_react3.createElement)(
               "span",
               { className: "dsh-model-allowance-status-label" },
-              statusLabel(providerStatus.state, t)
+              statusLabel(serviceState, t)
             ),
-            ...providerStatus.url ? [
+            ...currentStatus?.url ? [
               (0, import_react3.createElement)(
                 "span",
                 {
@@ -1841,13 +1866,13 @@ function BalanceBadge(props) {
           // The reason is a warning mark rather than another line:
           // the footer stays one row, and the detail is one hover
           // — or one keyboard focus — away.
-          providerStatus.summary ? (0, import_react3.createElement)(
+          currentStatus?.summary ? (0, import_react3.createElement)(
             "span",
             {
               className: "dsh-model-allowance-status-help",
               tabIndex: 0,
               role: "note",
-              "aria-label": providerStatus.summary
+              "aria-label": currentStatus.summary
             },
             (0, import_react3.createElement)(
               "span",
@@ -1859,10 +1884,10 @@ function BalanceBadge(props) {
             (0, import_react3.createElement)(
               "span",
               { className: "dsh-model-allowance-status-tip", role: "tooltip" },
-              providerStatus.summary
+              currentStatus.summary
             )
           ) : null
-        ) : null,
+        ),
         view?.updatedAt ? (0, import_react3.createElement)(
           "span",
           { className: "dsh-model-allowance-updated" },

@@ -39,6 +39,8 @@ export const zh = {
   'status.partialOutage': '部分服务中断',
   'status.majorOutage': '大面积中断',
   'status.maintenance': '维护中',
+  'status.loading': '状态加载中…',
+  'status.unsupported': '未提供状态服务',
   'status.unknown': '状态未知',
   'schedule.peakTitle': '高峰时段',
   'schedule.offPeakTitle': '低谷时段',
@@ -102,6 +104,8 @@ export const en = {
   'status.partialOutage': 'Partial outage',
   'status.majorOutage': 'Major outage',
   'status.maintenance': 'Maintenance',
+  'status.loading': 'Loading status…',
+  'status.unsupported': 'No status service provided',
   'status.unknown': 'Status unknown',
   'schedule.peakTitle': 'Peak hours',
   'schedule.offPeakTitle': 'Off-peak',
@@ -158,19 +162,21 @@ export function pickName(entry, route) {
   return name[activeLanguage()] ?? name.en ?? name.zh ?? route
 }
 
-/** Shared status state to its locale key. */
+/** Shared or card-only status state to its locale key. */
 const STATUS_LABEL_KEYS = {
   operational: 'status.operational',
   degraded: 'status.degraded',
   'partial-outage': 'status.partialOutage',
   'major-outage': 'status.majorOutage',
   maintenance: 'status.maintenance',
+  loading: 'status.loading',
+  unsupported: 'status.unsupported',
   unknown: 'status.unknown',
 }
 
 /**
- * Name one status state in the interface language.
- * @param {string} state Shared status state.
+ * Name one status display state in the interface language.
+ * @param {string} state Shared or card-only status state.
  * @param {(key: string, params?: object) => string} t Translator.
  * @returns {string} The label.
  */

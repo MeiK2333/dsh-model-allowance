@@ -35,6 +35,51 @@ function describe(error) {
 }
 
 /**
+ * Read one provider's status and always settle on a displayable result.
+ * @param {string} provider Provider route.
+ * @returns {Promise<{provider: string, state: string, url?: string, summary?: string, error?: string}>}
+ *   The status reading, or an unknown reading explaining why it failed.
+ */
+async function readProviderStatus(provider) {
+  try {
+    const api = await getBalanceApi()
+    if (!api || typeof api.status !== 'function') {
+      return { provider, state: 'unknown', error: 'status API unavailable' }
+    }
+    const result = await api.status(provider)
+    if (!result.ok) {
+      const error =
+        typeof result.error?.message === 'string'
+          ? result.error.message
+          : typeof result.error === 'string'
+            ? result.error
+            : 'status reading failed'
+      return { provider, state: 'unknown', error }
+    }
+    return result.value
+  } catch (error) {
+    console.error('[model-allowance] reading provider status failed', { provider, error })
+    return { provider, state: 'unknown', error: describe(error) }
+  }
+}
+
+/**
+ * Project a status reading onto the states the card can present.
+ *
+ * The Host uses `unknown` without a URL or error only when the vendor has no
+ * status source. A failed source keeps its URL or error, so it remains
+ * distinguishable from an unsupported one without another wire field.
+ *
+ * @param {{state: string, url?: string, error?: string} | null} status Current reading.
+ * @returns {string} A shared status state, `loading`, or `unsupported`.
+ */
+export function statusDisplayState(status) {
+  if (status === null) return 'loading'
+  if (status.state === 'unknown' && !status.url && !status.error) return 'unsupported'
+  return status.state
+}
+
+/**
  * The badge and its detail popover.
  * @param {object} props Slot props plus the plugin context and translator.
  * @returns {React.ReactElement | null} The rendered badge.
@@ -442,15 +487,8 @@ export function BalanceBadge(props) {
     if (!activeProvider) return undefined
     let cancelled = false
     const readStatus = async () => {
-      try {
-        const api = await getBalanceApi()
-        if (!api || typeof api.status !== 'function') return
-        const result = await api.status(activeProvider)
-        if (cancelled || !result.ok) return
-        setProviderStatus(result.value)
-      } catch (error) {
-        console.error('[model-allowance] reading provider status failed', { error })
-      }
+      const status = await readProviderStatus(activeProvider)
+      if (!cancelled) setProviderStatus(status)
     }
     void readStatus()
     const timer = setInterval(readStatus, STATUS_REFRESH_MS)
@@ -496,11 +534,10 @@ export function BalanceBadge(props) {
       }
       if (result.ok) setView(result.value)
       // Status has its own cache, so a refresh asks again and takes
-      // whatever the Host considers fresh.
-      if (typeof api.status === 'function') {
-        const status = await api.status(activeProvider)
-        if (status.ok) setProviderStatus(status.value)
-      }
+      // whatever the Host considers fresh. Keep the previous reading while
+      // the request is pending, then settle failures as unknown as well.
+      const status = await readProviderStatus(activeProvider)
+      setProviderStatus(status)
     } catch (error) {
       console.error('[model-allowance] refresh failed', {
         provider: activeProvider,
@@ -679,9 +716,10 @@ export function BalanceBadge(props) {
 
   // Which platform light the badge shows. A status reading for another
   // route — or none yet — is not evidence about this one, so it stays
-  // grey rather than claiming the platform is fine.
-  const serviceState =
-    providerStatus && providerStatus.provider === activeProvider ? providerStatus.state : 'unknown'
+  // grey rather than claiming the platform is fine. The same current-only
+  // reading drives the card, which says loading until this route answers.
+  const currentStatus = providerStatus?.provider === activeProvider ? providerStatus : null
+  const serviceState = statusDisplayState(currentStatus)
 
   // How many marks fit on one row. Each mark is `MARK_SIZE` plus the gap;
   // the menu button, when it appears, needs its own slot. An unmeasured
@@ -1015,73 +1053,71 @@ export function BalanceBadge(props) {
             // The platform status sits at the left edge of the footer, on
             // the same line as the reading time: the card gains no extra
             // row, and the state and the source page stay together.
-            serviceState !== 'unknown'
-              ? h(
+            h(
+              'span',
+              { className: 'dsh-model-allowance-status-wrap' },
+              h(
+                currentStatus?.url ? 'a' : 'span',
+                {
+                  className: 'dsh-model-allowance-status',
+                  'data-state': serviceState,
+                  ...(currentStatus?.url
+                    ? {
+                        href: currentStatus.url,
+                        target: '_blank',
+                        rel: 'noreferrer noopener',
+                      }
+                    : {}),
+                },
+                h('span', {
+                  className: 'dsh-model-allowance-status-dot',
+                  'aria-hidden': true,
+                }),
+                h(
                   'span',
-                  { className: 'dsh-model-allowance-status-wrap' },
-                  h(
-                    providerStatus.url ? 'a' : 'span',
-                    {
-                      className: 'dsh-model-allowance-status',
-                      'data-state': providerStatus.state,
-                      ...(providerStatus.url
-                        ? {
-                            href: providerStatus.url,
-                            target: '_blank',
-                            rel: 'noreferrer noopener',
-                          }
-                        : {}),
-                    },
-                    h('span', {
-                      className: 'dsh-model-allowance-status-dot',
-                      'aria-hidden': true,
-                    }),
-                    h(
-                      'span',
-                      { className: 'dsh-model-allowance-status-label' },
-                      statusLabel(providerStatus.state, t),
-                    ),
-                    ...(providerStatus.url
-                      ? [
-                          h(
-                            'span',
-                            {
-                              className: 'dsh-model-allowance-status-arrow',
-                              'aria-hidden': true,
-                            },
-                            '↗',
-                          ),
-                        ]
-                      : []),
-                  ),
-                  // The reason is a warning mark rather than another line:
-                  // the footer stays one row, and the detail is one hover
-                  // — or one keyboard focus — away.
-                  providerStatus.summary
-                    ? h(
+                  { className: 'dsh-model-allowance-status-label' },
+                  statusLabel(serviceState, t),
+                ),
+                ...(currentStatus?.url
+                  ? [
+                      h(
                         'span',
                         {
-                          className: 'dsh-model-allowance-status-help',
-                          tabIndex: 0,
-                          role: 'note',
-                          'aria-label': providerStatus.summary,
+                          className: 'dsh-model-allowance-status-arrow',
+                          'aria-hidden': true,
                         },
-                        h(
-                          'span',
-                          {
-                            'aria-hidden': true,
-                          },
-                          '!',
-                        ),
-                        h(
-                          'span',
-                          { className: 'dsh-model-allowance-status-tip', role: 'tooltip' },
-                          providerStatus.summary,
-                        ),
-                      )
-                    : null,
-                )
-              : null,
+                        '↗',
+                      ),
+                    ]
+                  : []),
+              ),
+              // The reason is a warning mark rather than another line:
+              // the footer stays one row, and the detail is one hover
+              // — or one keyboard focus — away.
+              currentStatus?.summary
+                ? h(
+                    'span',
+                    {
+                      className: 'dsh-model-allowance-status-help',
+                      tabIndex: 0,
+                      role: 'note',
+                      'aria-label': currentStatus.summary,
+                    },
+                    h(
+                      'span',
+                      {
+                        'aria-hidden': true,
+                      },
+                      '!',
+                    ),
+                    h(
+                      'span',
+                      { className: 'dsh-model-allowance-status-tip', role: 'tooltip' },
+                      currentStatus.summary,
+                    ),
+                  )
+                : null,
+            ),
             view?.updatedAt
               ? h(
                   'span',

@@ -13,6 +13,8 @@ const { formatAmount, formatDuration } = await import('../src/client/format.js')
 const { scheduleView, formatCountdown } = await import('../src/client/schedule.js')
 const { markOf, providerIcon } = await import('../src/client/icons.js')
 const { windowTitle } = await import('../src/client/windows.js')
+const { statusDisplayState } = await import('../src/client/badge.js')
+const { en, statusLabel, zh } = await import('../src/client/locales.js')
 
 const t = (key, params = {}) => {
   const dictionary = {
@@ -112,6 +114,24 @@ test('a vendor label distinguishes windows that share a unit', () => {
   )
   // A plain monthly window still falls back to the generic label.
   assert.equal(windowTitle({ id: 'monthly', unit: 'month' }, t), 'window.title.month')
+})
+
+test('the card distinguishes loading, no status source, and a failed status reading', () => {
+  assert.equal(statusDisplayState(null), 'loading')
+  assert.equal(statusDisplayState({ state: 'unknown' }), 'unsupported')
+  assert.equal(
+    statusDisplayState({ state: 'unknown', url: 'https://status.example.com' }),
+    'unknown',
+  )
+  assert.equal(statusDisplayState({ state: 'unknown', error: 'offline' }), 'unknown')
+  assert.equal(statusDisplayState({ state: 'operational' }), 'operational')
+
+  const zhT = (key) => zh[key] ?? key
+  const enT = (key) => en[key] ?? key
+  assert.equal(statusLabel('loading', zhT), '状态加载中…')
+  assert.equal(statusLabel('unsupported', zhT), '未提供状态服务')
+  assert.equal(statusLabel('loading', enT), 'Loading status…')
+  assert.equal(statusLabel('unsupported', enT), 'No status service provided')
 })
 
 test('money and duration formatting stay readable at the badge edges', () => {
