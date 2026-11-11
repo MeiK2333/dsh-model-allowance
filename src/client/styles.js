@@ -119,6 +119,33 @@ const STYLES = [
   'line-height:1;background:0 0;',
   'color:var(--provider-mark,var(--dsw-alias-label-primary))}',
   '.dsh-model-allowance-menu-mark svg{display:block}',
+  // The model list is a third floating surface. It opens upwards from the
+  // footer button, so it carries the same menu surface and elevation as the
+  // card and the provider overflow menu.
+  '.dsh-model-allowance-model-wrap{position:relative;display:inline-flex}',
+  '.dsh-model-allowance-model-menu{position:absolute;bottom:calc(100% + 4px);right:0;z-index:30;',
+  'min-width:180px;max-width:260px;max-height:240px;overflow-y:auto;padding:4px;border:0;',
+  'border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);',
+  'backdrop-filter:var(--dsw-menu-backdrop-filter);',
+  'box-shadow:var(--dsw-elevation-prominent)}',
+  '.dsh-model-allowance-model-item{display:flex;align-items:center;justify-content:space-between;',
+  'gap:10px;width:100%;padding:4px 6px;border:0;border-radius:var(--dsw-radius-xs);',
+  'background:0 0;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}',
+  '.dsh-model-allowance-model-item:hover{background:var(--dsw-alias-interactive-bg-hover)}',
+  // The model the session uses is dimmed rather than framed: a frame here
+  // would give the chip a second meaning it does not have.
+  '.dsh-model-allowance-model-item[data-current="true"]{color:var(--dsw-alias-label-secondary)}',
+  '.dsh-model-allowance-model-item[disabled]{opacity:.6;cursor:default}',
+  '.dsh-model-allowance-model-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  // The trailing label names the state of one model: the one in use, or the
+  // one being switched to.
+  '.dsh-model-allowance-model-note{flex:none;color:var(--dsw-alias-label-tertiary);font-size:11px}',
+  // A message covers the whole list: it loads, it is empty, or the switch
+  // failed and says why.
+  '.dsh-model-allowance-model-message{padding:4px 6px;color:var(--dsw-alias-label-secondary);',
+  'font-size:11px;word-break:break-word}',
+  '.dsh-model-allowance-model-message[data-tone="error"]{',
+  'color:var(--dsw-alias-state-error-primary)}',
   '.dsh-model-allowance-window{margin-top:10px;padding-top:10px;',
   'border-top:1px solid var(--dsw-alias-border-l1)}',
   // The first window has no boundary above it: the switcher already ends
@@ -161,6 +188,16 @@ const STYLES = [
   'color:var(--dsw-alias-label-tertiary);cursor:pointer;text-decoration:none}',
   '.dsh-model-allowance-icon-button:hover{color:var(--dsw-alias-label-secondary);',
   'border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-interactive-bg-hover)}',
+  // The vendor in use paints the switch glyph in that vendor's own colour,
+  // so the button says which vendor the card is on. The frame stays
+  // neutral: a coloured frame would fight the vendor marks in the strip
+  // above it.
+  '.dsh-model-allowance-icon-button[data-in-use="true"]{',
+  'color:var(--provider-mark,var(--dsw-alias-label-primary));',
+  'border-color:var(--dsw-alias-border-l3)}',
+  '.dsh-model-allowance-icon-button[data-in-use="true"]:hover{',
+  'color:var(--provider-mark,var(--dsw-alias-label-primary));',
+  'background:var(--dsw-alias-interactive-bg-hover)}',
   '.dsh-model-allowance-icon-button:focus-visible{',
   'outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
   '.dsh-model-allowance-icon-button[disabled]{opacity:.5;cursor:default}',

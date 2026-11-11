@@ -5,6 +5,9 @@
 Shows the balance or remaining allowance of the provider behind the current
 conversation model.
 
+The card also switches the session: the button next to the console link
+lists the provider's models and moves the conversation to the one you pick.
+
 ## Supported
 
 - DeepSeek

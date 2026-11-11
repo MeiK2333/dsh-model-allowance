@@ -62,6 +62,53 @@ export function consoleGlyph(size) {
 }
 
 /**
+ * The model glyph: two models trading places.
+ *
+ * A block on its own says "a model" and nothing else, so the button it
+ * marked read as decoration. The exchange arrows say the one thing the
+ * button does: replace the model in use with another one. The arrowheads
+ * are filled, like the refresh glyph's, because a stroked chevron turns to
+ * mush at this size.
+ *
+ * @param {number} size Rendered size in pixels.
+ * @returns {object} The icon element.
+ */
+export function modelGlyph(size) {
+  return h(
+    'svg',
+    { viewBox: '0 0 20 20', width: size, height: size, 'aria-hidden': 'true', focusable: 'false' },
+    h('path', {
+      d: 'M3.4 6.5h9.8',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.6,
+      strokeLinecap: 'round',
+    }),
+    h('path', {
+      d: 'M13.2 3.6L16.9 6.5L13.2 9.4Z',
+      fill: 'currentColor',
+      stroke: 'currentColor',
+      strokeWidth: 0.6,
+      strokeLinejoin: 'round',
+    }),
+    h('path', {
+      d: 'M16.6 13.5H6.8',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.6,
+      strokeLinecap: 'round',
+    }),
+    h('path', {
+      d: 'M6.8 10.6L3.1 13.5L6.8 16.4Z',
+      fill: 'currentColor',
+      stroke: 'currentColor',
+      strokeWidth: 0.6,
+      strokeLinejoin: 'round',
+    }),
+  )
+}
+
+/**
  * The artwork this build can draw, keyed by the hint a route's Host
  * metadata carries.
  *

@@ -62,6 +62,27 @@ export function resetBalanceNamespace() {
 }
 
 /**
+ * The Host's Session face, looked up without requiring it to be injected.
+ *
+ * The `session` namespace is a core namespace the harness publishes, and the
+ * model seat uses it to switch a session's model. It is looked up rather
+ * than injected so a host that does not publish it leaves the badge working:
+ * the switch button then simply stays hidden.
+ *
+ * @param {object} ctx Client plugin context.
+ * @returns {object | undefined} The Session face, when the host publishes one.
+ */
+export function lookupSessionFace(ctx) {
+  try {
+    const face = ctx.get('remote.session')
+    if (face !== undefined) return face
+  } catch {
+    // The property read below is the fallback.
+  }
+  return ctx.remote?.session
+}
+
+/**
  * Whether this Host accepts the optional model argument.
  *
  * A page can load a newer bundle than the Host process runs during an in-place

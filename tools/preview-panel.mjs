@@ -119,6 +119,9 @@ const panel = `
       <span class="dsh-model-allowance-updated">更新于 17:49:12</span>
       <button class="dsh-model-allowance-icon-button"><svg width="16" height="16" viewBox="0 0 20 20"><path d="M16 10a6 6 0 11-1.8-4.2M16 3v4h-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
       <a class="dsh-model-allowance-icon-button"><svg width="16" height="16" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 9l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></a>
+      <span class="dsh-model-allowance-model-wrap">
+        <button class="dsh-model-allowance-icon-button" data-in-use="true" aria-haspopup="menu" style="--provider-mark:#4D6BFE"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M3.4 6.5h9.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13.2 3.6L16.9 6.5L13.2 9.4Z" fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linejoin="round"/><path d="M16.6 13.5H6.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.8 10.6L3.1 13.5L6.8 16.4Z" fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linejoin="round"/></svg></button>
+      </span>
     </div>
   </div>
   <button class="dsh-model-allowance-badge"><span class="dsh-model-allowance-dot"></span><span class="dsh-model-allowance-label">剩余 62%</span></button>

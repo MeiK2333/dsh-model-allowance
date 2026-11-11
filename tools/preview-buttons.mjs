@@ -23,16 +23,17 @@ const client = fs.readFileSync(path.join(here, '..', 'client.js'), 'utf8')
 function blockOf(name) {
   const start = client.indexOf(`function ${name}(`)
   if (start < 0) throw new Error(`missing ${name}`)
-  const end = client.indexOf('\n    }', start)
+  // A bundled function ends with a brace in column zero.
+  const end = client.indexOf('\n}\n', start)
   if (end < 0) throw new Error(`unterminated ${name}`)
   return client.slice(start, end)
 }
 
 /** Read one numeric or string prop out of a props block. */
 function prop(block, key, fallback) {
-  const quoted = new RegExp(`${key}: '([^']+)'`).exec(block)
+  const quoted = new RegExp(`\\b${key}: ['"\`]([^'"\`]+)['"\`]`).exec(block)
   if (quoted) return quoted[1]
-  const numeric = new RegExp(`${key}: ([\\d.]+)`).exec(block)
+  const numeric = new RegExp(`\\b${key}: ([\\d.]+)`).exec(block)
   if (numeric) return Number(numeric[1])
   return fallback
 }
@@ -40,43 +41,52 @@ function prop(block, key, fallback) {
 /**
  * One glyph as inline SVG. Every path keeps its own fill, because the refresh
  * arrowhead is a filled triangle and would vanish if drawn as a stroke.
+ *
+ * The bundle names the element call `createElement)("path", …)` while the
+ * source says `h('path', …)`, so both spellings are read.
  */
 function markupOf(name, color) {
   const block = blockOf(name)
-  const rects = [...block.matchAll(/h\('rect', \{([\s\S]*?)\}\)/g)].map((match) => {
-    const props = match[1]
-    return `<rect x="${prop(props, 'x')}" y="${prop(props, 'y')}" width="${prop(
-      props,
-      'width',
-    )}" height="${prop(props, 'height')}" rx="${prop(props, 'rx', 0)}" fill="none" stroke="${color}" stroke-width="${prop(
-      props,
-      'strokeWidth',
-      1.6,
-    )}"/>`
-  })
-  const paths = [...block.matchAll(/h\('path', \{([\s\S]*?)\}\)/g)].map((match) => {
-    const props = match[1]
-    const fill = prop(props, 'fill', 'none') === 'currentColor' ? color : prop(props, 'fill', 'none')
-    const stroke = prop(props, 'stroke', 'none') === 'currentColor' ? color : prop(props, 'stroke', 'none')
-    const cap = prop(props, 'strokeLinecap', 'butt')
-    const join = prop(props, 'strokeLinejoin', 'miter')
-    return `<path d="${prop(props, 'd')}" fill="${fill}" stroke="${stroke}" stroke-width="${prop(
-      props,
-      'strokeWidth',
-      0,
-    )}" stroke-linecap="${cap}" stroke-linejoin="${join}"/>`
-  })
-  return rects.join('') + paths.join('')
+  const parts = []
+  for (const match of block.matchAll(
+    /(?:createElement\)\(|h\()\s*["'](path|rect)["'],\s*\{([\s\S]*?)\}\)/g,
+  )) {
+    const tag = match[1]
+    const props = match[2]
+    const fill = prop(props, 'fill', 'none')
+    const stroke = prop(props, 'stroke', 'none')
+    const paintedFill = fill === 'currentColor' ? color : fill
+    const paintedStroke = stroke === 'currentColor' ? color : stroke
+    const width = prop(props, 'strokeWidth', 0)
+    if (tag === 'rect') {
+      parts.push(
+        `<rect x="${prop(props, 'x')}" y="${prop(props, 'y')}" width="${prop(props, 'width')}" height="${prop(
+          props,
+          'height',
+        )}" rx="${prop(props, 'rx', 0)}" fill="${paintedFill}" stroke="${paintedStroke}" stroke-width="${width}"/>`,
+      )
+    } else {
+      parts.push(
+        `<path d="${prop(props, 'd')}" fill="${paintedFill}" stroke="${paintedStroke}" stroke-width="${width}" stroke-linecap="${prop(
+          props,
+          'strokeLinecap',
+          'butt',
+        )}" stroke-linejoin="${prop(props, 'strokeLinejoin', 'miter')}"/>`,
+      )
+    }
+  }
+  return parts.join('')
 }
 
 const BUTTON = 26
 const ICON = 16
 const SCALE = 8
 const gap = 24
-const width = BUTTON * 2 + gap * 3
+const glyphs = ['refreshGlyph', 'consoleGlyph', 'modelGlyph']
+const width = BUTTON * glyphs.length + gap * (glyphs.length + 1)
 const height = BUTTON + gap * 2
 
-const cells = ['refreshGlyph', 'consoleGlyph']
+const cells = glyphs
   .map(
     (name, index) => `
       <rect x="${gap + index * (BUTTON + gap)}" y="${gap}" width="${BUTTON}" height="${BUTTON}" rx="7"

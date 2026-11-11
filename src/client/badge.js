@@ -9,12 +9,31 @@ import {
   formatResetAt,
   STATUS_REFRESH_MS,
 } from './format.js'
-import { consoleGlyph, markOf, providerIcon, refreshGlyph } from './icons.js'
+import { consoleGlyph, markOf, modelGlyph, providerIcon, refreshGlyph } from './icons.js'
 import { pickName, statusLabel } from './locales.js'
-import { getBalanceApi, supportsModel } from './namespace.js'
+import { currentModelFor, modelsForProvider } from './models.js'
+import { getBalanceApi, lookupSessionFace, supportsModel } from './namespace.js'
 import { formatCountdown, scheduleView } from './schedule.js'
 import { STYLES } from './styles.js'
 import { barTone, shortestWindow, windowTitle, windowUsage, windowUsedPercent } from './windows.js'
+
+/**
+ * How long the Host's model catalog is reused before it is read again.
+ *
+ * The catalog changes only when a provider changes what it advertises, and
+ * every open of the list reads the same document.
+ */
+const CATALOG_TTL_MS = 60 * 1000
+
+/**
+ * The message of a thrown value.
+ * @param {unknown} error The thrown value.
+ * @returns {string} The message.
+ */
+function describe(error) {
+  return error instanceof Error ? error.message : String(error)
+}
+
 /**
  * The badge and its detail popover.
  * @param {object} props Slot props plus the plugin context and translator.
@@ -29,6 +48,9 @@ export function BalanceBadge(props) {
   const selection = useProjection('modelSelection')
   const selected = selection?.next?.provider ?? selection?.lastUsed?.provider ?? null
   const selectedModel = selection?.next?.model ?? selection?.lastUsed?.model ?? undefined
+  // The session this badge belongs to. A session-scoped slot carries its
+  // id, and the Host's switch needs it.
+  const sessionId = props.sessionId
 
   const [rawView, setView] = React.useState(null)
   const [loading, setLoading] = React.useState(false)
@@ -95,6 +117,24 @@ export function BalanceBadge(props) {
   const [providerStatus, setProviderStatus] = React.useState(null)
   // The pricing schedule the vendor meters by, when it publishes one.
   const [schedule, setSchedule] = React.useState(null)
+  // The models the switch button offers. The Host's catalog is the same one
+  // the composer's model seat reads, so the two always agree on which
+  // models exist.
+  const [modelList, setModelList] = React.useState([])
+  // 'idle' before the list was ever opened, then 'loading', 'ready', 'empty'
+  // or 'error'.
+  const [modelListState, setModelListState] = React.useState('idle')
+  const [modelError, setModelError] = React.useState(null)
+  const [modelMenuOpen, setModelMenuOpen] = React.useState(false)
+  // The model being switched to, while the Host performs the switch.
+  const [switchingModel, setSwitchingModel] = React.useState(null)
+  // The wrapper that holds the switch button and its list, so a click on
+  // either of them does not dismiss the list.
+  const modelWrapRef = React.useRef(null)
+  // The Host's model catalog, kept for a minute: it changes only when a
+  // provider changes what it advertises, and every open of the list reads
+  // the same document.
+  const catalogRef = React.useRef({ value: null, at: 0 })
 
   // The panel names routes from the Host's directory: small, local, and
   // stable for a session. Fetching it at mount means the first open names
@@ -155,6 +195,29 @@ export function BalanceBadge(props) {
   // Host falls back to the provider's own choice.
   const activeProvider = picked ?? provider
   const activeModel = picked === null || picked === provider ? selectedModel : undefined
+  // Whether the card points at the vendor the session is on. The card can
+  // be pointed at another vendor to read that vendor's balance, and then
+  // the switch button means something else: it would move the session
+  // over, rather than pick another model of the vendor already in use.
+  const inUse = activeProvider === provider
+  // What the button says it will do: another model of the vendor in use,
+  // or a move over to the vendor the card points at.
+  const switchLabel = t(inUse ? 'detail.switchModelHere' : 'detail.switchModelThere', {
+    name: nameOf(activeProvider),
+  })
+  // The model the session uses, when it uses one of the card's provider's
+  // models. The card can point at another provider, and then none of that
+  // provider's models is the current one.
+  const currentModel = currentModelFor(selection, activeProvider)
+  // The switch needs a session to switch and a host that can perform one.
+  // A host without the Session namespace keeps the badge whole: the button
+  // is simply not there.
+  const sessionFace = lookupSessionFace(ctx)
+  const canSwitch =
+    typeof sessionId === 'string' &&
+    sessionId !== '' &&
+    sessionFace !== undefined &&
+    typeof sessionFace.selectModel === 'function'
   // A reading belongs to the provider that produced it. Deriving the visible
   // view instead of clearing state keeps a stale reading from flashing on the
   // badge when the card points at another provider.
@@ -167,6 +230,7 @@ export function BalanceBadge(props) {
     if (open) return
     setPicked(null)
     setMenuOpen(false)
+    setModelMenuOpen(false)
   }, [open])
 
   // Track the strip's width so the row can decide how many marks fit. A
@@ -195,7 +259,14 @@ export function BalanceBadge(props) {
       setOpen(false)
     }
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      // The model list is the inner surface: Escape closes it first and
+      // leaves the card open.
+      if (modelMenuOpen) {
+        setModelMenuOpen(false)
+        return
+      }
+      setOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown)
@@ -203,7 +274,7 @@ export function BalanceBadge(props) {
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown)
     }
-  }, [open])
+  }, [open, modelMenuOpen])
 
   // Refresh the clock while the panel is open, and while a difference is
   // being shown — the card must fall back to the plain value on its own,
@@ -440,6 +511,124 @@ export function BalanceBadge(props) {
       setRefreshing(false)
     }
   }, [activeProvider, activeModel])
+
+  /**
+   * Show the models of the provider the card points at.
+   * @param {object | null} catalog The Host's model catalog.
+   */
+  const showModels = React.useCallback(
+    (catalog) => {
+      const models = modelsForProvider(catalog, activeProvider)
+      setModelList(models)
+      setModelListState(models.length > 0 ? 'ready' : 'empty')
+    },
+    [activeProvider],
+  )
+
+  // The catalog is read when the list opens and kept for a minute: a
+  // provider changes what it advertises rarely, and every open of the list
+  // reads the same document.
+  React.useEffect(() => {
+    if (!modelMenuOpen) return undefined
+    let cancelled = false
+    ;(async () => {
+      const face = lookupSessionFace(ctx)
+      if (face === undefined || typeof face.modelCatalog !== 'function') {
+        setModelListState('error')
+        setModelError(t('model.unavailable'))
+        return
+      }
+      const cached = catalogRef.current
+      if (cached.value !== null && Date.now() - cached.at < CATALOG_TTL_MS) {
+        if (!cancelled) showModels(cached.value)
+        return
+      }
+      setModelListState('loading')
+      try {
+        const result = await face.modelCatalog()
+        if (cancelled) return
+        if (!result?.ok) {
+          setModelListState('error')
+          setModelError(
+            t('model.loadFailed', { error: result?.error?.message ?? result?.error?.code ?? '' }),
+          )
+          return
+        }
+        catalogRef.current = { value: result.value, at: Date.now() }
+        showModels(result.value)
+      } catch (error) {
+        if (cancelled) return
+        setModelListState('error')
+        setModelError(t('model.loadFailed', { error: describe(error) }))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [modelMenuOpen, ctx, t, showModels])
+
+  // A click outside the list closes it. The button that opened the list
+  // sits inside the same wrapper, so the list is not dismissed by its own
+  // trigger.
+  React.useEffect(() => {
+    if (!modelMenuOpen) return undefined
+    const onPointerDown = (event) => {
+      const wrap = modelWrapRef.current
+      if (wrap && event.target instanceof Node && wrap.contains(event.target)) return
+      setModelMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+    }
+  }, [modelMenuOpen])
+
+  /**
+   * Switch the session to one model of the card's provider.
+   *
+   * The Host's own switch performs it, so the session records the same
+   * selection a click in the composer's model seat records, and the
+   * installation keeps that selection as its default.
+   *
+   * @param {{id: string, reasoning?: {defaultEffort?: string}}} model The model to switch to.
+   */
+  const switchToModel = React.useCallback(
+    async (model) => {
+      const face = lookupSessionFace(ctx)
+      if (face === undefined || typeof face.selectModel !== 'function') {
+        setModelError(t('model.unavailable'))
+        return
+      }
+      if (typeof sessionId !== 'string' || sessionId === '') {
+        setModelError(t('model.unavailable'))
+        return
+      }
+      setSwitchingModel(model.id)
+      try {
+        const effort = model.reasoning?.defaultEffort
+        const result = await face.selectModel({
+          sessionId,
+          provider: activeProvider,
+          model: model.id,
+          ...(typeof effort === 'string' && effort !== '' ? { reasoningEffort: effort } : {}),
+        })
+        if (!result?.ok) {
+          setModelError(
+            t('model.failed', { error: result?.error?.message ?? result?.error?.code ?? '' }),
+          )
+          return
+        }
+        setModelError(null)
+        setModelMenuOpen(false)
+      } catch (error) {
+        console.error('[model-allowance] switching the model failed', { error })
+        setModelError(t('model.failed', { error: describe(error) }))
+      } finally {
+        setSwitchingModel(null)
+      }
+    },
+    [ctx, sessionId, activeProvider, t],
+  )
 
   const label = React.useMemo(() => {
     if (!provider) return ''
@@ -924,6 +1113,118 @@ export function BalanceBadge(props) {
                     'aria-label': t('detail.console'),
                   },
                   consoleGlyph(16),
+                )
+              : null,
+            // The switch to another model of this provider. It sits to the
+            // right of the console link, which is the last thing the footer
+            // offered before, so the two never trade places.
+            canSwitch
+              ? h(
+                  'span',
+                  { ref: modelWrapRef, className: 'dsh-model-allowance-model-wrap' },
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'dsh-model-allowance-icon-button',
+                      'aria-haspopup': 'menu',
+                      'aria-expanded': modelMenuOpen ? 'true' : 'false',
+                      // The vendor in use paints the glyph in its own
+                      // colour, so the button says which vendor the card is
+                      // on instead of the strip having to say it twice.
+                      'data-in-use': inUse ? 'true' : 'false',
+                      style: { '--provider-mark': markFor(activeProvider).color },
+                      title: switchLabel,
+                      'aria-label': switchLabel,
+                      onClick: () => {
+                        setModelError(null)
+                        setModelMenuOpen((value) => !value)
+                      },
+                    },
+                    modelGlyph(16),
+                  ),
+                  modelMenuOpen
+                    ? h(
+                        'div',
+                        {
+                          className: 'dsh-model-allowance-model-menu',
+                          role: 'menu',
+                          'aria-label': t('model.title'),
+                        },
+                        modelListState === 'loading'
+                          ? h(
+                              'div',
+                              { className: 'dsh-model-allowance-model-message' },
+                              t('model.loading'),
+                            )
+                          : null,
+                        modelListState === 'empty'
+                          ? h(
+                              'div',
+                              { className: 'dsh-model-allowance-model-message' },
+                              t('model.empty'),
+                            )
+                          : null,
+                        modelListState === 'error'
+                          ? h(
+                              'div',
+                              {
+                                className: 'dsh-model-allowance-model-message',
+                                'data-tone': 'error',
+                              },
+                              modelError ?? t('model.unavailable'),
+                            )
+                          : null,
+                        ...modelList.map((model) => {
+                          const isCurrent = model.id === currentModel
+                          return h(
+                            'button',
+                            {
+                              type: 'button',
+                              key: model.id,
+                              role: 'menuitemradio',
+                              'aria-checked': isCurrent ? 'true' : 'false',
+                              'data-current': isCurrent ? 'true' : 'false',
+                              className: 'dsh-model-allowance-model-item',
+                              disabled: switchingModel !== null,
+                              title: model.id,
+                              onClick: () => {
+                                void switchToModel(model)
+                              },
+                            },
+                            h(
+                              'span',
+                              { className: 'dsh-model-allowance-model-name' },
+                              model.name ?? model.id,
+                            ),
+                            switchingModel === model.id
+                              ? h(
+                                  'span',
+                                  { className: 'dsh-model-allowance-model-note' },
+                                  t('model.switching'),
+                                )
+                              : isCurrent
+                                ? h(
+                                    'span',
+                                    { className: 'dsh-model-allowance-model-note' },
+                                    t('model.current'),
+                                  )
+                                : null,
+                          )
+                        }),
+                        // A failed switch keeps the list open and says why.
+                        modelError && modelListState !== 'error'
+                          ? h(
+                              'div',
+                              {
+                                className: 'dsh-model-allowance-model-message',
+                                'data-tone': 'error',
+                              },
+                              modelError,
+                            )
+                          : null,
+                      )
+                    : null,
                 )
               : null,
           ),

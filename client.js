@@ -97,8 +97,9 @@ function formatDelta(consumption) {
     if (magnitude >= 0.05) return `${magnitude.toFixed(1)}%`;
     return "";
   }
+  if (magnitude < 5e-5) return "";
   const value = magnitude >= 0.01 ? magnitude.toFixed(2) : magnitude.toFixed(4);
-  return Number(value) === 0 ? "" : value;
+  return value;
 }
 function formatClock(epochMs) {
   const at = new Date(epochMs);
@@ -147,6 +148,40 @@ function consoleGlyph(size) {
       fill: "none",
       stroke: "currentColor",
       strokeWidth: 1.6
+    })
+  );
+}
+function modelGlyph(size) {
+  return (0, import_react.createElement)(
+    "svg",
+    { viewBox: "0 0 20 20", width: size, height: size, "aria-hidden": "true", focusable: "false" },
+    (0, import_react.createElement)("path", {
+      d: "M3.4 6.5h9.8",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.6,
+      strokeLinecap: "round"
+    }),
+    (0, import_react.createElement)("path", {
+      d: "M13.2 3.6L16.9 6.5L13.2 9.4Z",
+      fill: "currentColor",
+      stroke: "currentColor",
+      strokeWidth: 0.6,
+      strokeLinejoin: "round"
+    }),
+    (0, import_react.createElement)("path", {
+      d: "M16.6 13.5H6.8",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.6,
+      strokeLinecap: "round"
+    }),
+    (0, import_react.createElement)("path", {
+      d: "M6.8 10.6L3.1 13.5L6.8 16.4Z",
+      fill: "currentColor",
+      stroke: "currentColor",
+      strokeWidth: 0.6,
+      strokeLinejoin: "round"
     })
   );
 }
@@ -304,6 +339,16 @@ var zh = {
   "detail.console": "\u63A7\u5236\u53F0",
   "detail.error": "\u65E0\u6CD5\u8BFB\u53D6\u5382\u5546\u4F59\u989D\u3002",
   "detail.moreProviders": "\u66F4\u591A\u5382\u5546",
+  "detail.switchModelHere": "\u5207\u6362 {name} \u7684\u6A21\u578B",
+  "detail.switchModelThere": "\u5207\u6362\u5230 {name} \u7684\u6A21\u578B",
+  "model.title": "\u6A21\u578B",
+  "model.loading": "\u52A0\u8F7D\u6A21\u578B\u2026",
+  "model.empty": "\u8BE5\u5382\u5546\u6682\u65E0\u53EF\u7528\u6A21\u578B",
+  "model.current": "\u5F53\u524D",
+  "model.switching": "\u5207\u6362\u4E2D\u2026",
+  "model.failed": "\u5207\u6362\u5931\u8D25\uFF1A{error}",
+  "model.loadFailed": "\u8BFB\u53D6\u6A21\u578B\u5217\u8868\u5931\u8D25\uFF1A{error}",
+  "model.unavailable": "\u672C\u673A\u672A\u63D0\u4F9B\u6A21\u578B\u5207\u6362\u63A5\u53E3",
   "status.operational": "\u8FD0\u884C\u6B63\u5E38",
   "status.degraded": "\u670D\u52A1\u964D\u7EA7",
   "status.partialOutage": "\u90E8\u5206\u670D\u52A1\u4E2D\u65AD",
@@ -355,6 +400,16 @@ var en = {
   "detail.console": "Console",
   "detail.error": "Could not read the provider balance.",
   "detail.moreProviders": "More providers",
+  "detail.switchModelHere": "Switch model of {name}",
+  "detail.switchModelThere": "Switch to a model of {name}",
+  "model.title": "Models",
+  "model.loading": "Loading models\u2026",
+  "model.empty": "No models available for this provider",
+  "model.current": "Current",
+  "model.switching": "Switching\u2026",
+  "model.failed": "Switch failed: {error}",
+  "model.loadFailed": "Could not read the model list: {error}",
+  "model.unavailable": "This host offers no model switch",
   "status.operational": "Operational",
   "status.degraded": "Degraded",
   "status.partialOutage": "Partial outage",
@@ -406,6 +461,22 @@ function statusLabel(state, t) {
   return key === void 0 ? t("status.unknown") : t(key);
 }
 
+// src/client/models.js
+function providerGroup(catalog, provider) {
+  const groups = Array.isArray(catalog?.groups) ? catalog.groups : [];
+  return groups.find((group) => group?.id === provider);
+}
+function modelsForProvider(catalog, provider) {
+  const group = providerGroup(catalog, provider);
+  const models = Array.isArray(group?.models) ? group.models : [];
+  return models.filter((model) => typeof model?.id === "string" && model.id !== "");
+}
+function currentModelFor(selection, provider) {
+  const next = selection?.next ?? selection?.lastUsed;
+  if (next?.provider !== provider) return void 0;
+  return typeof next.model === "string" ? next.model : void 0;
+}
+
 // src/client/namespace.js
 var balanceNamespace = null;
 var settleBalanceNamespace;
@@ -432,6 +503,14 @@ var modelSupport;
 function resetBalanceNamespace() {
   balanceNamespace = null;
   modelSupport = void 0;
+}
+function lookupSessionFace(ctx) {
+  try {
+    const face = ctx.get("remote.session");
+    if (face !== void 0) return face;
+  } catch {
+  }
+  return ctx.remote?.session;
 }
 async function supportsModel(api) {
   if (modelSupport !== void 0) return modelSupport;
@@ -764,6 +843,33 @@ var STYLES = [
   "line-height:1;background:0 0;",
   "color:var(--provider-mark,var(--dsw-alias-label-primary))}",
   ".dsh-model-allowance-menu-mark svg{display:block}",
+  // The model list is a third floating surface. It opens upwards from the
+  // footer button, so it carries the same menu surface and elevation as the
+  // card and the provider overflow menu.
+  ".dsh-model-allowance-model-wrap{position:relative;display:inline-flex}",
+  ".dsh-model-allowance-model-menu{position:absolute;bottom:calc(100% + 4px);right:0;z-index:30;",
+  "min-width:180px;max-width:260px;max-height:240px;overflow-y:auto;padding:4px;border:0;",
+  "border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);",
+  "backdrop-filter:var(--dsw-menu-backdrop-filter);",
+  "box-shadow:var(--dsw-elevation-prominent)}",
+  ".dsh-model-allowance-model-item{display:flex;align-items:center;justify-content:space-between;",
+  "gap:10px;width:100%;padding:4px 6px;border:0;border-radius:var(--dsw-radius-xs);",
+  "background:0 0;color:var(--dsw-alias-label-primary);font-size:12px;text-align:left;cursor:pointer}",
+  ".dsh-model-allowance-model-item:hover{background:var(--dsw-alias-interactive-bg-hover)}",
+  // The model the session uses is dimmed rather than framed: a frame here
+  // would give the chip a second meaning it does not have.
+  '.dsh-model-allowance-model-item[data-current="true"]{color:var(--dsw-alias-label-secondary)}',
+  ".dsh-model-allowance-model-item[disabled]{opacity:.6;cursor:default}",
+  ".dsh-model-allowance-model-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  // The trailing label names the state of one model: the one in use, or the
+  // one being switched to.
+  ".dsh-model-allowance-model-note{flex:none;color:var(--dsw-alias-label-tertiary);font-size:11px}",
+  // A message covers the whole list: it loads, it is empty, or the switch
+  // failed and says why.
+  ".dsh-model-allowance-model-message{padding:4px 6px;color:var(--dsw-alias-label-secondary);",
+  "font-size:11px;word-break:break-word}",
+  '.dsh-model-allowance-model-message[data-tone="error"]{',
+  "color:var(--dsw-alias-state-error-primary)}",
   ".dsh-model-allowance-window{margin-top:10px;padding-top:10px;",
   "border-top:1px solid var(--dsw-alias-border-l1)}",
   // The first window has no boundary above it: the switcher already ends
@@ -806,6 +912,16 @@ var STYLES = [
   "color:var(--dsw-alias-label-tertiary);cursor:pointer;text-decoration:none}",
   ".dsh-model-allowance-icon-button:hover{color:var(--dsw-alias-label-secondary);",
   "border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-interactive-bg-hover)}",
+  // The vendor in use paints the switch glyph in that vendor's own colour,
+  // so the button says which vendor the card is on. The frame stays
+  // neutral: a coloured frame would fight the vendor marks in the strip
+  // above it.
+  '.dsh-model-allowance-icon-button[data-in-use="true"]{',
+  "color:var(--provider-mark,var(--dsw-alias-label-primary));",
+  "border-color:var(--dsw-alias-border-l3)}",
+  '.dsh-model-allowance-icon-button[data-in-use="true"]:hover{',
+  "color:var(--provider-mark,var(--dsw-alias-label-primary));",
+  "background:var(--dsw-alias-interactive-bg-hover)}",
   ".dsh-model-allowance-icon-button:focus-visible{",
   "outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}",
   ".dsh-model-allowance-icon-button[disabled]{opacity:.5;cursor:default}",
@@ -965,11 +1081,16 @@ function barTone(percent) {
 }
 
 // src/client/badge.js
+var CATALOG_TTL_MS = 60 * 1e3;
+function describe(error) {
+  return error instanceof Error ? error.message : String(error);
+}
 function BalanceBadge(props) {
   const { useProjection, ctx, t } = props;
   const selection = useProjection("modelSelection");
   const selected = selection?.next?.provider ?? selection?.lastUsed?.provider ?? null;
   const selectedModel = selection?.next?.model ?? selection?.lastUsed?.model ?? void 0;
+  const sessionId = props.sessionId;
   const [rawView, setView] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -992,6 +1113,13 @@ function BalanceBadge(props) {
   const [defaultProvider, setDefaultProvider] = React.useState(null);
   const [providerStatus, setProviderStatus] = React.useState(null);
   const [schedule, setSchedule] = React.useState(null);
+  const [modelList, setModelList] = React.useState([]);
+  const [modelListState, setModelListState] = React.useState("idle");
+  const [modelError, setModelError] = React.useState(null);
+  const [modelMenuOpen, setModelMenuOpen] = React.useState(false);
+  const [switchingModel, setSwitchingModel] = React.useState(null);
+  const modelWrapRef = React.useRef(null);
+  const catalogRef = React.useRef({ value: null, at: 0 });
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -1037,11 +1165,19 @@ function BalanceBadge(props) {
   });
   const activeProvider = picked ?? provider;
   const activeModel = picked === null || picked === provider ? selectedModel : void 0;
+  const inUse = activeProvider === provider;
+  const switchLabel = t(inUse ? "detail.switchModelHere" : "detail.switchModelThere", {
+    name: nameOf(activeProvider)
+  });
+  const currentModel = currentModelFor(selection, activeProvider);
+  const sessionFace = lookupSessionFace(ctx);
+  const canSwitch = typeof sessionId === "string" && sessionId !== "" && sessionFace !== void 0 && typeof sessionFace.selectModel === "function";
   const view = rawView?.provider === activeProvider ? rawView : null;
   React.useEffect(() => {
     if (open) return;
     setPicked(null);
     setMenuOpen(false);
+    setModelMenuOpen(false);
   }, [open]);
   React.useEffect(() => {
     if (!open) return;
@@ -1062,7 +1198,12 @@ function BalanceBadge(props) {
       setOpen(false);
     };
     const onKeyDown = (event) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      if (modelMenuOpen) {
+        setModelMenuOpen(false);
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
@@ -1070,7 +1211,7 @@ function BalanceBadge(props) {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, modelMenuOpen]);
   const showingDifference = consumptionFreshAt(view?.consumption, now);
   React.useEffect(() => {
     if (!open && !showingDifference) return;
@@ -1258,6 +1399,101 @@ function BalanceBadge(props) {
       setRefreshing(false);
     }
   }, [activeProvider, activeModel]);
+  const showModels = React.useCallback(
+    (catalog) => {
+      const models = modelsForProvider(catalog, activeProvider);
+      setModelList(models);
+      setModelListState(models.length > 0 ? "ready" : "empty");
+    },
+    [activeProvider]
+  );
+  React.useEffect(() => {
+    if (!modelMenuOpen) return void 0;
+    let cancelled = false;
+    (async () => {
+      const face = lookupSessionFace(ctx);
+      if (face === void 0 || typeof face.modelCatalog !== "function") {
+        setModelListState("error");
+        setModelError(t("model.unavailable"));
+        return;
+      }
+      const cached = catalogRef.current;
+      if (cached.value !== null && Date.now() - cached.at < CATALOG_TTL_MS) {
+        if (!cancelled) showModels(cached.value);
+        return;
+      }
+      setModelListState("loading");
+      try {
+        const result = await face.modelCatalog();
+        if (cancelled) return;
+        if (!result?.ok) {
+          setModelListState("error");
+          setModelError(
+            t("model.loadFailed", { error: result?.error?.message ?? result?.error?.code ?? "" })
+          );
+          return;
+        }
+        catalogRef.current = { value: result.value, at: Date.now() };
+        showModels(result.value);
+      } catch (error) {
+        if (cancelled) return;
+        setModelListState("error");
+        setModelError(t("model.loadFailed", { error: describe(error) }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modelMenuOpen, ctx, t, showModels]);
+  React.useEffect(() => {
+    if (!modelMenuOpen) return void 0;
+    const onPointerDown = (event) => {
+      const wrap = modelWrapRef.current;
+      if (wrap && event.target instanceof Node && wrap.contains(event.target)) return;
+      setModelMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, [modelMenuOpen]);
+  const switchToModel = React.useCallback(
+    async (model) => {
+      const face = lookupSessionFace(ctx);
+      if (face === void 0 || typeof face.selectModel !== "function") {
+        setModelError(t("model.unavailable"));
+        return;
+      }
+      if (typeof sessionId !== "string" || sessionId === "") {
+        setModelError(t("model.unavailable"));
+        return;
+      }
+      setSwitchingModel(model.id);
+      try {
+        const effort = model.reasoning?.defaultEffort;
+        const result = await face.selectModel({
+          sessionId,
+          provider: activeProvider,
+          model: model.id,
+          ...typeof effort === "string" && effort !== "" ? { reasoningEffort: effort } : {}
+        });
+        if (!result?.ok) {
+          setModelError(
+            t("model.failed", { error: result?.error?.message ?? result?.error?.code ?? "" })
+          );
+          return;
+        }
+        setModelError(null);
+        setModelMenuOpen(false);
+      } catch (error) {
+        console.error("[model-allowance] switching the model failed", { error });
+        setModelError(t("model.failed", { error: describe(error) }));
+      } finally {
+        setSwitchingModel(null);
+      }
+    },
+    [ctx, sessionId, activeProvider, t]
+  );
   const label = React.useMemo(() => {
     if (!provider) return "";
     if (!view) return t("badge.loading");
@@ -1655,6 +1891,102 @@ function BalanceBadge(props) {
             "aria-label": t("detail.console")
           },
           consoleGlyph(16)
+        ) : null,
+        // The switch to another model of this provider. It sits to the
+        // right of the console link, which is the last thing the footer
+        // offered before, so the two never trade places.
+        canSwitch ? (0, import_react3.createElement)(
+          "span",
+          { ref: modelWrapRef, className: "dsh-model-allowance-model-wrap" },
+          (0, import_react3.createElement)(
+            "button",
+            {
+              type: "button",
+              className: "dsh-model-allowance-icon-button",
+              "aria-haspopup": "menu",
+              "aria-expanded": modelMenuOpen ? "true" : "false",
+              // The vendor in use paints the glyph in its own
+              // colour, so the button says which vendor the card is
+              // on instead of the strip having to say it twice.
+              "data-in-use": inUse ? "true" : "false",
+              style: { "--provider-mark": markFor(activeProvider).color },
+              title: switchLabel,
+              "aria-label": switchLabel,
+              onClick: () => {
+                setModelError(null);
+                setModelMenuOpen((value) => !value);
+              }
+            },
+            modelGlyph(16)
+          ),
+          modelMenuOpen ? (0, import_react3.createElement)(
+            "div",
+            {
+              className: "dsh-model-allowance-model-menu",
+              role: "menu",
+              "aria-label": t("model.title")
+            },
+            modelListState === "loading" ? (0, import_react3.createElement)(
+              "div",
+              { className: "dsh-model-allowance-model-message" },
+              t("model.loading")
+            ) : null,
+            modelListState === "empty" ? (0, import_react3.createElement)(
+              "div",
+              { className: "dsh-model-allowance-model-message" },
+              t("model.empty")
+            ) : null,
+            modelListState === "error" ? (0, import_react3.createElement)(
+              "div",
+              {
+                className: "dsh-model-allowance-model-message",
+                "data-tone": "error"
+              },
+              modelError ?? t("model.unavailable")
+            ) : null,
+            ...modelList.map((model) => {
+              const isCurrent = model.id === currentModel;
+              return (0, import_react3.createElement)(
+                "button",
+                {
+                  type: "button",
+                  key: model.id,
+                  role: "menuitemradio",
+                  "aria-checked": isCurrent ? "true" : "false",
+                  "data-current": isCurrent ? "true" : "false",
+                  className: "dsh-model-allowance-model-item",
+                  disabled: switchingModel !== null,
+                  title: model.id,
+                  onClick: () => {
+                    void switchToModel(model);
+                  }
+                },
+                (0, import_react3.createElement)(
+                  "span",
+                  { className: "dsh-model-allowance-model-name" },
+                  model.name ?? model.id
+                ),
+                switchingModel === model.id ? (0, import_react3.createElement)(
+                  "span",
+                  { className: "dsh-model-allowance-model-note" },
+                  t("model.switching")
+                ) : isCurrent ? (0, import_react3.createElement)(
+                  "span",
+                  { className: "dsh-model-allowance-model-note" },
+                  t("model.current")
+                ) : null
+              );
+            }),
+            // A failed switch keeps the list open and says why.
+            modelError && modelListState !== "error" ? (0, import_react3.createElement)(
+              "div",
+              {
+                className: "dsh-model-allowance-model-message",
+                "data-tone": "error"
+              },
+              modelError
+            ) : null
+          ) : null
         ) : null
       )
     ) : null
