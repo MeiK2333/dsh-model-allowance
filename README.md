@@ -63,6 +63,10 @@ updating means removing the old version first, then installing the new tag.
 
 DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`.
 
+## Development
+
+Dependencies are managed with pnpm (`pnpm install --frozen-lockfile`).
+
 ## License
 
 [MIT](LICENSE). Provider icons are trademarks of their respective owners,

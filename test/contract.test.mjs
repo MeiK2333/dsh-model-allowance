@@ -177,6 +177,19 @@ test('the schedule and status result schemas accept the Host declarations', () =
   )
 })
 
+test('the provider list schema keeps the alias and model-route fields', () => {
+  const list = descriptor('balance/list').result.create()
+  const entry = {
+    route: 'deepseek-account',
+    configured: true,
+    aliases: ['deepseek-official'],
+    modelRoutes: ['deepseek-chat'],
+  }
+  const parsed = list.parse([entry])
+  assert.deepEqual(parsed[0].aliases, ['deepseek-official'])
+  assert.deepEqual(parsed[0].modelRoutes, ['deepseek-chat'])
+})
+
 test('the route list and default-provider schemas accept the Host payloads', () => {
   const list = descriptor('balance/list').result.create()
   assert.doesNotThrow(() =>

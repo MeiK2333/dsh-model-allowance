@@ -1,67 +1,23 @@
 import * as React from 'react'
 import { createElement as h } from 'react'
+import { BalancePanel } from './components/balance-panel.js'
 import {
   consumptionFreshAt,
   formatAmount,
-  formatClock,
   formatDelta,
   formatDuration,
-  formatResetAt,
   STATUS_REFRESH_MS,
 } from './format.js'
-import { consoleGlyph, markOf, modelGlyph, providerIcon, refreshGlyph } from './icons.js'
-import { pickName, statusLabel } from './locales.js'
-import { currentModelFor, effortChoices, providerModelGroup } from './models.js'
+import { readProviderStatus, useBalanceStream } from './hooks/use-balance-stream.js'
+import { useDismiss } from './hooks/use-dismiss.js'
+import { useModelCatalog } from './hooks/use-model-catalog.js'
+import { entryCovers, useProviderDirectory } from './hooks/use-provider-directory.js'
+import { markOf } from './icons.js'
 import { getBalanceApi, lookupSessionFace, supportsModel } from './namespace.js'
-import { formatCountdown, scheduleView } from './schedule.js'
 import { STYLES } from './styles.js'
-import { barTone, shortestWindow, windowTitle, windowUsage, windowUsedPercent } from './windows.js'
+import { shortestWindow } from './windows.js'
 
-/**
- * How long the Host's model catalog is reused before it is read again.
- *
- * The catalog changes only when a provider changes what it advertises, and
- * every open of the list reads the same document.
- */
-const CATALOG_TTL_MS = 60 * 1000
-
-/**
- * The message of a thrown value.
- * @param {unknown} error The thrown value.
- * @returns {string} The message.
- */
-function describe(error) {
-  return error instanceof Error ? error.message : String(error)
-}
-
-/**
- * Read one provider's status and always settle on a displayable result.
- * @param {string} provider Provider route.
- * @returns {Promise<{provider: string, state: string, url?: string, summary?: string, error?: string}>}
- *   The status reading, or an unknown reading explaining why it failed.
- */
-async function readProviderStatus(provider) {
-  try {
-    const api = await getBalanceApi()
-    if (!api || typeof api.status !== 'function') {
-      return { provider, state: 'unknown', error: 'status API unavailable' }
-    }
-    const result = await api.status(provider)
-    if (!result.ok) {
-      const error =
-        typeof result.error?.message === 'string'
-          ? result.error.message
-          : typeof result.error === 'string'
-            ? result.error
-            : 'status reading failed'
-      return { provider, state: 'unknown', error }
-    }
-    return result.value
-  } catch (error) {
-    console.error('[model-allowance] reading provider status failed', { provider, error })
-    return { provider, state: 'unknown', error: describe(error) }
-  }
-}
+export { entryCovers }
 
 /**
  * Project a status reading onto the states the card can present.
@@ -80,25 +36,13 @@ export function statusDisplayState(status) {
 }
 
 /**
- * Whether one directory entry stands for a provider route.
- *
- * The Host names a vendor by two ids when the balance route and the route
- * that lists the vendor's models differ: the DeepSeek API vendor is
- * `deepseek` to a balance query and `deepseek-official` to the model catalog.
- * The entry that answers for one of them answers for the other.
- *
- * @param {{route: string, aliases?: readonly string[]}} entry Directory entry.
- * @param {string} route Provider route.
- * @returns {boolean} Whether the entry names the route.
- */
-export function entryCovers(entry, route) {
-  if (entry === undefined || entry === null) return false
-  if (entry.route === route) return true
-  return Array.isArray(entry.aliases) && entry.aliases.includes(route)
-}
-
-/**
  * The badge and its detail popover.
+ *
+ * The read states the verification harness addresses by hook-slot index —
+ * the reading, the open state, the panel root, the clock, and the switcher
+ * strip's measured width — stay declared here, in this order; the hooks
+ * below take them in and install their own state after them.
+ *
  * @param {object} props Slot props plus the plugin context and translator.
  * @returns {React.ReactElement | null} The rendered badge.
  */
@@ -117,6 +61,9 @@ export function BalanceBadge(props) {
   // id, and the Host's switch needs it.
   const sessionId = props.sessionId
 
+  // The reading the stream or a refresh last produced, and whether it is
+  // being read. The state lives here so the hook-slot layout of the
+  // component stays stable; the stream hook below installs the effect.
   const [rawView, setView] = React.useState(null)
   const [loading, setLoading] = React.useState(false)
   const [open, setOpen] = React.useState(false)
@@ -131,141 +78,38 @@ export function BalanceBadge(props) {
   // provider this installation can read. `picked` holds that override and
   // is cleared whenever the model moves, so the card snaps back to it.
   const [picked, setPicked] = React.useState(null)
-  // Every route the Host can read, with the metadata that names and draws
-  // it. The switcher offers the configured ones; the metadata of the rest
-  // still names the route when it is the one being read.
-  const [directory, setDirectory] = React.useState([])
-  const lastModelProvider = React.useRef(null)
-
-  /** The routes this installation can read, for the switcher. */
-  const available = directory.filter((entry) => entry.configured)
-
-  /**
-   * The directory entry for one route, when the Host named it.
-   * @param {string} route Provider route.
-   * @returns {object | undefined} The entry.
-   */
-  const entryOf = React.useCallback(
-    (route) => directory.find((entry) => entryCovers(entry, route)),
-    [directory],
-  )
-
-  /**
-   * Name a route from its metadata, falling back to the route id.
-   * @param {string} route Provider route.
-   * @returns {string} The display name.
-   */
-  const nameOf = React.useCallback((route) => pickName(entryOf(route), route), [entryOf])
-
-  /**
-   * The mark for a route, from its metadata.
-   * @param {string} route Provider route.
-   * @returns {{icon?: string, letter?: string, color: string}} The mark.
-   */
-  const markFor = (route) => markOf(entryOf(route), route)
-
-  // The switcher is a single row of marks. When they cannot all fit, the
-  // tail moves into a menu behind a button on the right, so the strip never
-  // wraps or clips. Width is measured rather than assumed.
+  // The switcher's overflow menu is controlled from here so closing the
+  // card also closes the menu.
   const [menuOpen, setMenuOpen] = React.useState(false)
-  const [stripWidth, setStripWidth] = React.useState(0)
-  const stripRef = React.useRef(null)
-
-  // A session that has not taken a turn yet has no `modelSelection` to
-  // read, and rendering nothing there would leave the composer without a
-  // badge until the first message. Ask what a new session would use — the
-  // installation's default, which the model selector also falls back to.
-  const [defaultProvider, setDefaultProvider] = React.useState(null)
   // The provider's own platform status, fetched with the panel. The view
   // carries its provider, so a reading for the route that was selected a
   // moment ago is never shown against the current one.
   const [providerStatus, setProviderStatus] = React.useState(null)
   // The pricing schedule the vendor meters by, when it publishes one.
   const [schedule, setSchedule] = React.useState(null)
-  // The models the switch button offers. The Host's catalog is the same one
-  // the composer's model seat reads, so the two always agree on which
-  // models exist.
-  const [modelList, setModelList] = React.useState([])
-  // The card route the shown list belongs to, so a list read for another
-  // route never shows against the route now in use.
-  const [modelListRoute, setModelListRoute] = React.useState(null)
-  // The Host provider id the listed models switch under, when it differs
-  // from the card's own route.
-  const [catalogProvider, setCatalogProvider] = React.useState(null)
-  // 'idle' before the list was ever opened, then 'loading', 'ready', 'empty'
-  // or 'error'.
-  const [modelListState, setModelListState] = React.useState('idle')
-  const [modelError, setModelError] = React.useState(null)
-  const [modelMenuOpen, setModelMenuOpen] = React.useState(false)
-  // The model whose effort choices show in the flyout while the pointer
-  // rests on its row, with the flyout's top offset inside the wrap.
-  const [hoverModel, setHoverModel] = React.useState(null)
-  // Closing the flyout waits a beat, so a pointer travelling from a row
-  // into the flyout does not dismiss it mid-air.
-  const hoverModelTimer = React.useRef(null)
-  // The model being switched to, while the Host performs the switch.
-  const [switchingModel, setSwitchingModel] = React.useState(null)
-  // The wrapper that holds the switch button and its list, so a click on
-  // either of them does not dismiss the list.
-  const modelWrapRef = React.useRef(null)
-  // The Host's model catalog, kept for a minute: it changes only when a
-  // provider changes what it advertises, and every open of the list reads
-  // the same document.
-  const catalogRef = React.useRef({ value: null, at: 0 })
-
-  // The panel names routes from the Host's directory: small, local, and
-  // stable for a session. Fetching it at mount means the first open names
-  // a route instead of flashing its id; the open-time refresh below keeps
-  // it current when a credential changed in the same session.
-  React.useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const api = await getBalanceApi()
-        if (!api || typeof api.list !== 'function') return
-        const result = await api.list()
-        if (cancelled || !result.ok) return
-        setDirectory(result.value)
-      } catch (error) {
-        console.error('[model-allowance] listing providers failed', { error })
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  React.useEffect(() => {
-    if (selected !== null) return undefined
-    let cancelled = false
-    ;(async () => {
-      try {
-        const api = await getBalanceApi()
-        if (!api || typeof api.defaultProvider !== 'function') return
-        const result = await api.defaultProvider()
-        if (cancelled || result?.ok !== true) return
-        const provider = result.value?.provider
-        if (typeof provider === 'string' && provider !== '') setDefaultProvider(provider)
-      } catch (error) {
-        console.error('[model-allowance] reading the default provider failed', { error })
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [selected])
-
-  const provider = selected ?? defaultProvider
-
   // Dropping the override belongs to the model *changing*, not to every
   // render, so the previous selection is compared rather than reset
   // blindly. A model switch inside one provider also resets it.
-  const selectionKey = `${provider ?? ''}\u0000${selectedModel ?? ''}`
+  const lastModelProvider = React.useRef(null)
+
+  // The switcher only steers the card while it is open. Closing the card
+  // returns the badge to the session's own model, which is the number the
+  // composer should always describe when nothing is open.
   React.useEffect(() => {
-    if (lastModelProvider.current === selectionKey) return
-    lastModelProvider.current = selectionKey
+    if (open) return
     setPicked(null)
-  })
+    setMenuOpen(false)
+  }, [open])
+
+  // The switcher strip's measured width and its node: the strip measures
+  // itself when it mounts and reports the width back through here.
+  const [stripWidth, setStripWidth] = React.useState(0)
+  const stripRef = React.useRef(null)
+
+  // The Host's provider directory, the installation's default provider,
+  // and the helpers that name and match a route from directory metadata.
+  const { available, defaultProvider, entryOf, nameOf } = useProviderDirectory(selected)
+  const provider = selected ?? defaultProvider
 
   // The provider the card is pointed at, and the model whose plan it reads.
   // Pointing the card at a *different* route has no model context, so the
@@ -284,240 +128,24 @@ export function BalanceBadge(props) {
   const switchLabel = t(inUse ? 'detail.switchModelHere' : 'detail.switchModelThere', {
     name: nameOf(activeProvider),
   })
-  // The model the session uses, when it uses one of the card's provider's
-  // models. The card can point at another provider, and then none of that
-  // provider's models is the current one. The catalog provider names the
-  // group the switch offers, which is the id the session selection carries.
-  const modelProvider = catalogProvider ?? activeProvider
-  const currentModel = currentModelFor(selection, modelProvider)
-  // A list read for another route is not evidence about this one: it reads
-  // as loading until the open of the list answers for the route in use.
-  const shownModelList = modelListRoute === activeProvider ? modelList : []
-  const shownModelListState = modelListRoute === activeProvider ? modelListState : 'loading'
-  // The switch needs a session to switch and a host that can perform one.
-  // A host without the Session namespace keeps the badge whole: the button
-  // is simply not there.
-  const sessionFace = lookupSessionFace(ctx)
-  const canSwitch =
-    typeof sessionId === 'string' &&
-    sessionId !== '' &&
-    sessionFace !== undefined &&
-    typeof sessionFace.selectModel === 'function'
   // A reading belongs to the provider that produced it. Deriving the visible
   // view instead of clearing state keeps a stale reading from flashing on the
   // badge when the card points at another provider.
   const view = rawView?.provider === activeProvider ? rawView : null
-
-  // The switcher only steers the card while it is open. Closing the card
-  // returns the badge to the session's own model, which is the number the
-  // composer should always describe when nothing is open.
-  React.useEffect(() => {
-    if (open) return
-    setPicked(null)
-    setMenuOpen(false)
-    setModelMenuOpen(false)
-  }, [open])
-
-  // Track the strip's width so the row can decide how many marks fit. A
-  // host without ResizeObserver simply shows them all.
-  React.useEffect(() => {
-    if (!open) return
-    const node = stripRef.current
-    if (!node) return
-    const measure = () => setStripWidth(node.clientWidth ?? 0)
-    measure()
-    if (typeof ResizeObserver !== 'function') return
-    const observer = new ResizeObserver(measure)
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [open])
-
-  // The panel has no close button: a click anywhere outside it dismisses it,
-  // and Escape does the same for keyboard users. The listener is on the
-  // document during capture so a click on a control that stops propagation
-  // still closes the panel.
-  React.useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event) => {
-      const root = rootRef.current
-      if (root && event.target instanceof Node && root.contains(event.target)) return
-      setOpen(false)
-    }
-    const onKeyDown = (event) => {
-      if (event.key !== 'Escape') return
-      // The model list is the inner surface: Escape closes it first and
-      // leaves the card open.
-      if (modelMenuOpen) {
-        setModelMenuOpen(false)
-        return
-      }
-      setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown, true)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open, modelMenuOpen])
+  // How far the number moved since the last reading, for a few seconds
+  // after it lands.
+  const showingDifference = consumptionFreshAt(view?.consumption, now)
 
   // Refresh the clock while the panel is open, and while a difference is
   // being shown — the card must fall back to the plain value on its own,
   // with no other render to trigger it. Once the difference expires this
   // effect re-runs and the interval stops.
-  const showingDifference = consumptionFreshAt(view?.consumption, now)
   React.useEffect(() => {
     if (!open && !showingDifference) return
     setNow(Date.now())
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [open, showingDifference])
-
-  // Ask which providers exist here when the card first opens. The answer is
-  // stable for a session unless a credential changes, so this is not polled.
-  React.useEffect(() => {
-    if (!open) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const api = await getBalanceApi()
-        if (!api || typeof api.list !== 'function') return
-        const result = await api.list()
-        if (cancelled || !result.ok) return
-        setDirectory(result.value)
-      } catch (error) {
-        console.error('[model-allowance] listing providers failed', { error })
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [open])
-
-  React.useEffect(() => {
-    if (!activeProvider) {
-      setView(null)
-      setLoading(false)
-      return
-    }
-    let cancelled = false
-    let handle
-    setLoading(true)
-
-    /** One unary read, used when the stream is unavailable or fails. */
-    const readOnce = async (api, model) => {
-      try {
-        let result = await api.balance(activeProvider, model)
-        // A Host that predates the model argument rejects the extra field.
-        // Retry with an explicit undefined second argument: the wire layer
-        // omits it, and the client descriptor still sees the two arguments it
-        // declares. Calling with one argument never reaches the Host.
-        if (!result.ok && model !== undefined) {
-          result = await api.balance(activeProvider, undefined)
-        }
-        if (cancelled) return
-        if (!result.ok) {
-          const detail =
-            typeof result.error?.message === 'string'
-              ? result.error.message
-              : typeof result.error === 'string'
-                ? result.error
-                : 'balance reading failed'
-          throw new Error(detail)
-        }
-        setView(result.value)
-      } catch (error) {
-        console.error('[model-allowance] reading failed', {
-          provider: activeProvider,
-          model,
-          error,
-        })
-        if (!cancelled) {
-          setView({
-            provider: activeProvider,
-            status: 'failed',
-            kind: 'quota',
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    ;(async () => {
-      const api = await getBalanceApi()
-      if (cancelled) return
-      if (!api) {
-        setView({
-          provider: activeProvider,
-          status: 'failed',
-          kind: 'quota',
-          error: 'balance namespace unavailable',
-        })
-        setLoading(false)
-        return
-      }
-      const readModel = (await supportsModel(api)) ? activeModel : undefined
-      if (cancelled) return
-
-      // The Host pushes a new reading when a turn ends or the periodic
-      // sweep runs, so the badge stays current without polling from the
-      // browser. A host without the stream API, or a stream that fails
-      // before its first frame, falls back to one unary read.
-      //
-      // `$stream` is a method: it reads its own connection to supervise
-      // carrier generations, so detaching it into a local throws. The items
-      // it yields are wrappers carrying the reading under `value`, and
-      // `accept()` confirms a generation's opening value.
-      const remote = ctx.remote
-      if (typeof remote?.$stream === 'function' && typeof api.watch === 'function') {
-        try {
-          handle = remote.$stream({
-            name: 'balance',
-            open: (signal) => api.watch(activeProvider, readModel, signal),
-            ended: () => new Error('balance stream ended'),
-          })
-        } catch (error) {
-          console.error('[model-allowance] opening the reading stream failed', { error })
-          handle = undefined
-        }
-        if (handle) {
-          let received = false
-          try {
-            for await (const item of handle) {
-              if (cancelled) return
-              const frame = item?.value
-              if (frame === undefined) continue
-              received = true
-              setView(frame)
-              setLoading(false)
-              item?.accept?.()
-            }
-          } catch (error) {
-            if (!cancelled) {
-              console.error('[model-allowance] reading stream failed', {
-                provider: activeProvider,
-                error,
-              })
-            }
-          } finally {
-            // A stream that produced nothing leaves the badge loading
-            // forever, so answer the same question the unary call would.
-            if (!cancelled && !received) await readOnce(api, readModel)
-          }
-          return
-        }
-      }
-
-      await readOnce(api, readModel)
-    })()
-
-    return () => {
-      cancelled = true
-      handle?.dispose?.()
-    }
-  }, [activeProvider, activeModel, ctx])
 
   // The badge dot speaks for the platform: green while the service is
   // available, red once its own status page says otherwise. It is read for
@@ -560,6 +188,29 @@ export function BalanceBadge(props) {
     }
   }, [activeProvider])
 
+  // The reading stream: the Host's stream with a unary fallback.
+  useBalanceStream({ activeProvider, activeModel, ctx, setView, setLoading })
+
+  // The Host's model catalog, the list the switch button offers, and the
+  // switch itself, with the effort flyout's hover state.
+  const catalog = useModelCatalog({ ctx, t, sessionId, activeProvider, entryOf, selection })
+
+  // The panel closes on a click outside it or on Escape.
+  useDismiss({
+    open,
+    rootRef,
+    modelMenuOpen: catalog.modelMenuOpen,
+    setOpen,
+    setModelMenuOpen: catalog.setModelMenuOpen,
+  })
+
+  const selectionKey = `${provider ?? ''}\u0000${selectedModel ?? ''}`
+  React.useEffect(() => {
+    if (lastModelProvider.current === selectionKey) return
+    lastModelProvider.current = selectionKey
+    setPicked(null)
+  })
+
   const refresh = React.useCallback(async () => {
     setRefreshing(true)
     try {
@@ -590,143 +241,21 @@ export function BalanceBadge(props) {
   }, [activeProvider, activeModel])
 
   /**
-   * Show the models of the provider the card points at.
-   * @param {object | null} catalog The Host's model catalog.
+   * The mark for a route, from its metadata.
+   * @param {string} route Provider route.
+   * @returns {{icon?: string, letter?: string, color: string}} The mark.
    */
-  const showModels = React.useCallback(
-    (catalog) => {
-      // A balance route and the Host provider id that lists the same
-      // vendor's models are not always the same id, so the adapter's own
-      // candidates follow the route itself.
-      const routes = [activeProvider, ...(entryOf(activeProvider)?.modelRoutes ?? [])]
-      const group = providerModelGroup(catalog, routes)
-      const models = group?.models ?? []
-      setCatalogProvider(group?.provider ?? null)
-      setModelListRoute(activeProvider)
-      setModelList(models)
-      setModelListState(models.length > 0 ? 'ready' : 'empty')
-    },
-    [activeProvider, entryOf],
-  )
+  const markFor = (route) => markOf(entryOf(route), route)
 
-  // The catalog is read when the list opens and kept for a minute: a
-  // provider changes what it advertises rarely, and every open of the list
-  // reads the same document.
-  React.useEffect(() => {
-    if (!modelMenuOpen) return undefined
-    let cancelled = false
-    ;(async () => {
-      const face = lookupSessionFace(ctx)
-      if (face === undefined || typeof face.modelCatalog !== 'function') {
-        setModelListState('error')
-        setModelError(t('model.unavailable'))
-        return
-      }
-      const cached = catalogRef.current
-      if (cached.value !== null && Date.now() - cached.at < CATALOG_TTL_MS) {
-        if (!cancelled) showModels(cached.value)
-        return
-      }
-      setModelListState('loading')
-      try {
-        const result = await face.modelCatalog()
-        if (cancelled) return
-        if (!result?.ok) {
-          setModelListState('error')
-          setModelError(
-            t('model.loadFailed', { error: result?.error?.message ?? result?.error?.code ?? '' }),
-          )
-          return
-        }
-        catalogRef.current = { value: result.value, at: Date.now() }
-        showModels(result.value)
-      } catch (error) {
-        if (cancelled) return
-        setModelListState('error')
-        setModelError(t('model.loadFailed', { error: describe(error) }))
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [modelMenuOpen, ctx, t, showModels])
-
-  // A click outside the list closes it. The button that opened the list
-  // sits inside the same wrapper, so the list is not dismissed by its own
-  // trigger.
-  React.useEffect(() => {
-    if (!modelMenuOpen) return undefined
-    const onPointerDown = (event) => {
-      const wrap = modelWrapRef.current
-      if (wrap && event.target instanceof Node && wrap.contains(event.target)) return
-      setModelMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown, true)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true)
-    }
-  }, [modelMenuOpen])
-
-  /**
-   * Switch the session to one model of the card's provider.
-   *
-   * The Host's own switch performs it, so the session records the same
-   * selection a click in the composer's model seat records, and the
-   * installation keeps that selection as its default.
-   *
-   * @param {{id: string}} model The model to switch to.
-   * @param {string | undefined} effort The reasoning effort the user picked,
-   *   or undefined to leave the choice to the provider.
-   */
-  const switchToModel = React.useCallback(
-    async (model, effort) => {
-      const face = lookupSessionFace(ctx)
-      if (face === undefined || typeof face.selectModel !== 'function') {
-        setModelError(t('model.unavailable'))
-        return
-      }
-      if (typeof sessionId !== 'string' || sessionId === '') {
-        setModelError(t('model.unavailable'))
-        return
-      }
-      setSwitchingModel(model.id)
-      try {
-        const result = await face.selectModel({
-          sessionId,
-          provider: catalogProvider ?? activeProvider,
-          model: model.id,
-          ...(typeof effort === 'string' && effort !== '' ? { reasoningEffort: effort } : {}),
-        })
-        if (!result?.ok) {
-          setModelError(
-            t('model.failed', { error: result?.error?.message ?? result?.error?.code ?? '' }),
-          )
-          return
-        }
-        setModelError(null)
-        setModelMenuOpen(false)
-      } catch (error) {
-        console.error('[model-allowance] switching the model failed', { error })
-        setModelError(t('model.failed', { error: describe(error) }))
-      } finally {
-        setSwitchingModel(null)
-      }
-    },
-    [ctx, sessionId, activeProvider, catalogProvider, t],
-  )
-
-  // The flyout is a sibling of the list, so the row and the flyout share
-  // the hover through a delayed close rather than CSS nesting.
-  const showEffortFlyout = React.useCallback((model, top) => {
-    clearTimeout(hoverModelTimer.current)
-    setHoverModel({ model, top })
-  }, [])
-  const scheduleEffortFlyoutClose = React.useCallback((id) => {
-    clearTimeout(hoverModelTimer.current)
-    hoverModelTimer.current = setTimeout(() => {
-      setHoverModel((current) => (current?.model?.id === id ? null : current))
-    }, 150)
-  }, [])
+  // The switch needs a session to switch and a host that can perform one.
+  // A host without the Session namespace keeps the badge whole: the button
+  // is simply not there.
+  const sessionFace = lookupSessionFace(ctx)
+  const canSwitch =
+    typeof sessionId === 'string' &&
+    sessionId !== '' &&
+    sessionFace !== undefined &&
+    typeof sessionFace.selectModel === 'function'
 
   const label = React.useMemo(() => {
     if (!provider) return ''
@@ -782,75 +311,6 @@ export function BalanceBadge(props) {
   const currentStatus = providerStatus?.provider === activeProvider ? providerStatus : null
   const serviceState = statusDisplayState(currentStatus)
 
-  // How many marks fit on one row. Each mark is `MARK_SIZE` plus the gap;
-  // the menu button, when it appears, needs its own slot. An unmeasured
-  // strip (no host observer) keeps every mark visible.
-  const MARK_SIZE = 26
-  const MARK_GAP = 4
-  const MENU_SIZE = 26
-  const perMark = MARK_SIZE + MARK_GAP
-  let visibleCount = available.length
-  if (stripWidth > 0 && available.length * perMark - MARK_GAP > stripWidth) {
-    visibleCount = Math.max(1, Math.floor((stripWidth - MENU_SIZE - MARK_GAP) / perMark))
-    visibleCount = Math.min(visibleCount, available.length - 1)
-  }
-  let shown = available.slice(0, visibleCount)
-  let overflow = available.slice(visibleCount)
-  // The provider being read stays visible; it is the one the card is about.
-  const activeIndex = overflow.findIndex((entry) => entryCovers(entry, activeProvider))
-  if (activeIndex >= 0 && shown.length > 0) {
-    const displaced = shown[shown.length - 1]
-    shown = [...shown.slice(0, -1), overflow[activeIndex]]
-    overflow = [...overflow.slice(0, activeIndex), displaced, ...overflow.slice(activeIndex + 1)]
-  }
-
-  /** One provider mark. */
-  const markButton = (entry) => {
-    const mark = markFor(entry.route)
-    const name = nameOf(entry.route)
-    const active = entryCovers(entry, activeProvider)
-    return h(
-      'button',
-      {
-        type: 'button',
-        key: entry.route,
-        role: 'tab',
-        className: 'dsh-model-allowance-tab',
-        'data-active': active ? 'true' : 'false',
-        'aria-selected': active ? 'true' : 'false',
-        'aria-label': name,
-        title: name,
-        style: { '--provider-mark': mark.color },
-        onClick: () => {
-          setPicked(entry.route)
-          setMenuOpen(false)
-        },
-      },
-      providerIcon(entry.route, 14, mark),
-    )
-  }
-
-  /**
-   * Move focus through the provider strip with the arrow keys.
-   *
-   * A `role="tablist"` is expected to support roving focus; without this the
-   * strip is only reachable with Tab, which skips the marks once a menu opens.
-   */
-  const onTabKeyDown = (event) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-    const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')]
-    if (tabs.length === 0) return
-    const index = tabs.indexOf(document.activeElement)
-    const next =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? tabs.length - 1
-          : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length
-    event.preventDefault()
-    tabs[next]?.focus()
-  }
-
   return h(
     'div',
     {
@@ -890,537 +350,31 @@ export function BalanceBadge(props) {
         : null,
     ),
     open
-      ? h(
-          'div',
-          {
-            className: 'dsh-model-allowance-panel',
-            id: 'dsh-model-allowance-panel',
-            role: 'dialog',
-            'aria-label': t('detail.title'),
-          },
-          // With more than one readable provider the card opens a switcher;
-          // with one there is nothing to switch, so it just names it.
-          available.length > 1
-            ? h(
-                // The clipping strip and the menu are siblings: the strip
-                // hides what does not fit, and the menu would be clipped
-                // with it if it lived inside.
-                'div',
-                { className: 'dsh-model-allowance-switcher-wrap' },
-                h(
-                  'div',
-                  {
-                    ref: stripRef,
-                    className: 'dsh-model-allowance-switcher',
-                    role: 'tablist',
-                    'aria-label': t('detail.provider'),
-                    onKeyDown: onTabKeyDown,
-                  },
-                  ...shown.map(markButton),
-                  overflow.length > 0
-                    ? h(
-                        'button',
-                        {
-                          type: 'button',
-                          className: 'dsh-model-allowance-more',
-                          'aria-haspopup': 'menu',
-                          'aria-expanded': menuOpen ? 'true' : 'false',
-                          'aria-label': t('detail.moreProviders'),
-                          title: t('detail.moreProviders'),
-                          onClick: () => setMenuOpen((value) => !value),
-                        },
-                        '⋯',
-                      )
-                    : null,
-                ),
-                menuOpen && overflow.length > 0
-                  ? h(
-                      'div',
-                      { className: 'dsh-model-allowance-menu', role: 'menu' },
-                      ...overflow.map((entry) =>
-                        h(
-                          'button',
-                          {
-                            type: 'button',
-                            key: entry.route,
-                            role: 'menuitem',
-                            className: 'dsh-model-allowance-menu-item',
-                            onClick: () => {
-                              setPicked(entry.route)
-                              setMenuOpen(false)
-                            },
-                          },
-                          h(
-                            'span',
-                            {
-                              className: 'dsh-model-allowance-menu-mark',
-                              style: { '--provider-mark': markFor(entry.route).color },
-                            },
-                            providerIcon(entry.route, 11, markFor(entry.route)),
-                          ),
-                          h('span', null, nameOf(entry.route)),
-                        ),
-                      ),
-                    )
-                  : null,
-              )
-            : h(
-                'div',
-                { className: 'dsh-model-allowance-row' },
-                h('span', null, t('detail.provider')),
-                h('span', null, nameOf(activeProvider)),
-              ),
-          view?.kind === 'amount' && typeof view.amount === 'number'
-            ? h(
-                'div',
-                { className: 'dsh-model-allowance-row' },
-                h('span', null, t('detail.amount')),
-                h('span', null, formatAmount(view.amount, view.currency)),
-              )
-            : null,
-          // A metered plan reports one block per window. Each shows how much
-          // of its allowance is spent as one bar you can read at a glance,
-          // then when it comes back.
-          ...(Array.isArray(view?.windows) && view.windows.length > 0
-            ? view.windows.map((window, index) => {
-                const consumed = windowUsedPercent(window)
-                const percent =
-                  consumed === undefined ? undefined : Math.max(0, Math.round(consumed))
-                const filled = consumed === undefined ? 0 : Math.min(100, Math.max(0, consumed))
-                const usage = windowUsage(window, t)
-                return h(
-                  'div',
-                  {
-                    className: 'dsh-model-allowance-window',
-                    key: `w-${String(index)}`,
-                    // The first block needs no divider: the switcher above
-                    // it already ends in one, and a bare provider row does
-                    // not deserve a line either. Only the boundaries
-                    // *between* windows are drawn.
-                    'data-first': index === 0 ? 'true' : undefined,
-                  },
-                  h(
-                    'div',
-                    { className: 'dsh-model-allowance-window-head' },
-                    h(
-                      'span',
-                      { className: 'dsh-model-allowance-window-title' },
-                      windowTitle(window, t),
-                    ),
-                    // Countable units sit beside the title; a plan that
-                    // reports only a percentage has none to show.
-                    usage === undefined
-                      ? null
-                      : h('span', { className: 'dsh-model-allowance-usage' }, usage),
-                  ),
-                  percent === undefined
-                    ? null
-                    : h(
-                        'div',
-                        { className: 'dsh-model-allowance-percent' },
-                        t('window.usedPercent', { percent }),
-                      ),
-                  percent === undefined
-                    ? null
-                    : h(
-                        'div',
-                        {
-                          className: 'dsh-model-allowance-bar',
-                          role: 'progressbar',
-                          'aria-valuenow': percent,
-                          'aria-valuemin': 0,
-                          'aria-valuemax': 100,
-                          'aria-valuetext': t('window.usedPercent', { percent }),
-                        },
-                        h('div', {
-                          className: 'dsh-model-allowance-bar-fill',
-                          'data-tone': barTone(percent),
-                          style: { width: `${String(filled)}%` },
-                        }),
-                      ),
-                  // A window with zero usage has not started its rolling timer
-                  // yet, so the countdown would be misleading. Hide it until
-                  // consumption begins.
-                  typeof window.resetAt === 'number' &&
-                    (typeof window.remainingPercent !== 'number' || window.remainingPercent < 100)
-                    ? h(
-                        'div',
-                        { className: 'dsh-model-allowance-foot' },
-                        h(
-                          'span',
-                          null,
-                          t('window.resetIn', {
-                            duration: formatCountdown(window.resetAt - now),
-                          }),
-                        ),
-                        h('span', null, formatResetAt(window.resetAt)),
-                      )
-                    : null,
-                )
-              })
-            : []),
-          // A single scalar reading has no windows to break down.
-          !Array.isArray(view?.windows) && typeof view?.remainingMs === 'number'
-            ? h(
-                'div',
-                { className: 'dsh-model-allowance-row' },
-                h('span', null, t('detail.remaining')),
-                h('span', null, formatDuration(view.remainingMs, t)),
-              )
-            : null,
-          !Array.isArray(view?.windows) && typeof view?.remaining === 'number'
-            ? h(
-                'div',
-                { className: 'dsh-model-allowance-row' },
-                h('span', null, t('detail.remaining')),
-                h('span', null, String(view.remaining)),
-              )
-            : null,
-          !Array.isArray(view?.windows) && typeof view?.total === 'number'
-            ? h(
-                'div',
-                { className: 'dsh-model-allowance-row' },
-                h('span', null, t('detail.total')),
-                h('span', null, String(view.total)),
-              )
-            : null,
-          view?.status === 'failed'
-            ? h(
-                'div',
-                { className: 'dsh-model-allowance-error' },
-                t('detail.error'),
-                // The Host reports why a reading failed; showing it is what
-                // turns "it does not work" into something actionable.
-                view.error
-                  ? h('div', { className: 'dsh-model-allowance-reason' }, view.error)
-                  : null,
-              )
-            : null,
-          view?.status === 'unsupported'
-            ? h(
-                'div',
-                { className: 'dsh-model-allowance-reason' },
-                t('badge.unsupportedWithName', { name: nameOf(activeProvider) }),
-              )
-            : null,
-          view?.status === 'unconfigured'
-            ? h('div', { className: 'dsh-model-allowance-reason' }, t('badge.unconfigured'))
-            : null,
-          // A vendor that prices by the wall clock gets its phase and
-          // countdown here, above the footer.
-          schedule && schedule.provider === activeProvider ? scheduleView(schedule, now, t) : null,
-          h(
-            'div',
-            { className: 'dsh-model-allowance-actions' },
-            // The platform status sits at the left edge of the footer, on
-            // the same line as the reading time: the card gains no extra
-            // row, and the state and the source page stay together.
-            h(
-              'span',
-              { className: 'dsh-model-allowance-status-wrap' },
-              h(
-                currentStatus?.url ? 'a' : 'span',
-                {
-                  className: 'dsh-model-allowance-status',
-                  'data-state': serviceState,
-                  ...(currentStatus?.url
-                    ? {
-                        href: currentStatus.url,
-                        target: '_blank',
-                        rel: 'noreferrer noopener',
-                      }
-                    : {}),
-                },
-                h('span', {
-                  className: 'dsh-model-allowance-status-dot',
-                  'aria-hidden': true,
-                }),
-                h(
-                  'span',
-                  { className: 'dsh-model-allowance-status-label' },
-                  statusLabel(serviceState, t),
-                ),
-                ...(currentStatus?.url
-                  ? [
-                      h(
-                        'span',
-                        {
-                          className: 'dsh-model-allowance-status-arrow',
-                          'aria-hidden': true,
-                        },
-                        '↗',
-                      ),
-                    ]
-                  : []),
-              ),
-              // The reason is a warning mark rather than another line:
-              // the footer stays one row, and the detail is one hover
-              // — or one keyboard focus — away.
-              currentStatus?.summary
-                ? h(
-                    'span',
-                    {
-                      className: 'dsh-model-allowance-status-help',
-                      tabIndex: 0,
-                      role: 'note',
-                      'aria-label': currentStatus.summary,
-                    },
-                    h(
-                      'span',
-                      {
-                        'aria-hidden': true,
-                      },
-                      '!',
-                    ),
-                    h(
-                      'span',
-                      { className: 'dsh-model-allowance-status-tip', role: 'tooltip' },
-                      currentStatus.summary,
-                    ),
-                  )
-                : null,
-            ),
-            view?.updatedAt
-              ? h(
-                  'span',
-                  { className: 'dsh-model-allowance-updated' },
-                  t('detail.updatedAt', { time: formatClock(view.updatedAt) }),
-                )
-              : null,
-            h(
-              'button',
-              {
-                type: 'button',
-                className: 'dsh-model-allowance-icon-button',
-                onClick: refresh,
-                disabled: refreshing,
-                title: refreshing ? t('detail.refreshing') : t('detail.refresh'),
-                'aria-label': refreshing ? t('detail.refreshing') : t('detail.refresh'),
-              },
-              refreshGlyph(16),
-            ),
-            view?.consoleUrl
-              ? h(
-                  'a',
-                  {
-                    className: 'dsh-model-allowance-icon-button',
-                    href: view.consoleUrl,
-                    target: '_blank',
-                    rel: 'noreferrer noopener',
-                    title: t('detail.console'),
-                    'aria-label': t('detail.console'),
-                  },
-                  consoleGlyph(16),
-                )
-              : null,
-            // The switch to another model of this provider. It sits to the
-            // right of the console link, which is the last thing the footer
-            // offered before, so the two never trade places.
-            canSwitch
-              ? h(
-                  'span',
-                  { ref: modelWrapRef, className: 'dsh-model-allowance-model-wrap' },
-                  h(
-                    'button',
-                    {
-                      type: 'button',
-                      className: 'dsh-model-allowance-icon-button',
-                      'aria-haspopup': 'menu',
-                      'aria-expanded': modelMenuOpen ? 'true' : 'false',
-                      // The vendor in use paints the glyph in its own
-                      // colour, so the button says which vendor the card is
-                      // on instead of the strip having to say it twice.
-                      'data-in-use': inUse ? 'true' : 'false',
-                      style: { '--provider-mark': markFor(activeProvider).color },
-                      title: switchLabel,
-                      'aria-label': switchLabel,
-                      onClick: () => {
-                        setModelError(null)
-                        // Every open of the list starts with the flyout
-                        // closed.
-                        clearTimeout(hoverModelTimer.current)
-                        setHoverModel(null)
-                        setModelMenuOpen((value) => !value)
-                      },
-                    },
-                    modelGlyph(16),
-                  ),
-                  modelMenuOpen
-                    ? h(
-                        'div',
-                        {
-                          className: 'dsh-model-allowance-model-menu',
-                          role: 'menu',
-                          'aria-label': t('model.title'),
-                        },
-                        shownModelListState === 'loading'
-                          ? h(
-                              'div',
-                              { className: 'dsh-model-allowance-model-message' },
-                              t('model.loading'),
-                            )
-                          : null,
-                        shownModelListState === 'empty'
-                          ? h(
-                              'div',
-                              { className: 'dsh-model-allowance-model-message' },
-                              t('model.empty'),
-                            )
-                          : null,
-                        shownModelListState === 'error'
-                          ? h(
-                              'div',
-                              {
-                                className: 'dsh-model-allowance-model-message',
-                                'data-tone': 'error',
-                              },
-                              modelError ?? t('model.unavailable'),
-                            )
-                          : null,
-                        ...shownModelList.map((model) => {
-                          const isCurrent = model.id === currentModel
-                          // A model that takes a reasoning effort carries an
-                          // arrow and offers its choices in a flyout on
-                          // hover; a click takes the model at its default
-                          // effort. Every other model switches on the click
-                          // it already had.
-                          const efforts = effortChoices(model)
-                          const defaultEffortId = efforts?.find((effort) => effort.isDefault)?.id
-                          return h(
-                            'button',
-                            {
-                              type: 'button',
-                              key: model.id,
-                              role: 'menuitemradio',
-                              'aria-checked': isCurrent ? 'true' : 'false',
-                              'data-current': isCurrent ? 'true' : 'false',
-                              className: 'dsh-model-allowance-model-item',
-                              disabled: switchingModel !== null,
-                              title: model.id,
-                              ...(efforts === null ? {} : { 'aria-haspopup': 'menu' }),
-                              onClick: () => {
-                                void switchToModel(model, defaultEffortId)
-                              },
-                              ...(efforts === null
-                                ? {}
-                                : {
-                                    onMouseEnter: (event) => {
-                                      const wrap = modelWrapRef.current
-                                      if (!wrap) return
-                                      const top =
-                                        event.currentTarget.getBoundingClientRect().top -
-                                        wrap.getBoundingClientRect().top
-                                      showEffortFlyout(model, top)
-                                    },
-                                    onMouseLeave: () => {
-                                      scheduleEffortFlyoutClose(model.id)
-                                    },
-                                  }),
-                            },
-                            h(
-                              'span',
-                              { className: 'dsh-model-allowance-model-name' },
-                              model.name ?? model.id,
-                            ),
-                            h(
-                              'span',
-                              { className: 'dsh-model-allowance-model-side' },
-                              switchingModel === model.id
-                                ? h(
-                                    'span',
-                                    { className: 'dsh-model-allowance-model-note' },
-                                    t('model.switching'),
-                                  )
-                                : isCurrent
-                                  ? h(
-                                      'span',
-                                      { className: 'dsh-model-allowance-model-note' },
-                                      t('model.current'),
-                                    )
-                                  : null,
-                              efforts === null
-                                ? null
-                                : h(
-                                    'span',
-                                    {
-                                      className: 'dsh-model-allowance-model-arrow',
-                                      'aria-hidden': true,
-                                    },
-                                    '›',
-                                  ),
-                            ),
-                          )
-                        }),
-                        // A failed switch keeps the list open and says why.
-                        modelError && shownModelListState !== 'error'
-                          ? h(
-                              'div',
-                              {
-                                className: 'dsh-model-allowance-model-message',
-                                'data-tone': 'error',
-                              },
-                              modelError,
-                            )
-                          : null,
-                      )
-                    : null,
-                  // The effort flyout is a sibling of the list, not a
-                  // child: the list scrolls, and a nested panel would be
-                  // clipped by it. Sharing the hover with the row keeps
-                  // it open while the pointer crosses over.
-                  modelMenuOpen && hoverModel !== null && shownModelList.includes(hoverModel.model)
-                    ? h(
-                        'div',
-                        {
-                          className: 'dsh-model-allowance-effort-menu',
-                          role: 'menu',
-                          'aria-label': t('model.title'),
-                          style: { top: `${hoverModel.top}px` },
-                          onMouseEnter: () => {
-                            clearTimeout(hoverModelTimer.current)
-                          },
-                          onMouseLeave: () => {
-                            scheduleEffortFlyoutClose(hoverModel.model.id)
-                          },
-                        },
-                        ...effortChoices(hoverModel.model).map((effort) => {
-                          const isCurrentEffort =
-                            hoverModel.model.id === currentModel && effort.id === selectedEffort
-                          return h(
-                            'button',
-                            {
-                              type: 'button',
-                              key: effort.id ?? 'provider-default',
-                              role: 'menuitemradio',
-                              'aria-checked': isCurrentEffort ? 'true' : 'false',
-                              'data-current': isCurrentEffort ? 'true' : 'false',
-                              'data-default': effort.isDefault ? 'true' : 'false',
-                              className: 'dsh-model-allowance-effort-item',
-                              disabled: switchingModel !== null,
-                              onClick: () => {
-                                void switchToModel(hoverModel.model, effort.id)
-                              },
-                            },
-                            h(
-                              'span',
-                              { className: 'dsh-model-allowance-model-name' },
-                              effort.providerDefault ? t('model.effortDefault') : effort.name,
-                            ),
-                            effort.isDefault && !isCurrentEffort
-                              ? h(
-                                  'span',
-                                  { className: 'dsh-model-allowance-model-note' },
-                                  t('model.effortDefault'),
-                                )
-                              : null,
-                          )
-                        }),
-                      )
-                    : null,
-                )
-              : null,
-          ),
-        )
+      ? h(BalancePanel, {
+          t,
+          now,
+          view,
+          activeProvider,
+          available,
+          schedule,
+          currentStatus,
+          serviceState,
+          refresh,
+          refreshing,
+          canSwitch,
+          inUse,
+          switchLabel,
+          selectedEffort,
+          setPicked,
+          nameOf,
+          markFor,
+          catalog,
+          menuOpen,
+          setMenuOpen,
+          stripWidth,
+          setStripWidth,
+          stripRef,
+        })
       : null,
   )
 }

@@ -67,6 +67,7 @@
     "typecheck": "tsc --noEmit",
     "prepack": "npm run build"
   },
+  "packageManager": "pnpm@12.10.1",
   "devDependencies": {
     "@biomejs/biome": "^2.6.5",
     "@deepseek-ai/cordis": "^4.1.0",

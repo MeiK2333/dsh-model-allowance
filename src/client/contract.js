@@ -114,6 +114,8 @@ export function createBalanceContribution() {
       name: z.object({ zh: z.string().optional(), en: z.string().optional() }).optional(),
       color: z.string().optional(),
       iconHint: z.string().optional(),
+      aliases: z.array(z.string()).optional(),
+      modelRoutes: z.array(z.string()).optional(),
     }),
   )
   return {

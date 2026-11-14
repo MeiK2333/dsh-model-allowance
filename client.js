@@ -42,11 +42,14 @@ __export(index_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(index_exports);
-var import_react4 = require("react");
+var import_react8 = require("react");
 
 // src/client/badge.js
-var React = __toESM(require("react"), 1);
-var import_react3 = require("react");
+var React6 = __toESM(require("react"), 1);
+var import_react7 = require("react");
+
+// src/client/components/balance-panel.js
+var import_react6 = require("react");
 
 // src/client/format.js
 var CURRENCY_SYMBOLS = {
@@ -559,96 +562,6 @@ function statusLabel(state, t) {
   return key === void 0 ? t("status.unknown") : t(key);
 }
 
-// src/client/models.js
-function providerGroup(catalog, provider) {
-  const groups = Array.isArray(catalog?.groups) ? catalog.groups : [];
-  return groups.find((group) => group?.id === provider);
-}
-function modelsForProvider(catalog, provider) {
-  const group = providerGroup(catalog, provider);
-  const models = Array.isArray(group?.models) ? group.models : [];
-  return models.filter((model) => typeof model?.id === "string" && model.id !== "");
-}
-function providerModelGroup(catalog, routes) {
-  const seen = /* @__PURE__ */ new Set();
-  for (const route of routes) {
-    if (typeof route !== "string" || route === "" || seen.has(route)) continue;
-    seen.add(route);
-    const models = modelsForProvider(catalog, route);
-    if (models.length > 0) return { provider: route, models };
-  }
-  return void 0;
-}
-function effortChoices(model) {
-  const reasoning = model?.reasoning;
-  const efforts = Array.isArray(reasoning?.efforts) ? reasoning.efforts : [];
-  if (efforts.length === 0) return null;
-  const entries = efforts.filter((effort) => typeof effort?.id === "string" && effort.id !== "").map((effort) => ({
-    id: effort.id,
-    name: typeof effort.name === "string" && effort.name !== "" ? effort.name : effort.id,
-    isDefault: effort.id === reasoning.defaultEffort
-  }));
-  if (reasoning.defaultEffort === void 0) {
-    entries.unshift({ id: void 0, providerDefault: true });
-  }
-  return entries;
-}
-function currentModelFor(selection, provider) {
-  const next = selection?.next ?? selection?.lastUsed;
-  if (next?.provider !== provider) return void 0;
-  return typeof next.model === "string" ? next.model : void 0;
-}
-
-// src/client/namespace.js
-var balanceNamespace = null;
-var settleBalanceNamespace;
-var balanceNamespaceReady = new Promise((resolve) => {
-  settleBalanceNamespace = resolve;
-});
-async function getBalanceApi() {
-  if (balanceNamespace) return balanceNamespace;
-  return await balanceNamespaceReady;
-}
-function lookupBalanceNamespace(ctx) {
-  try {
-    return ctx.get("remote.balance");
-  } catch {
-    return void 0;
-  }
-}
-function setBalanceNamespace(value) {
-  balanceNamespace = value;
-  settleBalanceNamespace(value);
-  return value;
-}
-var modelSupport;
-function resetBalanceNamespace() {
-  balanceNamespace = null;
-  modelSupport = void 0;
-}
-function lookupSessionFace(ctx) {
-  try {
-    const face = ctx.get("remote.session");
-    if (face !== void 0) return face;
-  } catch {
-  }
-  return ctx.remote?.session;
-}
-async function supportsModel(api) {
-  if (modelSupport !== void 0) return modelSupport;
-  if (typeof api?.capabilities !== "function") {
-    modelSupport = false;
-    return modelSupport;
-  }
-  try {
-    const result = await api.capabilities();
-    modelSupport = result?.ok === true && result.value?.modelScoped === true;
-  } catch {
-    modelSupport = false;
-  }
-  return modelSupport;
-}
-
 // src/client/schedule.js
 var import_react2 = require("react");
 function formatCountdown(ms) {
@@ -841,6 +754,1105 @@ function scheduleView(schedule, now, t) {
       })
     )
   );
+}
+
+// src/client/windows.js
+function windowTitle(window, t) {
+  const label = window.label?.[activeLanguage()] ?? window.label?.en ?? window.label?.zh;
+  if (typeof label === "string" && label !== "") return label;
+  if (window.unit === "hour" && window.count) {
+    return t("window.title.hour", { count: window.count });
+  }
+  if (window.unit === "week") return t("window.title.week");
+  if (window.unit === "day" && window.count === 7) return t("window.title.week");
+  if (window.unit === "day" && window.count) {
+    return t("window.title.day", { count: window.count });
+  }
+  if (window.unit === "month") return t("window.title.month");
+  return t("window.title.unknown");
+}
+function windowUsedPercent(window) {
+  if (typeof window.remainingPercent === "number") return 100 - window.remainingPercent;
+  if (typeof window.used === "number" && typeof window.total === "number" && window.total > 0) {
+    return window.used / window.total * 100;
+  }
+  return void 0;
+}
+var UNIT_MS = {
+  hour: 36e5,
+  day: 864e5,
+  week: 7 * 864e5,
+  month: 30 * 864e5
+};
+function shortestWindow(windows) {
+  let shortest;
+  let shortestMs = Number.POSITIVE_INFINITY;
+  for (const window of windows) {
+    if (typeof window.remainingPercent !== "number") continue;
+    const unit = UNIT_MS[window.unit];
+    if (unit === void 0) continue;
+    const count = typeof window.count === "number" && window.count > 0 ? window.count : 1;
+    const lengthMs = unit * count;
+    if (lengthMs < shortestMs) {
+      shortest = window;
+      shortestMs = lengthMs;
+    }
+  }
+  return shortest;
+}
+function windowUsage(window, t) {
+  if (typeof window.total !== "number" || typeof window.used !== "number") return void 0;
+  return t("window.usedOfTotal", {
+    used: formatNumber(window.used),
+    total: formatNumber(window.total)
+  });
+}
+function barTone(percent) {
+  if (percent >= 85) return "error";
+  if (percent >= 60) return "warn";
+  return "ok";
+}
+
+// src/client/components/effort-flyout.js
+var import_react3 = require("react");
+
+// src/client/models.js
+function providerGroup(catalog, provider) {
+  const groups = Array.isArray(catalog?.groups) ? catalog.groups : [];
+  return groups.find((group) => group?.id === provider);
+}
+function modelsForProvider(catalog, provider) {
+  const group = providerGroup(catalog, provider);
+  const models = Array.isArray(group?.models) ? group.models : [];
+  return models.filter((model) => typeof model?.id === "string" && model.id !== "");
+}
+function providerModelGroup(catalog, routes) {
+  const seen = /* @__PURE__ */ new Set();
+  for (const route of routes) {
+    if (typeof route !== "string" || route === "" || seen.has(route)) continue;
+    seen.add(route);
+    const models = modelsForProvider(catalog, route);
+    if (models.length > 0) return { provider: route, models };
+  }
+  return void 0;
+}
+function effortChoices(model) {
+  const reasoning = model?.reasoning;
+  const efforts = Array.isArray(reasoning?.efforts) ? reasoning.efforts : [];
+  if (efforts.length === 0) return null;
+  const entries = efforts.filter((effort) => typeof effort?.id === "string" && effort.id !== "").map((effort) => ({
+    id: effort.id,
+    name: typeof effort.name === "string" && effort.name !== "" ? effort.name : effort.id,
+    isDefault: effort.id === reasoning.defaultEffort
+  }));
+  if (reasoning.defaultEffort === void 0) {
+    entries.unshift({ id: void 0, providerDefault: true });
+  }
+  return entries;
+}
+function currentModelFor(selection, provider) {
+  const next = selection?.next ?? selection?.lastUsed;
+  if (next?.provider !== provider) return void 0;
+  return typeof next.model === "string" ? next.model : void 0;
+}
+
+// src/client/components/effort-flyout.js
+function EffortFlyout({
+  t,
+  hoverModel,
+  currentModel,
+  selectedEffort,
+  switchingModel,
+  switchToModel,
+  keepEffortFlyout,
+  scheduleEffortFlyoutClose
+}) {
+  return (0, import_react3.createElement)(
+    "div",
+    {
+      className: "dsh-model-allowance-effort-menu",
+      role: "menu",
+      "aria-label": t("model.title"),
+      style: { top: `${hoverModel.top}px` },
+      onMouseEnter: keepEffortFlyout,
+      onMouseLeave: () => {
+        scheduleEffortFlyoutClose(hoverModel.model.id);
+      }
+    },
+    ...effortChoices(hoverModel.model).map((effort) => {
+      const isCurrentEffort = hoverModel.model.id === currentModel && effort.id === selectedEffort;
+      return (0, import_react3.createElement)(
+        "button",
+        {
+          type: "button",
+          key: effort.id ?? "provider-default",
+          role: "menuitemradio",
+          "aria-checked": isCurrentEffort ? "true" : "false",
+          "data-current": isCurrentEffort ? "true" : "false",
+          "data-default": effort.isDefault ? "true" : "false",
+          className: "dsh-model-allowance-effort-item",
+          disabled: switchingModel !== null,
+          onClick: () => {
+            void switchToModel(hoverModel.model, effort.id);
+          }
+        },
+        (0, import_react3.createElement)(
+          "span",
+          { className: "dsh-model-allowance-model-name" },
+          effort.providerDefault ? t("model.effortDefault") : effort.name
+        ),
+        effort.isDefault && !isCurrentEffort ? (0, import_react3.createElement)("span", { className: "dsh-model-allowance-model-note" }, t("model.effortDefault")) : null
+      );
+    })
+  );
+}
+
+// src/client/components/model-menu.js
+var import_react4 = require("react");
+function ModelMenu({
+  t,
+  models,
+  state,
+  modelError,
+  currentModel,
+  switchingModel,
+  switchToModel,
+  modelWrapRef,
+  showEffortFlyout,
+  scheduleEffortFlyoutClose
+}) {
+  return (0, import_react4.createElement)(
+    "div",
+    {
+      className: "dsh-model-allowance-model-menu",
+      role: "menu",
+      "aria-label": t("model.title")
+    },
+    state === "loading" ? (0, import_react4.createElement)("div", { className: "dsh-model-allowance-model-message" }, t("model.loading")) : null,
+    state === "empty" ? (0, import_react4.createElement)("div", { className: "dsh-model-allowance-model-message" }, t("model.empty")) : null,
+    state === "error" ? (0, import_react4.createElement)(
+      "div",
+      {
+        className: "dsh-model-allowance-model-message",
+        "data-tone": "error"
+      },
+      modelError ?? t("model.unavailable")
+    ) : null,
+    ...models.map((model) => {
+      const isCurrent = model.id === currentModel;
+      const efforts = effortChoices(model);
+      const defaultEffortId = efforts?.find((effort) => effort.isDefault)?.id;
+      return (0, import_react4.createElement)(
+        "button",
+        {
+          type: "button",
+          key: model.id,
+          role: "menuitemradio",
+          "aria-checked": isCurrent ? "true" : "false",
+          "data-current": isCurrent ? "true" : "false",
+          className: "dsh-model-allowance-model-item",
+          disabled: switchingModel !== null,
+          title: model.id,
+          ...efforts === null ? {} : { "aria-haspopup": "menu" },
+          onClick: () => {
+            void switchToModel(model, defaultEffortId);
+          },
+          ...efforts === null ? {} : {
+            onMouseEnter: (event) => {
+              const wrap = modelWrapRef.current;
+              if (!wrap) return;
+              const top = event.currentTarget.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
+              showEffortFlyout(model, top);
+            },
+            onMouseLeave: () => {
+              scheduleEffortFlyoutClose(model.id);
+            }
+          }
+        },
+        (0, import_react4.createElement)("span", { className: "dsh-model-allowance-model-name" }, model.name ?? model.id),
+        (0, import_react4.createElement)(
+          "span",
+          { className: "dsh-model-allowance-model-side" },
+          switchingModel === model.id ? (0, import_react4.createElement)("span", { className: "dsh-model-allowance-model-note" }, t("model.switching")) : isCurrent ? (0, import_react4.createElement)("span", { className: "dsh-model-allowance-model-note" }, t("model.current")) : null,
+          efforts === null ? null : (0, import_react4.createElement)(
+            "span",
+            {
+              className: "dsh-model-allowance-model-arrow",
+              "aria-hidden": true
+            },
+            "\u203A"
+          )
+        )
+      );
+    }),
+    // A failed switch keeps the list open and says why.
+    modelError && state !== "error" ? (0, import_react4.createElement)(
+      "div",
+      {
+        className: "dsh-model-allowance-model-message",
+        "data-tone": "error"
+      },
+      modelError
+    ) : null
+  );
+}
+
+// src/client/components/provider-strip.js
+var React2 = __toESM(require("react"), 1);
+var import_react5 = require("react");
+
+// src/client/hooks/use-provider-directory.js
+var React = __toESM(require("react"), 1);
+
+// src/client/namespace.js
+var balanceNamespace = null;
+var settleBalanceNamespace;
+var balanceNamespaceReady = new Promise((resolve) => {
+  settleBalanceNamespace = resolve;
+});
+async function getBalanceApi() {
+  if (balanceNamespace) return balanceNamespace;
+  return await balanceNamespaceReady;
+}
+function lookupBalanceNamespace(ctx) {
+  try {
+    return ctx.get("remote.balance");
+  } catch {
+    return void 0;
+  }
+}
+function setBalanceNamespace(value) {
+  balanceNamespace = value;
+  settleBalanceNamespace(value);
+  return value;
+}
+var modelSupport;
+function resetBalanceNamespace() {
+  balanceNamespace = null;
+  modelSupport = void 0;
+}
+function lookupSessionFace(ctx) {
+  try {
+    const face = ctx.get("remote.session");
+    if (face !== void 0) return face;
+  } catch {
+  }
+  return ctx.remote?.session;
+}
+async function supportsModel(api) {
+  if (modelSupport !== void 0) return modelSupport;
+  if (typeof api?.capabilities !== "function") {
+    modelSupport = false;
+    return modelSupport;
+  }
+  try {
+    const result = await api.capabilities();
+    modelSupport = result?.ok === true && result.value?.modelScoped === true;
+  } catch {
+    modelSupport = false;
+  }
+  return modelSupport;
+}
+
+// src/client/hooks/use-provider-directory.js
+function entryCovers(entry, route) {
+  if (entry === void 0 || entry === null) return false;
+  if (entry.route === route) return true;
+  return Array.isArray(entry.aliases) && entry.aliases.includes(route);
+}
+function useProviderDirectory(selected) {
+  const [directory, setDirectory] = React.useState([]);
+  const [defaultProvider, setDefaultProvider] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const api = await getBalanceApi();
+        if (!api || typeof api.list !== "function") return;
+        const result = await api.list();
+        if (cancelled || !result.ok) return;
+        setDirectory(result.value);
+      } catch (error) {
+        console.error("[model-allowance] listing providers failed", { error });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  React.useEffect(() => {
+    if (selected !== null) return void 0;
+    let cancelled = false;
+    (async () => {
+      try {
+        const api = await getBalanceApi();
+        if (!api || typeof api.defaultProvider !== "function") return;
+        const result = await api.defaultProvider();
+        if (cancelled || result?.ok !== true) return;
+        const provider = result.value?.provider;
+        if (typeof provider === "string" && provider !== "") setDefaultProvider(provider);
+      } catch (error) {
+        console.error("[model-allowance] reading the default provider failed", { error });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
+  const available = directory.filter((entry) => entry.configured);
+  const entryOf = React.useCallback(
+    (route) => directory.find((entry) => entryCovers(entry, route)),
+    [directory]
+  );
+  const nameOf = React.useCallback((route) => pickName(entryOf(route), route), [entryOf]);
+  return { available, defaultProvider, entryOf, nameOf };
+}
+
+// src/client/components/provider-strip.js
+function splitStrip(entries, stripWidth, activeProvider) {
+  const MARK_SIZE = 26;
+  const MARK_GAP = 4;
+  const MENU_SIZE = 26;
+  const perMark = MARK_SIZE + MARK_GAP;
+  let visibleCount = entries.length;
+  if (stripWidth > 0 && entries.length * perMark - MARK_GAP > stripWidth) {
+    visibleCount = Math.max(1, Math.floor((stripWidth - MENU_SIZE - MARK_GAP) / perMark));
+    visibleCount = Math.min(visibleCount, entries.length - 1);
+  }
+  let shown = entries.slice(0, visibleCount);
+  let overflow = entries.slice(visibleCount);
+  const activeIndex = overflow.findIndex((entry) => entryCovers(entry, activeProvider));
+  if (activeIndex >= 0 && shown.length > 0) {
+    const displaced = shown[shown.length - 1];
+    shown = [...shown.slice(0, -1), overflow[activeIndex]];
+    overflow = [...overflow.slice(0, activeIndex), displaced, ...overflow.slice(activeIndex + 1)];
+  }
+  return { shown, overflow };
+}
+function ProviderStrip({
+  t,
+  available,
+  activeProvider,
+  markFor,
+  nameOf,
+  onPick,
+  menuOpen,
+  setMenuOpen,
+  stripWidth,
+  setStripWidth,
+  stripRef
+}) {
+  React2.useEffect(() => {
+    const node = stripRef.current;
+    if (!node) return;
+    const measure = () => setStripWidth(node.clientWidth ?? 0);
+    measure();
+    if (typeof ResizeObserver !== "function") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [setStripWidth]);
+  const { shown, overflow } = splitStrip(available, stripWidth, activeProvider);
+  const markButton = (entry) => {
+    const mark = markFor(entry.route);
+    const name = nameOf(entry.route);
+    const active = entryCovers(entry, activeProvider);
+    return (0, import_react5.createElement)(
+      "button",
+      {
+        type: "button",
+        key: entry.route,
+        role: "tab",
+        className: "dsh-model-allowance-tab",
+        "data-active": active ? "true" : "false",
+        "aria-selected": active ? "true" : "false",
+        "aria-label": name,
+        title: name,
+        style: { "--provider-mark": mark.color },
+        onClick: () => {
+          onPick(entry.route);
+          setMenuOpen(false);
+        }
+      },
+      providerIcon(entry.route, 14, mark)
+    );
+  };
+  const onTabKeyDown = (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+    if (tabs.length === 0) return;
+    const index = tabs.indexOf(document.activeElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    event.preventDefault();
+    tabs[next]?.focus();
+  };
+  return (0, import_react5.createElement)(
+    "div",
+    { className: "dsh-model-allowance-switcher-wrap" },
+    (0, import_react5.createElement)(
+      "div",
+      {
+        ref: stripRef,
+        className: "dsh-model-allowance-switcher",
+        role: "tablist",
+        "aria-label": t("detail.provider"),
+        onKeyDown: onTabKeyDown
+      },
+      ...shown.map(markButton),
+      overflow.length > 0 ? (0, import_react5.createElement)(
+        "button",
+        {
+          type: "button",
+          className: "dsh-model-allowance-more",
+          "aria-haspopup": "menu",
+          "aria-expanded": menuOpen ? "true" : "false",
+          "aria-label": t("detail.moreProviders"),
+          title: t("detail.moreProviders"),
+          onClick: () => setMenuOpen((value) => !value)
+        },
+        "\u22EF"
+      ) : null
+    ),
+    menuOpen && overflow.length > 0 ? (0, import_react5.createElement)(
+      "div",
+      { className: "dsh-model-allowance-menu", role: "menu" },
+      ...overflow.map(
+        (entry) => (0, import_react5.createElement)(
+          "button",
+          {
+            type: "button",
+            key: entry.route,
+            role: "menuitem",
+            className: "dsh-model-allowance-menu-item",
+            onClick: () => {
+              onPick(entry.route);
+              setMenuOpen(false);
+            }
+          },
+          (0, import_react5.createElement)(
+            "span",
+            {
+              className: "dsh-model-allowance-menu-mark",
+              style: { "--provider-mark": markFor(entry.route).color }
+            },
+            providerIcon(entry.route, 11, markFor(entry.route))
+          ),
+          (0, import_react5.createElement)("span", null, nameOf(entry.route))
+        )
+      )
+    ) : null
+  );
+}
+
+// src/client/components/balance-panel.js
+function BalancePanel({
+  t,
+  now,
+  view,
+  activeProvider,
+  available,
+  schedule,
+  currentStatus,
+  serviceState,
+  refresh,
+  refreshing,
+  canSwitch,
+  inUse,
+  switchLabel,
+  selectedEffort,
+  setPicked,
+  nameOf,
+  markFor,
+  catalog,
+  menuOpen,
+  setMenuOpen,
+  stripWidth,
+  setStripWidth,
+  stripRef
+}) {
+  return (0, import_react6.createElement)(
+    "div",
+    {
+      className: "dsh-model-allowance-panel",
+      id: "dsh-model-allowance-panel",
+      role: "dialog",
+      "aria-label": t("detail.title")
+    },
+    // With more than one readable provider the card opens a switcher;
+    // with one there is nothing to switch, so it just names it.
+    available.length > 1 ? (0, import_react6.createElement)(ProviderStrip, {
+      t,
+      available,
+      activeProvider,
+      markFor,
+      nameOf,
+      onPick: setPicked,
+      menuOpen,
+      setMenuOpen,
+      stripWidth,
+      setStripWidth,
+      stripRef
+    }) : (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-row" },
+      (0, import_react6.createElement)("span", null, t("detail.provider")),
+      (0, import_react6.createElement)("span", null, nameOf(activeProvider))
+    ),
+    view?.kind === "amount" && typeof view.amount === "number" ? (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-row" },
+      (0, import_react6.createElement)("span", null, t("detail.amount")),
+      (0, import_react6.createElement)("span", null, formatAmount(view.amount, view.currency))
+    ) : null,
+    ...Array.isArray(view?.windows) && view.windows.length > 0 ? view.windows.map((window, index) => {
+      const consumed = windowUsedPercent(window);
+      const percent = consumed === void 0 ? void 0 : Math.max(0, Math.round(consumed));
+      const filled = consumed === void 0 ? 0 : Math.min(100, Math.max(0, consumed));
+      const usage = windowUsage(window, t);
+      return (0, import_react6.createElement)(
+        "div",
+        {
+          className: "dsh-model-allowance-window",
+          key: `w-${String(index)}`,
+          // The first block needs no divider: the switcher above
+          // it already ends in one, and a bare provider row does
+          // not deserve a line either. Only the boundaries
+          // *between* windows are drawn.
+          "data-first": index === 0 ? "true" : void 0
+        },
+        (0, import_react6.createElement)(
+          "div",
+          { className: "dsh-model-allowance-window-head" },
+          (0, import_react6.createElement)("span", { className: "dsh-model-allowance-window-title" }, windowTitle(window, t)),
+          // Countable units sit beside the title; a plan that
+          // reports only a percentage has none to show.
+          usage === void 0 ? null : (0, import_react6.createElement)("span", { className: "dsh-model-allowance-usage" }, usage)
+        ),
+        percent === void 0 ? null : (0, import_react6.createElement)(
+          "div",
+          { className: "dsh-model-allowance-percent" },
+          t("window.usedPercent", { percent })
+        ),
+        percent === void 0 ? null : (0, import_react6.createElement)(
+          "div",
+          {
+            className: "dsh-model-allowance-bar",
+            role: "progressbar",
+            "aria-valuenow": percent,
+            "aria-valuemin": 0,
+            "aria-valuemax": 100,
+            "aria-valuetext": t("window.usedPercent", { percent })
+          },
+          (0, import_react6.createElement)("div", {
+            className: "dsh-model-allowance-bar-fill",
+            "data-tone": barTone(percent),
+            style: { width: `${String(filled)}%` }
+          })
+        ),
+        // A window with zero usage has not started its rolling timer
+        // yet, so the countdown would be misleading. Hide it until
+        // consumption begins.
+        typeof window.resetAt === "number" && (typeof window.remainingPercent !== "number" || window.remainingPercent < 100) ? (0, import_react6.createElement)(
+          "div",
+          { className: "dsh-model-allowance-foot" },
+          (0, import_react6.createElement)(
+            "span",
+            null,
+            t("window.resetIn", {
+              duration: formatCountdown(window.resetAt - now)
+            })
+          ),
+          (0, import_react6.createElement)("span", null, formatResetAt(window.resetAt))
+        ) : null
+      );
+    }) : [],
+    // A single scalar reading has no windows to break down.
+    !Array.isArray(view?.windows) && typeof view?.remainingMs === "number" ? (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-row" },
+      (0, import_react6.createElement)("span", null, t("detail.remaining")),
+      (0, import_react6.createElement)("span", null, formatDuration(view.remainingMs, t))
+    ) : null,
+    !Array.isArray(view?.windows) && typeof view?.remaining === "number" ? (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-row" },
+      (0, import_react6.createElement)("span", null, t("detail.remaining")),
+      (0, import_react6.createElement)("span", null, String(view.remaining))
+    ) : null,
+    !Array.isArray(view?.windows) && typeof view?.total === "number" ? (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-row" },
+      (0, import_react6.createElement)("span", null, t("detail.total")),
+      (0, import_react6.createElement)("span", null, String(view.total))
+    ) : null,
+    view?.status === "failed" ? (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-error" },
+      t("detail.error"),
+      // The Host reports why a reading failed; showing it is what
+      // turns "it does not work" into something actionable.
+      view.error ? (0, import_react6.createElement)("div", { className: "dsh-model-allowance-reason" }, view.error) : null
+    ) : null,
+    view?.status === "unsupported" ? (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-reason" },
+      t("badge.unsupportedWithName", { name: nameOf(activeProvider) })
+    ) : null,
+    view?.status === "unconfigured" ? (0, import_react6.createElement)("div", { className: "dsh-model-allowance-reason" }, t("badge.unconfigured")) : null,
+    // A vendor that prices by the wall clock gets its phase and
+    // countdown here, above the footer.
+    schedule && schedule.provider === activeProvider ? scheduleView(schedule, now, t) : null,
+    (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-actions" },
+      // The platform status sits at the left edge of the footer, on
+      // the same line as the reading time: the card gains no extra
+      // row, and the state and the source page stay together.
+      (0, import_react6.createElement)(
+        "span",
+        { className: "dsh-model-allowance-status-wrap" },
+        (0, import_react6.createElement)(
+          currentStatus?.url ? "a" : "span",
+          {
+            className: "dsh-model-allowance-status",
+            "data-state": serviceState,
+            ...currentStatus?.url ? {
+              href: currentStatus.url,
+              target: "_blank",
+              rel: "noreferrer noopener"
+            } : {}
+          },
+          (0, import_react6.createElement)("span", {
+            className: "dsh-model-allowance-status-dot",
+            "aria-hidden": true
+          }),
+          (0, import_react6.createElement)(
+            "span",
+            { className: "dsh-model-allowance-status-label" },
+            statusLabel(serviceState, t)
+          ),
+          ...currentStatus?.url ? [
+            (0, import_react6.createElement)(
+              "span",
+              {
+                className: "dsh-model-allowance-status-arrow",
+                "aria-hidden": true
+              },
+              "\u2197"
+            )
+          ] : []
+        ),
+        // The reason is a warning mark rather than another line:
+        // the footer stays one row, and the detail is one hover
+        // — or one keyboard focus — away.
+        currentStatus?.summary ? (0, import_react6.createElement)(
+          "span",
+          {
+            className: "dsh-model-allowance-status-help",
+            tabIndex: 0,
+            role: "note",
+            "aria-label": currentStatus.summary
+          },
+          (0, import_react6.createElement)(
+            "span",
+            {
+              "aria-hidden": true
+            },
+            "!"
+          ),
+          (0, import_react6.createElement)(
+            "span",
+            { className: "dsh-model-allowance-status-tip", role: "tooltip" },
+            currentStatus.summary
+          )
+        ) : null
+      ),
+      view?.updatedAt ? (0, import_react6.createElement)(
+        "span",
+        { className: "dsh-model-allowance-updated" },
+        t("detail.updatedAt", { time: formatClock(view.updatedAt) })
+      ) : null,
+      (0, import_react6.createElement)(
+        "button",
+        {
+          type: "button",
+          className: "dsh-model-allowance-icon-button",
+          onClick: refresh,
+          disabled: refreshing,
+          title: refreshing ? t("detail.refreshing") : t("detail.refresh"),
+          "aria-label": refreshing ? t("detail.refreshing") : t("detail.refresh")
+        },
+        refreshGlyph(16)
+      ),
+      view?.consoleUrl ? (0, import_react6.createElement)(
+        "a",
+        {
+          className: "dsh-model-allowance-icon-button",
+          href: view.consoleUrl,
+          target: "_blank",
+          rel: "noreferrer noopener",
+          title: t("detail.console"),
+          "aria-label": t("detail.console")
+        },
+        consoleGlyph(16)
+      ) : null,
+      // The switch to another model of this provider. It sits to the
+      // right of the console link, which is the last thing the footer
+      // offered before, so the two never trade places.
+      canSwitch ? (0, import_react6.createElement)(
+        "span",
+        { ref: catalog.modelWrapRef, className: "dsh-model-allowance-model-wrap" },
+        (0, import_react6.createElement)(
+          "button",
+          {
+            type: "button",
+            className: "dsh-model-allowance-icon-button",
+            "aria-haspopup": "menu",
+            "aria-expanded": catalog.modelMenuOpen ? "true" : "false",
+            // The vendor in use paints the glyph in its own
+            // colour, so the button says which vendor the card is
+            // on instead of the strip having to say it twice.
+            "data-in-use": inUse ? "true" : "false",
+            style: { "--provider-mark": markFor(activeProvider).color },
+            title: switchLabel,
+            "aria-label": switchLabel,
+            onClick: catalog.toggleModelMenu
+          },
+          modelGlyph(16)
+        ),
+        catalog.modelMenuOpen ? (0, import_react6.createElement)(ModelMenu, {
+          t,
+          models: catalog.shownModelList,
+          state: catalog.shownModelListState,
+          modelError: catalog.modelError,
+          currentModel: catalog.currentModel,
+          switchingModel: catalog.switchingModel,
+          switchToModel: catalog.switchToModel,
+          modelWrapRef: catalog.modelWrapRef,
+          showEffortFlyout: catalog.showEffortFlyout,
+          scheduleEffortFlyoutClose: catalog.scheduleEffortFlyoutClose
+        }) : null,
+        // The effort flyout is a sibling of the list, not a
+        // child: the list scrolls, and a nested panel would be
+        // clipped by it.
+        catalog.modelMenuOpen && catalog.hoverModel !== null && catalog.shownModelList.includes(catalog.hoverModel.model) ? (0, import_react6.createElement)(EffortFlyout, {
+          t,
+          hoverModel: catalog.hoverModel,
+          currentModel: catalog.currentModel,
+          selectedEffort,
+          switchingModel: catalog.switchingModel,
+          switchToModel: catalog.switchToModel,
+          keepEffortFlyout: catalog.keepEffortFlyout,
+          scheduleEffortFlyoutClose: catalog.scheduleEffortFlyoutClose
+        }) : null
+      ) : null
+    )
+  );
+}
+
+// src/client/hooks/use-balance-stream.js
+var React3 = __toESM(require("react"), 1);
+function describe(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+async function readProviderStatus(provider) {
+  try {
+    const api = await getBalanceApi();
+    if (!api || typeof api.status !== "function") {
+      return { provider, state: "unknown", error: "status API unavailable" };
+    }
+    const result = await api.status(provider);
+    if (!result.ok) {
+      const error = typeof result.error?.message === "string" ? result.error.message : typeof result.error === "string" ? result.error : "status reading failed";
+      return { provider, state: "unknown", error };
+    }
+    return result.value;
+  } catch (error) {
+    console.error("[model-allowance] reading provider status failed", { provider, error });
+    return { provider, state: "unknown", error: describe(error) };
+  }
+}
+function useBalanceStream({ activeProvider, activeModel, ctx, setView, setLoading }) {
+  React3.useEffect(() => {
+    if (!activeProvider) {
+      setView(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    let handle;
+    setLoading(true);
+    const readOnce = async (api, model) => {
+      try {
+        let result = await api.balance(activeProvider, model);
+        if (!result.ok && model !== void 0) {
+          result = await api.balance(activeProvider, void 0);
+        }
+        if (cancelled) return;
+        if (!result.ok) {
+          const detail = typeof result.error?.message === "string" ? result.error.message : typeof result.error === "string" ? result.error : "balance reading failed";
+          throw new Error(detail);
+        }
+        setView(result.value);
+      } catch (error) {
+        console.error("[model-allowance] reading failed", {
+          provider: activeProvider,
+          model,
+          error
+        });
+        if (!cancelled) {
+          setView({
+            provider: activeProvider,
+            status: "failed",
+            kind: "quota",
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    (async () => {
+      const api = await getBalanceApi();
+      if (cancelled) return;
+      if (!api) {
+        setView({
+          provider: activeProvider,
+          status: "failed",
+          kind: "quota",
+          error: "balance namespace unavailable"
+        });
+        setLoading(false);
+        return;
+      }
+      const readModel = await supportsModel(api) ? activeModel : void 0;
+      if (cancelled) return;
+      const remote = ctx.remote;
+      if (typeof remote?.$stream === "function" && typeof api.watch === "function") {
+        try {
+          handle = remote.$stream({
+            name: "balance",
+            open: (signal) => api.watch(activeProvider, readModel, signal),
+            ended: () => new Error("balance stream ended")
+          });
+        } catch (error) {
+          console.error("[model-allowance] opening the reading stream failed", { error });
+          handle = void 0;
+        }
+        if (handle) {
+          let received = false;
+          try {
+            for await (const item of handle) {
+              if (cancelled) return;
+              const frame = item?.value;
+              if (frame === void 0) continue;
+              received = true;
+              setView(frame);
+              setLoading(false);
+              item?.accept?.();
+            }
+          } catch (error) {
+            if (!cancelled) {
+              console.error("[model-allowance] reading stream failed", {
+                provider: activeProvider,
+                error
+              });
+            }
+          } finally {
+            if (!cancelled && !received) await readOnce(api, readModel);
+          }
+          return;
+        }
+      }
+      await readOnce(api, readModel);
+    })();
+    return () => {
+      cancelled = true;
+      handle?.dispose?.();
+    };
+  }, [activeProvider, activeModel, ctx, setView, setLoading]);
+}
+
+// src/client/hooks/use-dismiss.js
+var React4 = __toESM(require("react"), 1);
+function useDismiss({ open, rootRef, modelMenuOpen, setOpen, setModelMenuOpen }) {
+  React4.useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event) => {
+      const root = rootRef.current;
+      if (root && event.target instanceof Node && root.contains(event.target)) return;
+      setOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      if (modelMenuOpen) {
+        setModelMenuOpen(false);
+        return;
+      }
+      setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, modelMenuOpen, setOpen, setModelMenuOpen]);
+}
+
+// src/client/hooks/use-model-catalog.js
+var React5 = __toESM(require("react"), 1);
+var CATALOG_TTL_MS = 60 * 1e3;
+function useModelCatalog({ ctx, t, sessionId, activeProvider, entryOf, selection }) {
+  const [modelList, setModelList] = React5.useState([]);
+  const [modelListRoute, setModelListRoute] = React5.useState(null);
+  const [catalogProvider, setCatalogProvider] = React5.useState(null);
+  const [modelListState, setModelListState] = React5.useState("idle");
+  const [modelError, setModelError] = React5.useState(null);
+  const [modelMenuOpen, setModelMenuOpen] = React5.useState(false);
+  const [hoverModel, setHoverModel] = React5.useState(null);
+  const hoverModelTimer = React5.useRef(null);
+  const [switchingModel, setSwitchingModel] = React5.useState(null);
+  const modelWrapRef = React5.useRef(null);
+  const catalogRef = React5.useRef({ value: null, at: 0 });
+  const showModels = React5.useCallback(
+    (catalog) => {
+      const routes = [activeProvider, ...entryOf(activeProvider)?.modelRoutes ?? []];
+      const group = providerModelGroup(catalog, routes);
+      const models = group?.models ?? [];
+      setCatalogProvider(group?.provider ?? null);
+      setModelListRoute(activeProvider);
+      setModelList(models);
+      setModelListState(models.length > 0 ? "ready" : "empty");
+    },
+    [activeProvider, entryOf]
+  );
+  React5.useEffect(() => {
+    if (!modelMenuOpen) return void 0;
+    let cancelled = false;
+    (async () => {
+      const face = lookupSessionFace(ctx);
+      if (face === void 0 || typeof face.modelCatalog !== "function") {
+        setModelListState("error");
+        setModelError(t("model.unavailable"));
+        return;
+      }
+      const cached = catalogRef.current;
+      if (cached.value !== null && Date.now() - cached.at < CATALOG_TTL_MS) {
+        if (!cancelled) showModels(cached.value);
+        return;
+      }
+      setModelListState("loading");
+      try {
+        const result = await face.modelCatalog();
+        if (cancelled) return;
+        if (!result?.ok) {
+          setModelListState("error");
+          setModelError(
+            t("model.loadFailed", { error: result?.error?.message ?? result?.error?.code ?? "" })
+          );
+          return;
+        }
+        catalogRef.current = { value: result.value, at: Date.now() };
+        showModels(result.value);
+      } catch (error) {
+        if (cancelled) return;
+        setModelListState("error");
+        setModelError(t("model.loadFailed", { error: describe(error) }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modelMenuOpen, ctx, t, showModels]);
+  React5.useEffect(() => {
+    if (!modelMenuOpen) return void 0;
+    const onPointerDown = (event) => {
+      const wrap = modelWrapRef.current;
+      if (wrap && event.target instanceof Node && wrap.contains(event.target)) return;
+      setModelMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, [modelMenuOpen]);
+  const switchToModel = React5.useCallback(
+    async (model, effort) => {
+      const face = lookupSessionFace(ctx);
+      if (face === void 0 || typeof face.selectModel !== "function") {
+        setModelError(t("model.unavailable"));
+        return;
+      }
+      if (typeof sessionId !== "string" || sessionId === "") {
+        setModelError(t("model.unavailable"));
+        return;
+      }
+      setSwitchingModel(model.id);
+      try {
+        const result = await face.selectModel({
+          sessionId,
+          provider: catalogProvider ?? activeProvider,
+          model: model.id,
+          ...typeof effort === "string" && effort !== "" ? { reasoningEffort: effort } : {}
+        });
+        if (!result?.ok) {
+          setModelError(
+            t("model.failed", { error: result?.error?.message ?? result?.error?.code ?? "" })
+          );
+          return;
+        }
+        setModelError(null);
+        setModelMenuOpen(false);
+      } catch (error) {
+        console.error("[model-allowance] switching the model failed", { error });
+        setModelError(t("model.failed", { error: describe(error) }));
+      } finally {
+        setSwitchingModel(null);
+      }
+    },
+    [ctx, sessionId, activeProvider, catalogProvider, t]
+  );
+  const showEffortFlyout = React5.useCallback((model, top) => {
+    clearTimeout(hoverModelTimer.current);
+    setHoverModel({ model, top });
+  }, []);
+  const scheduleEffortFlyoutClose = React5.useCallback((id) => {
+    clearTimeout(hoverModelTimer.current);
+    hoverModelTimer.current = setTimeout(() => {
+      setHoverModel((current) => current?.model?.id === id ? null : current);
+    }, 150);
+  }, []);
+  const keepEffortFlyout = React5.useCallback(() => {
+    clearTimeout(hoverModelTimer.current);
+  }, []);
+  const toggleModelMenu = React5.useCallback(() => {
+    setModelError(null);
+    clearTimeout(hoverModelTimer.current);
+    setHoverModel(null);
+    setModelMenuOpen((value) => !value);
+  }, []);
+  const modelProvider = catalogProvider ?? activeProvider;
+  const currentModel = currentModelFor(selection, modelProvider);
+  const shownModelList = modelListRoute === activeProvider ? modelList : [];
+  const shownModelListState = modelListRoute === activeProvider ? modelListState : "loading";
+  return {
+    modelMenuOpen,
+    setModelMenuOpen,
+    modelWrapRef,
+    shownModelList,
+    shownModelListState,
+    modelError,
+    setModelError,
+    currentModel,
+    switchingModel,
+    hoverModel,
+    showEffortFlyout,
+    scheduleEffortFlyoutClose,
+    keepEffortFlyout,
+    toggleModelMenu,
+    switchToModel
+  };
 }
 
 // src/client/styles.js
@@ -1174,94 +2186,11 @@ var STYLES = [
 ];
 var STYLES_JOINED = STYLES.join("");
 
-// src/client/windows.js
-function windowTitle(window, t) {
-  const label = window.label?.[activeLanguage()] ?? window.label?.en ?? window.label?.zh;
-  if (typeof label === "string" && label !== "") return label;
-  if (window.unit === "hour" && window.count) {
-    return t("window.title.hour", { count: window.count });
-  }
-  if (window.unit === "week") return t("window.title.week");
-  if (window.unit === "day" && window.count === 7) return t("window.title.week");
-  if (window.unit === "day" && window.count) {
-    return t("window.title.day", { count: window.count });
-  }
-  if (window.unit === "month") return t("window.title.month");
-  return t("window.title.unknown");
-}
-function windowUsedPercent(window) {
-  if (typeof window.remainingPercent === "number") return 100 - window.remainingPercent;
-  if (typeof window.used === "number" && typeof window.total === "number" && window.total > 0) {
-    return window.used / window.total * 100;
-  }
-  return void 0;
-}
-var UNIT_MS = {
-  hour: 36e5,
-  day: 864e5,
-  week: 7 * 864e5,
-  month: 30 * 864e5
-};
-function shortestWindow(windows) {
-  let shortest;
-  let shortestMs = Number.POSITIVE_INFINITY;
-  for (const window of windows) {
-    if (typeof window.remainingPercent !== "number") continue;
-    const unit = UNIT_MS[window.unit];
-    if (unit === void 0) continue;
-    const count = typeof window.count === "number" && window.count > 0 ? window.count : 1;
-    const lengthMs = unit * count;
-    if (lengthMs < shortestMs) {
-      shortest = window;
-      shortestMs = lengthMs;
-    }
-  }
-  return shortest;
-}
-function windowUsage(window, t) {
-  if (typeof window.total !== "number" || typeof window.used !== "number") return void 0;
-  return t("window.usedOfTotal", {
-    used: formatNumber(window.used),
-    total: formatNumber(window.total)
-  });
-}
-function barTone(percent) {
-  if (percent >= 85) return "error";
-  if (percent >= 60) return "warn";
-  return "ok";
-}
-
 // src/client/badge.js
-var CATALOG_TTL_MS = 60 * 1e3;
-function describe(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-async function readProviderStatus(provider) {
-  try {
-    const api = await getBalanceApi();
-    if (!api || typeof api.status !== "function") {
-      return { provider, state: "unknown", error: "status API unavailable" };
-    }
-    const result = await api.status(provider);
-    if (!result.ok) {
-      const error = typeof result.error?.message === "string" ? result.error.message : typeof result.error === "string" ? result.error : "status reading failed";
-      return { provider, state: "unknown", error };
-    }
-    return result.value;
-  } catch (error) {
-    console.error("[model-allowance] reading provider status failed", { provider, error });
-    return { provider, state: "unknown", error: describe(error) };
-  }
-}
 function statusDisplayState(status) {
   if (status === null) return "loading";
   if (status.state === "unknown" && !status.url && !status.error) return "unsupported";
   return status.state;
-}
-function entryCovers(entry, route) {
-  if (entry === void 0 || entry === null) return false;
-  if (entry.route === route) return true;
-  return Array.isArray(entry.aliases) && entry.aliases.includes(route);
 }
 function BalanceBadge(props) {
   const { useProjection, ctx, t } = props;
@@ -1270,258 +2199,41 @@ function BalanceBadge(props) {
   const selectedModel = selection?.next?.model ?? selection?.lastUsed?.model ?? void 0;
   const selectedEffort = selection?.next?.reasoningEffort ?? selection?.lastUsed?.reasoningEffort ?? void 0;
   const sessionId = props.sessionId;
-  const [rawView, setView] = React.useState(null);
-  const [loading, setLoading] = React.useState(false);
-  const [open, setOpen] = React.useState(false);
-  const [refreshing, setRefreshing] = React.useState(false);
-  const rootRef = React.useRef(null);
-  const [now, setNow] = React.useState(() => Date.now());
-  const [picked, setPicked] = React.useState(null);
-  const [directory, setDirectory] = React.useState([]);
-  const lastModelProvider = React.useRef(null);
-  const available = directory.filter((entry) => entry.configured);
-  const entryOf = React.useCallback(
-    (route) => directory.find((entry) => entryCovers(entry, route)),
-    [directory]
-  );
-  const nameOf = React.useCallback((route) => pickName(entryOf(route), route), [entryOf]);
-  const markFor = (route) => markOf(entryOf(route), route);
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const [stripWidth, setStripWidth] = React.useState(0);
-  const stripRef = React.useRef(null);
-  const [defaultProvider, setDefaultProvider] = React.useState(null);
-  const [providerStatus, setProviderStatus] = React.useState(null);
-  const [schedule, setSchedule] = React.useState(null);
-  const [modelList, setModelList] = React.useState([]);
-  const [modelListRoute, setModelListRoute] = React.useState(null);
-  const [catalogProvider, setCatalogProvider] = React.useState(null);
-  const [modelListState, setModelListState] = React.useState("idle");
-  const [modelError, setModelError] = React.useState(null);
-  const [modelMenuOpen, setModelMenuOpen] = React.useState(false);
-  const [hoverModel, setHoverModel] = React.useState(null);
-  const hoverModelTimer = React.useRef(null);
-  const [switchingModel, setSwitchingModel] = React.useState(null);
-  const modelWrapRef = React.useRef(null);
-  const catalogRef = React.useRef({ value: null, at: 0 });
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const api = await getBalanceApi();
-        if (!api || typeof api.list !== "function") return;
-        const result = await api.list();
-        if (cancelled || !result.ok) return;
-        setDirectory(result.value);
-      } catch (error) {
-        console.error("[model-allowance] listing providers failed", { error });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  React.useEffect(() => {
-    if (selected !== null) return void 0;
-    let cancelled = false;
-    (async () => {
-      try {
-        const api = await getBalanceApi();
-        if (!api || typeof api.defaultProvider !== "function") return;
-        const result = await api.defaultProvider();
-        if (cancelled || result?.ok !== true) return;
-        const provider2 = result.value?.provider;
-        if (typeof provider2 === "string" && provider2 !== "") setDefaultProvider(provider2);
-      } catch (error) {
-        console.error("[model-allowance] reading the default provider failed", { error });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selected]);
-  const provider = selected ?? defaultProvider;
-  const selectionKey = `${provider ?? ""}\0${selectedModel ?? ""}`;
-  React.useEffect(() => {
-    if (lastModelProvider.current === selectionKey) return;
-    lastModelProvider.current = selectionKey;
+  const [rawView, setView] = React6.useState(null);
+  const [loading, setLoading] = React6.useState(false);
+  const [open, setOpen] = React6.useState(false);
+  const [refreshing, setRefreshing] = React6.useState(false);
+  const rootRef = React6.useRef(null);
+  const [now, setNow] = React6.useState(() => Date.now());
+  const [picked, setPicked] = React6.useState(null);
+  const [menuOpen, setMenuOpen] = React6.useState(false);
+  const [providerStatus, setProviderStatus] = React6.useState(null);
+  const [schedule, setSchedule] = React6.useState(null);
+  const lastModelProvider = React6.useRef(null);
+  React6.useEffect(() => {
+    if (open) return;
     setPicked(null);
-  });
+    setMenuOpen(false);
+  }, [open]);
+  const [stripWidth, setStripWidth] = React6.useState(0);
+  const stripRef = React6.useRef(null);
+  const { available, defaultProvider, entryOf, nameOf } = useProviderDirectory(selected);
+  const provider = selected ?? defaultProvider;
   const activeProvider = picked ?? provider;
   const inUse = activeProvider === provider || entryOf(provider)?.route === activeProvider;
   const activeModel = inUse ? selectedModel : void 0;
   const switchLabel = t(inUse ? "detail.switchModelHere" : "detail.switchModelThere", {
     name: nameOf(activeProvider)
   });
-  const modelProvider = catalogProvider ?? activeProvider;
-  const currentModel = currentModelFor(selection, modelProvider);
-  const shownModelList = modelListRoute === activeProvider ? modelList : [];
-  const shownModelListState = modelListRoute === activeProvider ? modelListState : "loading";
-  const sessionFace = lookupSessionFace(ctx);
-  const canSwitch = typeof sessionId === "string" && sessionId !== "" && sessionFace !== void 0 && typeof sessionFace.selectModel === "function";
   const view = rawView?.provider === activeProvider ? rawView : null;
-  React.useEffect(() => {
-    if (open) return;
-    setPicked(null);
-    setMenuOpen(false);
-    setModelMenuOpen(false);
-  }, [open]);
-  React.useEffect(() => {
-    if (!open) return;
-    const node = stripRef.current;
-    if (!node) return;
-    const measure = () => setStripWidth(node.clientWidth ?? 0);
-    measure();
-    if (typeof ResizeObserver !== "function") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [open]);
-  React.useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event) => {
-      const root = rootRef.current;
-      if (root && event.target instanceof Node && root.contains(event.target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (event) => {
-      if (event.key !== "Escape") return;
-      if (modelMenuOpen) {
-        setModelMenuOpen(false);
-        return;
-      }
-      setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open, modelMenuOpen]);
   const showingDifference = consumptionFreshAt(view?.consumption, now);
-  React.useEffect(() => {
+  React6.useEffect(() => {
     if (!open && !showingDifference) return;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1e3);
     return () => clearInterval(timer);
   }, [open, showingDifference]);
-  React.useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const api = await getBalanceApi();
-        if (!api || typeof api.list !== "function") return;
-        const result = await api.list();
-        if (cancelled || !result.ok) return;
-        setDirectory(result.value);
-      } catch (error) {
-        console.error("[model-allowance] listing providers failed", { error });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-  React.useEffect(() => {
-    if (!activeProvider) {
-      setView(null);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    let handle;
-    setLoading(true);
-    const readOnce = async (api, model) => {
-      try {
-        let result = await api.balance(activeProvider, model);
-        if (!result.ok && model !== void 0) {
-          result = await api.balance(activeProvider, void 0);
-        }
-        if (cancelled) return;
-        if (!result.ok) {
-          const detail = typeof result.error?.message === "string" ? result.error.message : typeof result.error === "string" ? result.error : "balance reading failed";
-          throw new Error(detail);
-        }
-        setView(result.value);
-      } catch (error) {
-        console.error("[model-allowance] reading failed", {
-          provider: activeProvider,
-          model,
-          error
-        });
-        if (!cancelled) {
-          setView({
-            provider: activeProvider,
-            status: "failed",
-            kind: "quota",
-            error: error instanceof Error ? error.message : String(error)
-          });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    (async () => {
-      const api = await getBalanceApi();
-      if (cancelled) return;
-      if (!api) {
-        setView({
-          provider: activeProvider,
-          status: "failed",
-          kind: "quota",
-          error: "balance namespace unavailable"
-        });
-        setLoading(false);
-        return;
-      }
-      const readModel = await supportsModel(api) ? activeModel : void 0;
-      if (cancelled) return;
-      const remote = ctx.remote;
-      if (typeof remote?.$stream === "function" && typeof api.watch === "function") {
-        try {
-          handle = remote.$stream({
-            name: "balance",
-            open: (signal) => api.watch(activeProvider, readModel, signal),
-            ended: () => new Error("balance stream ended")
-          });
-        } catch (error) {
-          console.error("[model-allowance] opening the reading stream failed", { error });
-          handle = void 0;
-        }
-        if (handle) {
-          let received = false;
-          try {
-            for await (const item of handle) {
-              if (cancelled) return;
-              const frame = item?.value;
-              if (frame === void 0) continue;
-              received = true;
-              setView(frame);
-              setLoading(false);
-              item?.accept?.();
-            }
-          } catch (error) {
-            if (!cancelled) {
-              console.error("[model-allowance] reading stream failed", {
-                provider: activeProvider,
-                error
-              });
-            }
-          } finally {
-            if (!cancelled && !received) await readOnce(api, readModel);
-          }
-          return;
-        }
-      }
-      await readOnce(api, readModel);
-    })();
-    return () => {
-      cancelled = true;
-      handle?.dispose?.();
-    };
-  }, [activeProvider, activeModel, ctx]);
-  React.useEffect(() => {
+  React6.useEffect(() => {
     if (!activeProvider) return void 0;
     let cancelled = false;
     const readStatus = async () => {
@@ -1535,7 +2247,7 @@ function BalanceBadge(props) {
       clearInterval(timer);
     };
   }, [activeProvider]);
-  React.useEffect(() => {
+  React6.useEffect(() => {
     if (!activeProvider) return void 0;
     let cancelled = false;
     (async () => {
@@ -1553,7 +2265,22 @@ function BalanceBadge(props) {
       cancelled = true;
     };
   }, [activeProvider]);
-  const refresh = React.useCallback(async () => {
+  useBalanceStream({ activeProvider, activeModel, ctx, setView, setLoading });
+  const catalog = useModelCatalog({ ctx, t, sessionId, activeProvider, entryOf, selection });
+  useDismiss({
+    open,
+    rootRef,
+    modelMenuOpen: catalog.modelMenuOpen,
+    setOpen,
+    setModelMenuOpen: catalog.setModelMenuOpen
+  });
+  const selectionKey = `${provider ?? ""}\0${selectedModel ?? ""}`;
+  React6.useEffect(() => {
+    if (lastModelProvider.current === selectionKey) return;
+    lastModelProvider.current = selectionKey;
+    setPicked(null);
+  });
+  const refresh = React6.useCallback(async () => {
     setRefreshing(true);
     try {
       const api = await getBalanceApi();
@@ -1576,115 +2303,10 @@ function BalanceBadge(props) {
       setRefreshing(false);
     }
   }, [activeProvider, activeModel]);
-  const showModels = React.useCallback(
-    (catalog) => {
-      const routes = [activeProvider, ...entryOf(activeProvider)?.modelRoutes ?? []];
-      const group = providerModelGroup(catalog, routes);
-      const models = group?.models ?? [];
-      setCatalogProvider(group?.provider ?? null);
-      setModelListRoute(activeProvider);
-      setModelList(models);
-      setModelListState(models.length > 0 ? "ready" : "empty");
-    },
-    [activeProvider, entryOf]
-  );
-  React.useEffect(() => {
-    if (!modelMenuOpen) return void 0;
-    let cancelled = false;
-    (async () => {
-      const face = lookupSessionFace(ctx);
-      if (face === void 0 || typeof face.modelCatalog !== "function") {
-        setModelListState("error");
-        setModelError(t("model.unavailable"));
-        return;
-      }
-      const cached = catalogRef.current;
-      if (cached.value !== null && Date.now() - cached.at < CATALOG_TTL_MS) {
-        if (!cancelled) showModels(cached.value);
-        return;
-      }
-      setModelListState("loading");
-      try {
-        const result = await face.modelCatalog();
-        if (cancelled) return;
-        if (!result?.ok) {
-          setModelListState("error");
-          setModelError(
-            t("model.loadFailed", { error: result?.error?.message ?? result?.error?.code ?? "" })
-          );
-          return;
-        }
-        catalogRef.current = { value: result.value, at: Date.now() };
-        showModels(result.value);
-      } catch (error) {
-        if (cancelled) return;
-        setModelListState("error");
-        setModelError(t("model.loadFailed", { error: describe(error) }));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [modelMenuOpen, ctx, t, showModels]);
-  React.useEffect(() => {
-    if (!modelMenuOpen) return void 0;
-    const onPointerDown = (event) => {
-      const wrap = modelWrapRef.current;
-      if (wrap && event.target instanceof Node && wrap.contains(event.target)) return;
-      setModelMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-    };
-  }, [modelMenuOpen]);
-  const switchToModel = React.useCallback(
-    async (model, effort) => {
-      const face = lookupSessionFace(ctx);
-      if (face === void 0 || typeof face.selectModel !== "function") {
-        setModelError(t("model.unavailable"));
-        return;
-      }
-      if (typeof sessionId !== "string" || sessionId === "") {
-        setModelError(t("model.unavailable"));
-        return;
-      }
-      setSwitchingModel(model.id);
-      try {
-        const result = await face.selectModel({
-          sessionId,
-          provider: catalogProvider ?? activeProvider,
-          model: model.id,
-          ...typeof effort === "string" && effort !== "" ? { reasoningEffort: effort } : {}
-        });
-        if (!result?.ok) {
-          setModelError(
-            t("model.failed", { error: result?.error?.message ?? result?.error?.code ?? "" })
-          );
-          return;
-        }
-        setModelError(null);
-        setModelMenuOpen(false);
-      } catch (error) {
-        console.error("[model-allowance] switching the model failed", { error });
-        setModelError(t("model.failed", { error: describe(error) }));
-      } finally {
-        setSwitchingModel(null);
-      }
-    },
-    [ctx, sessionId, activeProvider, catalogProvider, t]
-  );
-  const showEffortFlyout = React.useCallback((model, top) => {
-    clearTimeout(hoverModelTimer.current);
-    setHoverModel({ model, top });
-  }, []);
-  const scheduleEffortFlyoutClose = React.useCallback((id) => {
-    clearTimeout(hoverModelTimer.current);
-    hoverModelTimer.current = setTimeout(() => {
-      setHoverModel((current) => current?.model?.id === id ? null : current);
-    }, 150);
-  }, []);
-  const label = React.useMemo(() => {
+  const markFor = (route) => markOf(entryOf(route), route);
+  const sessionFace = lookupSessionFace(ctx);
+  const canSwitch = typeof sessionId === "string" && sessionId !== "" && sessionFace !== void 0 && typeof sessionFace.selectModel === "function";
+  const label = React6.useMemo(() => {
     if (!provider) return "";
     if (!view) return t("badge.loading");
     if (view.status === "ready") {
@@ -1722,57 +2344,7 @@ function BalanceBadge(props) {
   if (!provider) return null;
   const currentStatus = providerStatus?.provider === activeProvider ? providerStatus : null;
   const serviceState = statusDisplayState(currentStatus);
-  const MARK_SIZE = 26;
-  const MARK_GAP = 4;
-  const MENU_SIZE = 26;
-  const perMark = MARK_SIZE + MARK_GAP;
-  let visibleCount = available.length;
-  if (stripWidth > 0 && available.length * perMark - MARK_GAP > stripWidth) {
-    visibleCount = Math.max(1, Math.floor((stripWidth - MENU_SIZE - MARK_GAP) / perMark));
-    visibleCount = Math.min(visibleCount, available.length - 1);
-  }
-  let shown = available.slice(0, visibleCount);
-  let overflow = available.slice(visibleCount);
-  const activeIndex = overflow.findIndex((entry) => entryCovers(entry, activeProvider));
-  if (activeIndex >= 0 && shown.length > 0) {
-    const displaced = shown[shown.length - 1];
-    shown = [...shown.slice(0, -1), overflow[activeIndex]];
-    overflow = [...overflow.slice(0, activeIndex), displaced, ...overflow.slice(activeIndex + 1)];
-  }
-  const markButton = (entry) => {
-    const mark = markFor(entry.route);
-    const name = nameOf(entry.route);
-    const active = entryCovers(entry, activeProvider);
-    return (0, import_react3.createElement)(
-      "button",
-      {
-        type: "button",
-        key: entry.route,
-        role: "tab",
-        className: "dsh-model-allowance-tab",
-        "data-active": active ? "true" : "false",
-        "aria-selected": active ? "true" : "false",
-        "aria-label": name,
-        title: name,
-        style: { "--provider-mark": mark.color },
-        onClick: () => {
-          setPicked(entry.route);
-          setMenuOpen(false);
-        }
-      },
-      providerIcon(entry.route, 14, mark)
-    );
-  };
-  const onTabKeyDown = (event) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')];
-    if (tabs.length === 0) return;
-    const index = tabs.indexOf(document.activeElement);
-    const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-    event.preventDefault();
-    tabs[next]?.focus();
-  };
-  return (0, import_react3.createElement)(
+  return (0, import_react7.createElement)(
     "div",
     {
       ref: rootRef,
@@ -1782,8 +2354,8 @@ function BalanceBadge(props) {
     },
     // Component-local styles: React removes them with the component, and
     // every colour comes from a theme token so light and dark both follow.
-    (0, import_react3.createElement)("style", { key: "styles" }, STYLES_JOINED),
-    (0, import_react3.createElement)(
+    (0, import_react7.createElement)("style", { key: "styles" }, STYLES_JOINED),
+    (0, import_react7.createElement)(
       "button",
       {
         type: "button",
@@ -1793,12 +2365,12 @@ function BalanceBadge(props) {
         "aria-controls": open ? "dsh-model-allowance-panel" : void 0,
         onClick: () => setOpen((value) => !value)
       },
-      (0, import_react3.createElement)("span", { className: "dsh-model-allowance-dot", "aria-hidden": true }),
-      (0, import_react3.createElement)("span", { className: "dsh-model-allowance-label" }, label),
+      (0, import_react7.createElement)("span", { className: "dsh-model-allowance-dot", "aria-hidden": true }),
+      (0, import_react7.createElement)("span", { className: "dsh-model-allowance-label" }, label),
       // How far the number moved since the last reading, for a few seconds
       // after it lands. The arrow follows the number shown beside it: down
       // means the balance fell.
-      showingDifference ? (0, import_react3.createElement)(
+      showingDifference ? (0, import_react7.createElement)(
         "span",
         {
           className: "dsh-model-allowance-delta",
@@ -1808,456 +2380,31 @@ function BalanceBadge(props) {
         `${view.consumption.delta < 0 ? "\u2193" : "\u2191"}${formatDelta(view.consumption)}`
       ) : null
     ),
-    open ? (0, import_react3.createElement)(
-      "div",
-      {
-        className: "dsh-model-allowance-panel",
-        id: "dsh-model-allowance-panel",
-        role: "dialog",
-        "aria-label": t("detail.title")
-      },
-      // With more than one readable provider the card opens a switcher;
-      // with one there is nothing to switch, so it just names it.
-      available.length > 1 ? (0, import_react3.createElement)(
-        // The clipping strip and the menu are siblings: the strip
-        // hides what does not fit, and the menu would be clipped
-        // with it if it lived inside.
-        "div",
-        { className: "dsh-model-allowance-switcher-wrap" },
-        (0, import_react3.createElement)(
-          "div",
-          {
-            ref: stripRef,
-            className: "dsh-model-allowance-switcher",
-            role: "tablist",
-            "aria-label": t("detail.provider"),
-            onKeyDown: onTabKeyDown
-          },
-          ...shown.map(markButton),
-          overflow.length > 0 ? (0, import_react3.createElement)(
-            "button",
-            {
-              type: "button",
-              className: "dsh-model-allowance-more",
-              "aria-haspopup": "menu",
-              "aria-expanded": menuOpen ? "true" : "false",
-              "aria-label": t("detail.moreProviders"),
-              title: t("detail.moreProviders"),
-              onClick: () => setMenuOpen((value) => !value)
-            },
-            "\u22EF"
-          ) : null
-        ),
-        menuOpen && overflow.length > 0 ? (0, import_react3.createElement)(
-          "div",
-          { className: "dsh-model-allowance-menu", role: "menu" },
-          ...overflow.map(
-            (entry) => (0, import_react3.createElement)(
-              "button",
-              {
-                type: "button",
-                key: entry.route,
-                role: "menuitem",
-                className: "dsh-model-allowance-menu-item",
-                onClick: () => {
-                  setPicked(entry.route);
-                  setMenuOpen(false);
-                }
-              },
-              (0, import_react3.createElement)(
-                "span",
-                {
-                  className: "dsh-model-allowance-menu-mark",
-                  style: { "--provider-mark": markFor(entry.route).color }
-                },
-                providerIcon(entry.route, 11, markFor(entry.route))
-              ),
-              (0, import_react3.createElement)("span", null, nameOf(entry.route))
-            )
-          )
-        ) : null
-      ) : (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-row" },
-        (0, import_react3.createElement)("span", null, t("detail.provider")),
-        (0, import_react3.createElement)("span", null, nameOf(activeProvider))
-      ),
-      view?.kind === "amount" && typeof view.amount === "number" ? (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-row" },
-        (0, import_react3.createElement)("span", null, t("detail.amount")),
-        (0, import_react3.createElement)("span", null, formatAmount(view.amount, view.currency))
-      ) : null,
-      ...Array.isArray(view?.windows) && view.windows.length > 0 ? view.windows.map((window, index) => {
-        const consumed = windowUsedPercent(window);
-        const percent = consumed === void 0 ? void 0 : Math.max(0, Math.round(consumed));
-        const filled = consumed === void 0 ? 0 : Math.min(100, Math.max(0, consumed));
-        const usage = windowUsage(window, t);
-        return (0, import_react3.createElement)(
-          "div",
-          {
-            className: "dsh-model-allowance-window",
-            key: `w-${String(index)}`,
-            // The first block needs no divider: the switcher above
-            // it already ends in one, and a bare provider row does
-            // not deserve a line either. Only the boundaries
-            // *between* windows are drawn.
-            "data-first": index === 0 ? "true" : void 0
-          },
-          (0, import_react3.createElement)(
-            "div",
-            { className: "dsh-model-allowance-window-head" },
-            (0, import_react3.createElement)(
-              "span",
-              { className: "dsh-model-allowance-window-title" },
-              windowTitle(window, t)
-            ),
-            // Countable units sit beside the title; a plan that
-            // reports only a percentage has none to show.
-            usage === void 0 ? null : (0, import_react3.createElement)("span", { className: "dsh-model-allowance-usage" }, usage)
-          ),
-          percent === void 0 ? null : (0, import_react3.createElement)(
-            "div",
-            { className: "dsh-model-allowance-percent" },
-            t("window.usedPercent", { percent })
-          ),
-          percent === void 0 ? null : (0, import_react3.createElement)(
-            "div",
-            {
-              className: "dsh-model-allowance-bar",
-              role: "progressbar",
-              "aria-valuenow": percent,
-              "aria-valuemin": 0,
-              "aria-valuemax": 100,
-              "aria-valuetext": t("window.usedPercent", { percent })
-            },
-            (0, import_react3.createElement)("div", {
-              className: "dsh-model-allowance-bar-fill",
-              "data-tone": barTone(percent),
-              style: { width: `${String(filled)}%` }
-            })
-          ),
-          // A window with zero usage has not started its rolling timer
-          // yet, so the countdown would be misleading. Hide it until
-          // consumption begins.
-          typeof window.resetAt === "number" && (typeof window.remainingPercent !== "number" || window.remainingPercent < 100) ? (0, import_react3.createElement)(
-            "div",
-            { className: "dsh-model-allowance-foot" },
-            (0, import_react3.createElement)(
-              "span",
-              null,
-              t("window.resetIn", {
-                duration: formatCountdown(window.resetAt - now)
-              })
-            ),
-            (0, import_react3.createElement)("span", null, formatResetAt(window.resetAt))
-          ) : null
-        );
-      }) : [],
-      // A single scalar reading has no windows to break down.
-      !Array.isArray(view?.windows) && typeof view?.remainingMs === "number" ? (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-row" },
-        (0, import_react3.createElement)("span", null, t("detail.remaining")),
-        (0, import_react3.createElement)("span", null, formatDuration(view.remainingMs, t))
-      ) : null,
-      !Array.isArray(view?.windows) && typeof view?.remaining === "number" ? (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-row" },
-        (0, import_react3.createElement)("span", null, t("detail.remaining")),
-        (0, import_react3.createElement)("span", null, String(view.remaining))
-      ) : null,
-      !Array.isArray(view?.windows) && typeof view?.total === "number" ? (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-row" },
-        (0, import_react3.createElement)("span", null, t("detail.total")),
-        (0, import_react3.createElement)("span", null, String(view.total))
-      ) : null,
-      view?.status === "failed" ? (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-error" },
-        t("detail.error"),
-        // The Host reports why a reading failed; showing it is what
-        // turns "it does not work" into something actionable.
-        view.error ? (0, import_react3.createElement)("div", { className: "dsh-model-allowance-reason" }, view.error) : null
-      ) : null,
-      view?.status === "unsupported" ? (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-reason" },
-        t("badge.unsupportedWithName", { name: nameOf(activeProvider) })
-      ) : null,
-      view?.status === "unconfigured" ? (0, import_react3.createElement)("div", { className: "dsh-model-allowance-reason" }, t("badge.unconfigured")) : null,
-      // A vendor that prices by the wall clock gets its phase and
-      // countdown here, above the footer.
-      schedule && schedule.provider === activeProvider ? scheduleView(schedule, now, t) : null,
-      (0, import_react3.createElement)(
-        "div",
-        { className: "dsh-model-allowance-actions" },
-        // The platform status sits at the left edge of the footer, on
-        // the same line as the reading time: the card gains no extra
-        // row, and the state and the source page stay together.
-        (0, import_react3.createElement)(
-          "span",
-          { className: "dsh-model-allowance-status-wrap" },
-          (0, import_react3.createElement)(
-            currentStatus?.url ? "a" : "span",
-            {
-              className: "dsh-model-allowance-status",
-              "data-state": serviceState,
-              ...currentStatus?.url ? {
-                href: currentStatus.url,
-                target: "_blank",
-                rel: "noreferrer noopener"
-              } : {}
-            },
-            (0, import_react3.createElement)("span", {
-              className: "dsh-model-allowance-status-dot",
-              "aria-hidden": true
-            }),
-            (0, import_react3.createElement)(
-              "span",
-              { className: "dsh-model-allowance-status-label" },
-              statusLabel(serviceState, t)
-            ),
-            ...currentStatus?.url ? [
-              (0, import_react3.createElement)(
-                "span",
-                {
-                  className: "dsh-model-allowance-status-arrow",
-                  "aria-hidden": true
-                },
-                "\u2197"
-              )
-            ] : []
-          ),
-          // The reason is a warning mark rather than another line:
-          // the footer stays one row, and the detail is one hover
-          // — or one keyboard focus — away.
-          currentStatus?.summary ? (0, import_react3.createElement)(
-            "span",
-            {
-              className: "dsh-model-allowance-status-help",
-              tabIndex: 0,
-              role: "note",
-              "aria-label": currentStatus.summary
-            },
-            (0, import_react3.createElement)(
-              "span",
-              {
-                "aria-hidden": true
-              },
-              "!"
-            ),
-            (0, import_react3.createElement)(
-              "span",
-              { className: "dsh-model-allowance-status-tip", role: "tooltip" },
-              currentStatus.summary
-            )
-          ) : null
-        ),
-        view?.updatedAt ? (0, import_react3.createElement)(
-          "span",
-          { className: "dsh-model-allowance-updated" },
-          t("detail.updatedAt", { time: formatClock(view.updatedAt) })
-        ) : null,
-        (0, import_react3.createElement)(
-          "button",
-          {
-            type: "button",
-            className: "dsh-model-allowance-icon-button",
-            onClick: refresh,
-            disabled: refreshing,
-            title: refreshing ? t("detail.refreshing") : t("detail.refresh"),
-            "aria-label": refreshing ? t("detail.refreshing") : t("detail.refresh")
-          },
-          refreshGlyph(16)
-        ),
-        view?.consoleUrl ? (0, import_react3.createElement)(
-          "a",
-          {
-            className: "dsh-model-allowance-icon-button",
-            href: view.consoleUrl,
-            target: "_blank",
-            rel: "noreferrer noopener",
-            title: t("detail.console"),
-            "aria-label": t("detail.console")
-          },
-          consoleGlyph(16)
-        ) : null,
-        // The switch to another model of this provider. It sits to the
-        // right of the console link, which is the last thing the footer
-        // offered before, so the two never trade places.
-        canSwitch ? (0, import_react3.createElement)(
-          "span",
-          { ref: modelWrapRef, className: "dsh-model-allowance-model-wrap" },
-          (0, import_react3.createElement)(
-            "button",
-            {
-              type: "button",
-              className: "dsh-model-allowance-icon-button",
-              "aria-haspopup": "menu",
-              "aria-expanded": modelMenuOpen ? "true" : "false",
-              // The vendor in use paints the glyph in its own
-              // colour, so the button says which vendor the card is
-              // on instead of the strip having to say it twice.
-              "data-in-use": inUse ? "true" : "false",
-              style: { "--provider-mark": markFor(activeProvider).color },
-              title: switchLabel,
-              "aria-label": switchLabel,
-              onClick: () => {
-                setModelError(null);
-                clearTimeout(hoverModelTimer.current);
-                setHoverModel(null);
-                setModelMenuOpen((value) => !value);
-              }
-            },
-            modelGlyph(16)
-          ),
-          modelMenuOpen ? (0, import_react3.createElement)(
-            "div",
-            {
-              className: "dsh-model-allowance-model-menu",
-              role: "menu",
-              "aria-label": t("model.title")
-            },
-            shownModelListState === "loading" ? (0, import_react3.createElement)(
-              "div",
-              { className: "dsh-model-allowance-model-message" },
-              t("model.loading")
-            ) : null,
-            shownModelListState === "empty" ? (0, import_react3.createElement)(
-              "div",
-              { className: "dsh-model-allowance-model-message" },
-              t("model.empty")
-            ) : null,
-            shownModelListState === "error" ? (0, import_react3.createElement)(
-              "div",
-              {
-                className: "dsh-model-allowance-model-message",
-                "data-tone": "error"
-              },
-              modelError ?? t("model.unavailable")
-            ) : null,
-            ...shownModelList.map((model) => {
-              const isCurrent = model.id === currentModel;
-              const efforts = effortChoices(model);
-              const defaultEffortId = efforts?.find((effort) => effort.isDefault)?.id;
-              return (0, import_react3.createElement)(
-                "button",
-                {
-                  type: "button",
-                  key: model.id,
-                  role: "menuitemradio",
-                  "aria-checked": isCurrent ? "true" : "false",
-                  "data-current": isCurrent ? "true" : "false",
-                  className: "dsh-model-allowance-model-item",
-                  disabled: switchingModel !== null,
-                  title: model.id,
-                  ...efforts === null ? {} : { "aria-haspopup": "menu" },
-                  onClick: () => {
-                    void switchToModel(model, defaultEffortId);
-                  },
-                  ...efforts === null ? {} : {
-                    onMouseEnter: (event) => {
-                      const wrap = modelWrapRef.current;
-                      if (!wrap) return;
-                      const top = event.currentTarget.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
-                      showEffortFlyout(model, top);
-                    },
-                    onMouseLeave: () => {
-                      scheduleEffortFlyoutClose(model.id);
-                    }
-                  }
-                },
-                (0, import_react3.createElement)(
-                  "span",
-                  { className: "dsh-model-allowance-model-name" },
-                  model.name ?? model.id
-                ),
-                (0, import_react3.createElement)(
-                  "span",
-                  { className: "dsh-model-allowance-model-side" },
-                  switchingModel === model.id ? (0, import_react3.createElement)(
-                    "span",
-                    { className: "dsh-model-allowance-model-note" },
-                    t("model.switching")
-                  ) : isCurrent ? (0, import_react3.createElement)(
-                    "span",
-                    { className: "dsh-model-allowance-model-note" },
-                    t("model.current")
-                  ) : null,
-                  efforts === null ? null : (0, import_react3.createElement)(
-                    "span",
-                    {
-                      className: "dsh-model-allowance-model-arrow",
-                      "aria-hidden": true
-                    },
-                    "\u203A"
-                  )
-                )
-              );
-            }),
-            // A failed switch keeps the list open and says why.
-            modelError && shownModelListState !== "error" ? (0, import_react3.createElement)(
-              "div",
-              {
-                className: "dsh-model-allowance-model-message",
-                "data-tone": "error"
-              },
-              modelError
-            ) : null
-          ) : null,
-          // The effort flyout is a sibling of the list, not a
-          // child: the list scrolls, and a nested panel would be
-          // clipped by it. Sharing the hover with the row keeps
-          // it open while the pointer crosses over.
-          modelMenuOpen && hoverModel !== null && shownModelList.includes(hoverModel.model) ? (0, import_react3.createElement)(
-            "div",
-            {
-              className: "dsh-model-allowance-effort-menu",
-              role: "menu",
-              "aria-label": t("model.title"),
-              style: { top: `${hoverModel.top}px` },
-              onMouseEnter: () => {
-                clearTimeout(hoverModelTimer.current);
-              },
-              onMouseLeave: () => {
-                scheduleEffortFlyoutClose(hoverModel.model.id);
-              }
-            },
-            ...effortChoices(hoverModel.model).map((effort) => {
-              const isCurrentEffort = hoverModel.model.id === currentModel && effort.id === selectedEffort;
-              return (0, import_react3.createElement)(
-                "button",
-                {
-                  type: "button",
-                  key: effort.id ?? "provider-default",
-                  role: "menuitemradio",
-                  "aria-checked": isCurrentEffort ? "true" : "false",
-                  "data-current": isCurrentEffort ? "true" : "false",
-                  "data-default": effort.isDefault ? "true" : "false",
-                  className: "dsh-model-allowance-effort-item",
-                  disabled: switchingModel !== null,
-                  onClick: () => {
-                    void switchToModel(hoverModel.model, effort.id);
-                  }
-                },
-                (0, import_react3.createElement)(
-                  "span",
-                  { className: "dsh-model-allowance-model-name" },
-                  effort.providerDefault ? t("model.effortDefault") : effort.name
-                ),
-                effort.isDefault && !isCurrentEffort ? (0, import_react3.createElement)(
-                  "span",
-                  { className: "dsh-model-allowance-model-note" },
-                  t("model.effortDefault")
-                ) : null
-              );
-            })
-          ) : null
-        ) : null
-      )
-    ) : null
+    open ? (0, import_react7.createElement)(BalancePanel, {
+      t,
+      now,
+      view,
+      activeProvider,
+      available,
+      schedule,
+      currentStatus,
+      serviceState,
+      refresh,
+      refreshing,
+      canSwitch,
+      inUse,
+      switchLabel,
+      selectedEffort,
+      setPicked,
+      nameOf,
+      markFor,
+      catalog,
+      menuOpen,
+      setMenuOpen,
+      stripWidth,
+      setStripWidth,
+      stripRef
+    }) : null
   );
 }
 
@@ -2353,7 +2500,9 @@ function createBalanceContribution() {
       configured: z.boolean(),
       name: z.object({ zh: z.string().optional(), en: z.string().optional() }).optional(),
       color: z.string().optional(),
-      iconHint: z.string().optional()
+      iconHint: z.string().optional(),
+      aliases: z.array(z.string()).optional(),
+      modelRoutes: z.array(z.string()).optional()
     })
   );
   return {
@@ -2497,7 +2646,7 @@ function apply(ctx) {
         id: "model-allowance",
         order: 10
       },
-      (props) => (0, import_react4.createElement)(BalanceBadge, { ...props, ctx, t })
+      (props) => (0, import_react8.createElement)(BalanceBadge, { ...props, ctx, t })
     )
   );
 }
