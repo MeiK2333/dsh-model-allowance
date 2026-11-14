@@ -159,6 +159,29 @@ test('a directory entry answers for every id of its vendor', () => {
   assert.equal(entryCovers(undefined, 'zai'), false)
 })
 
+test('every floating surface of the card is solid', async () => {
+  // The card, its provider overflow menu, the model list, and the effort
+  // flyout all float over the conversation. A frosted panel there let the
+  // text underneath show through, so every one of them is painted on a solid
+  // layer instead of the translucent menu surface.
+  const { STYLES } = await import('../src/client/styles.js')
+  const rule = (selector) => {
+    const start = STYLES.indexOf(selector)
+    assert.notEqual(start, -1, `the rule ${selector} is missing`)
+    return STYLES.slice(start, STYLES.indexOf('}', start))
+  }
+  for (const selector of [
+    '.dsh-model-allowance-panel{',
+    '.dsh-model-allowance-menu{',
+    '.dsh-model-allowance-model-menu{',
+    '.dsh-model-allowance-effort-menu{',
+  ]) {
+    const surface = rule(selector)
+    assert.match(surface, /background:var\(--dsw-alias-bg-layer-2\)/)
+    assert.doesNotMatch(surface, /backdrop-filter/)
+  }
+})
+
 test('money and duration formatting stay readable at the badge edges', () => {
   assert.equal(formatAmount(46.71, 'CNY'), '¥46.71')
   assert.equal(formatAmount(1.2, 'USD'), '$1.20')

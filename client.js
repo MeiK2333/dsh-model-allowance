@@ -897,8 +897,7 @@ var STYLES = [
   ".dsh-model-allowance-panel{position:absolute;bottom:calc(100% + 6px);right:0;z-index:20;",
   "box-sizing:border-box;min-width:300px;max-width:calc(100vw - 24px);",
   "padding:8px 10px 10px;border:0;",
-  "border-radius:var(--dsw-radius-lg);background:var(--dsw-specific-menu);",
-  "backdrop-filter:var(--dsw-menu-backdrop-filter);",
+  "border-radius:var(--dsw-radius-lg);background:var(--dsw-alias-bg-layer-2);",
   "box-shadow:var(--dsw-elevation-prominent);color:var(--dsw-alias-label-primary);",
   "font-size:12px}",
   ".dsh-model-allowance-row{display:flex;justify-content:space-between;gap:16px;padding:2px 0}",
@@ -948,11 +947,10 @@ var STYLES = [
   ".dsh-model-allowance-more:hover{color:var(--dsw-alias-label-secondary);",
   "border-color:var(--dsw-alias-border-l2)}",
   // The overflow menu is a second floating surface, so it carries the same
-  // menu surface and elevation as the card it belongs to.
+  // solid layer and elevation as the card it belongs to.
   ".dsh-model-allowance-menu{position:absolute;top:calc(100% + 2px);right:0;z-index:30;",
   "min-width:150px;padding:4px;border:0;",
-  "border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);",
-  "backdrop-filter:var(--dsw-menu-backdrop-filter);",
+  "border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-2);",
   "box-shadow:var(--dsw-elevation-prominent)}",
   ".dsh-model-allowance-menu-item{display:flex;align-items:center;gap:8px;width:100%;",
   "padding:4px 6px;border:0;border-radius:var(--dsw-radius-xs);background:0 0;",
@@ -968,11 +966,15 @@ var STYLES = [
   // The model list is a third floating surface. It opens upwards from the
   // footer button, so it carries the same menu surface and elevation as the
   // card and the provider overflow menu.
+  //
+  // It is the one surface that is not translucent: the list floats over the
+  // conversation, and a frosted panel there let the text underneath show
+  // through the model names. A solid layer keeps the list readable wherever
+  // it opens.
   ".dsh-model-allowance-model-wrap{position:relative;display:inline-flex}",
   ".dsh-model-allowance-model-menu{position:absolute;bottom:calc(100% + 4px);right:0;z-index:30;",
   "min-width:180px;max-width:260px;max-height:240px;overflow-y:auto;padding:4px;border:0;",
-  "border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);",
-  "backdrop-filter:var(--dsw-menu-backdrop-filter);",
+  "border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-2);",
   "box-shadow:var(--dsw-elevation-prominent)}",
   ".dsh-model-allowance-model-item{display:flex;align-items:center;justify-content:space-between;",
   "gap:10px;width:100%;padding:4px 6px;border:0;border-radius:var(--dsw-radius-xs);",
@@ -990,11 +992,11 @@ var STYLES = [
   ".dsh-model-allowance-model-arrow{color:var(--dsw-alias-label-tertiary);font-size:12px;",
   "line-height:1}",
   // The effort flyout opens to the right of the list, on the row the
-  // pointer rests on, as a fourth floating surface of the card.
+  // pointer rests on, as a fourth floating surface of the card. It overlaps
+  // the list, so it is solid for the same reason the list is.
   ".dsh-model-allowance-effort-menu{position:absolute;left:calc(100% + 4px);z-index:31;",
   "display:flex;flex-direction:column;min-width:130px;max-width:220px;padding:4px;border:0;",
-  "border-radius:var(--dsw-radius-md);background:var(--dsw-specific-menu);",
-  "backdrop-filter:var(--dsw-menu-backdrop-filter);",
+  "border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-2);",
   "box-shadow:var(--dsw-elevation-prominent)}",
   ".dsh-model-allowance-effort-item{display:flex;align-items:center;justify-content:space-between;",
   "gap:10px;width:100%;padding:3px 6px;border:0;border-radius:var(--dsw-radius-xs);",
