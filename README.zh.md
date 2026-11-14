@@ -37,10 +37,10 @@
 2. 点击 **Install（安装）**，填入：
 
    ```
-   dsh-model-allowance@1.0.0
+   dsh-model-allowance@1.0.7
    ```
 
-   如果已有更新版本，请把 `1.0.0` 换成最新的精确版本。
+   如果已有更新版本，请把 `1.0.7` 换成最新的精确版本。
 3. 确认安装。如果 DSH 提示需要重启，重启 DSH；否则刷新页面即可。
 
 通过 npm 安装的版本可以在 Plugin Manager 中使用 **Update** 更新。
@@ -48,7 +48,7 @@
 ### 从 GitHub 安装
 
 ```
-git+https://github.com/MeiK2333/dsh-model-allowance.git#v1.0.0
+git+https://github.com/MeiK2333/dsh-model-allowance.git#v1.0.7
 ```
 
 Git 安装不受 Plugin Manager 的 **Update** 管理；更新时需要先移除旧版本，
