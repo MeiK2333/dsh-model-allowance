@@ -80,10 +80,11 @@ test('the provider mark renders a whole-pixel svg', () => {
   assert.ok(Number.isInteger(height) && height % 2 === 0)
 })
 
-test('Kimi and OpenCode use their official marks instead of a letter', () => {
+test('Kimi, OpenCode, and Qwen use their official marks instead of a letter', () => {
   for (const [route, hint] of [
     ['kimi-coding', 'kimi'],
     ['opencode-go', 'opencode'],
+    ['qwen-token-plan-cn', 'qwen'],
   ]) {
     const html = renderToStaticMarkup(
       providerIcon(route, 14, markOf({ color: '#64748b', iconHint: hint }, route)),
@@ -95,6 +96,17 @@ test('Kimi and OpenCode use their official marks instead of a letter', () => {
     assert.ok(Number.isInteger(width) && width % 2 === 0)
     assert.ok(Number.isInteger(height) && height % 2 === 0)
   }
+})
+
+test("Qwen's petals carry the vendor's own paint", () => {
+  const html = renderToStaticMarkup(
+    providerIcon('qwen-token-plan-cn', 14, markOf({ color: '#082DFF', iconHint: 'qwen' }, 'qwen')),
+  )
+  // The mark is painted by its own gradients, not by the brand colour.
+  assert.match(html, /linearGradient/)
+  assert.match(html, /#082DFF/)
+  assert.match(html, /#3FD2F9/)
+  assert.match(html, /fill="url\(#dsh-balance-qwen-0\)"/)
 })
 
 test('a vendor label distinguishes windows that share a unit', () => {
