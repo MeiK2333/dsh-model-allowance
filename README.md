@@ -25,6 +25,10 @@ of the current conversation, next to the input box.
 
 ### Not supported
 
+These vendors publish no balance API. As long as they are configured here,
+they still appear in the card: the panel says there is no balance API, and
+their models stay switchable.
+
 - Qwen Token Plan: the vendor publishes no balance API
 - Mimo Token Plan：the vendor publishes no balance API
 

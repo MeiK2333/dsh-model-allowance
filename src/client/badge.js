@@ -80,6 +80,24 @@ export function statusDisplayState(status) {
 }
 
 /**
+ * Whether one directory entry stands for a provider route.
+ *
+ * The Host names a vendor by two ids when the balance route and the route
+ * that lists the vendor's models differ: the DeepSeek API vendor is
+ * `deepseek` to a balance query and `deepseek-official` to the model catalog.
+ * The entry that answers for one of them answers for the other.
+ *
+ * @param {{route: string, aliases?: readonly string[]}} entry Directory entry.
+ * @param {string} route Provider route.
+ * @returns {boolean} Whether the entry names the route.
+ */
+export function entryCovers(entry, route) {
+  if (entry === undefined || entry === null) return false
+  if (entry.route === route) return true
+  return Array.isArray(entry.aliases) && entry.aliases.includes(route)
+}
+
+/**
  * The badge and its detail popover.
  * @param {object} props Slot props plus the plugin context and translator.
  * @returns {React.ReactElement | null} The rendered badge.
@@ -128,7 +146,7 @@ export function BalanceBadge(props) {
    * @returns {object | undefined} The entry.
    */
   const entryOf = React.useCallback(
-    (route) => directory.find((entry) => entry.route === route),
+    (route) => directory.find((entry) => entryCovers(entry, route)),
     [directory],
   )
 
@@ -253,12 +271,14 @@ export function BalanceBadge(props) {
   // Pointing the card at a *different* route has no model context, so the
   // Host falls back to the provider's own choice.
   const activeProvider = picked ?? provider
-  const activeModel = picked === null || picked === provider ? selectedModel : undefined
   // Whether the card points at the vendor the session is on. The card can
   // be pointed at another vendor to read that vendor's balance, and then
   // the switch button means something else: it would move the session
   // over, rather than pick another model of the vendor already in use.
-  const inUse = activeProvider === provider
+  // Another id of the same vendor is the same vendor, so the card still
+  // counts as pointing at it.
+  const inUse = activeProvider === provider || entryOf(provider)?.route === activeProvider
+  const activeModel = inUse ? selectedModel : undefined
   // What the button says it will do: another model of the vendor in use,
   // or a move over to the vendor the card points at.
   const switchLabel = t(inUse ? 'detail.switchModelHere' : 'detail.switchModelThere', {
@@ -777,7 +797,7 @@ export function BalanceBadge(props) {
   let shown = available.slice(0, visibleCount)
   let overflow = available.slice(visibleCount)
   // The provider being read stays visible; it is the one the card is about.
-  const activeIndex = overflow.findIndex((entry) => entry.route === activeProvider)
+  const activeIndex = overflow.findIndex((entry) => entryCovers(entry, activeProvider))
   if (activeIndex >= 0 && shown.length > 0) {
     const displaced = shown[shown.length - 1]
     shown = [...shown.slice(0, -1), overflow[activeIndex]]
@@ -788,6 +808,7 @@ export function BalanceBadge(props) {
   const markButton = (entry) => {
     const mark = markFor(entry.route)
     const name = nameOf(entry.route)
+    const active = entryCovers(entry, activeProvider)
     return h(
       'button',
       {
@@ -795,8 +816,8 @@ export function BalanceBadge(props) {
         key: entry.route,
         role: 'tab',
         className: 'dsh-model-allowance-tab',
-        'data-active': entry.route === activeProvider ? 'true' : 'false',
-        'aria-selected': entry.route === activeProvider ? 'true' : 'false',
+        'data-active': active ? 'true' : 'false',
+        'aria-selected': active ? 'true' : 'false',
         'aria-label': name,
         title: name,
         style: { '--provider-mark': mark.color },

@@ -1166,6 +1166,11 @@ function statusDisplayState(status) {
   if (status.state === "unknown" && !status.url && !status.error) return "unsupported";
   return status.state;
 }
+function entryCovers(entry, route) {
+  if (entry === void 0 || entry === null) return false;
+  if (entry.route === route) return true;
+  return Array.isArray(entry.aliases) && entry.aliases.includes(route);
+}
 function BalanceBadge(props) {
   const { useProjection, ctx, t } = props;
   const selection = useProjection("modelSelection");
@@ -1184,7 +1189,7 @@ function BalanceBadge(props) {
   const lastModelProvider = React.useRef(null);
   const available = directory.filter((entry) => entry.configured);
   const entryOf = React.useCallback(
-    (route) => directory.find((entry) => entry.route === route),
+    (route) => directory.find((entry) => entryCovers(entry, route)),
     [directory]
   );
   const nameOf = React.useCallback((route) => pickName(entryOf(route), route), [entryOf]);
@@ -1250,8 +1255,8 @@ function BalanceBadge(props) {
     setPicked(null);
   });
   const activeProvider = picked ?? provider;
-  const activeModel = picked === null || picked === provider ? selectedModel : void 0;
-  const inUse = activeProvider === provider;
+  const inUse = activeProvider === provider || entryOf(provider)?.route === activeProvider;
+  const activeModel = inUse ? selectedModel : void 0;
   const switchLabel = t(inUse ? "detail.switchModelHere" : "detail.switchModelThere", {
     name: nameOf(activeProvider)
   });
@@ -1636,7 +1641,7 @@ function BalanceBadge(props) {
   }
   let shown = available.slice(0, visibleCount);
   let overflow = available.slice(visibleCount);
-  const activeIndex = overflow.findIndex((entry) => entry.route === activeProvider);
+  const activeIndex = overflow.findIndex((entry) => entryCovers(entry, activeProvider));
   if (activeIndex >= 0 && shown.length > 0) {
     const displaced = shown[shown.length - 1];
     shown = [...shown.slice(0, -1), overflow[activeIndex]];
@@ -1645,6 +1650,7 @@ function BalanceBadge(props) {
   const markButton = (entry) => {
     const mark = markFor(entry.route);
     const name = nameOf(entry.route);
+    const active = entryCovers(entry, activeProvider);
     return (0, import_react3.createElement)(
       "button",
       {
@@ -1652,8 +1658,8 @@ function BalanceBadge(props) {
         key: entry.route,
         role: "tab",
         className: "dsh-model-allowance-tab",
-        "data-active": entry.route === activeProvider ? "true" : "false",
-        "aria-selected": entry.route === activeProvider ? "true" : "false",
+        "data-active": active ? "true" : "false",
+        "aria-selected": active ? "true" : "false",
         "aria-label": name,
         title: name,
         style: { "--provider-mark": mark.color },

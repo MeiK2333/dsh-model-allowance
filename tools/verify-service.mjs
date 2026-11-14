@@ -204,6 +204,91 @@ try {
     }
     console.log('credentials: route credentials come from the harness, per route')
   }
+
+  // --- a vendor the harness serves but the plugin cannot price --------------
+  // The card is how models are picked, so a vendor without a balance adapter
+  // must still be offered: its models have to stay reachable, and the panel
+  // says there is no balance API for it.
+  {
+    const served = [
+      { id: 'qwen-token-plan-cn', name: 'Qwen Token Plan CN' },
+      { id: 'acme-ai', name: 'ACME AI' },
+      { id: 'deepseek-official', name: 'DeepSeek' },
+    ]
+    const vendorCredentials = { DEEPSEEK_API_KEY: 'sk-test', MINIMAX_API_KEY: 'sk-test' }
+    const vendorCtx = strictContext({
+      credentials: {
+        resolve: async (ref) =>
+          vendorCredentials[ref] ? { value: vendorCredentials[ref], source: 'test' } : undefined,
+      },
+      llm: {
+        listProviders: () => served,
+        // The harness knows the international MiniMax route, and the
+        // installation stores its key — but no profile routes to it.
+        listConfigurableProviders: () => [
+          {
+            provider: 'minimax',
+            displayName: 'MiniMax',
+            settingsNs: 'llm-pi-ai',
+            settingsPath: ['providers', 'minimax'],
+            nativeAuth: { env: ['MINIMAX_API_KEY'] },
+          },
+        ],
+      },
+      settings: { describe: () => [] },
+    })
+    const vendorService = new BalanceService({
+      ctx: vendorCtx,
+      resolveCredential: async (ref) => vendorCredentials[ref],
+      options: { ttlMs: 1000, requestTimeoutMs: 5000 },
+    })
+
+    const directory = await vendorService.available()
+    const byRoute = Object.fromEntries(directory.map((entry) => [entry.route, entry]))
+
+    // A vendor with a placeholder adapter: no balance API, but the harness
+    // serves it, so this installation has it configured.
+    if (byRoute['qwen-token-plan-cn']?.configured !== true) {
+      throw new Error('a served vendor with no balance API was not offered')
+    }
+    // A vendor this build knows nothing about at all.
+    if (byRoute['acme-ai']?.configured !== true) {
+      throw new Error('a vendor with no adapter was not offered')
+    }
+    if (byRoute['acme-ai']?.name?.zh !== 'ACME AI') {
+      throw new Error('the vendor was not named by the harness')
+    }
+    // The harness's other id for a vendor this build can price is the same
+    // vendor: it must not become a second, priceless entry of its own.
+    if (byRoute['deepseek-official'] !== undefined) {
+      throw new Error('the second id of a priced vendor became an entry of its own')
+    }
+    if (byRoute.deepseek?.aliases?.includes('deepseek-official') !== true) {
+      throw new Error('the second id of a priced vendor is not an alias of it')
+    }
+    // A stored key is not a route: the harness does not serve the
+    // international MiniMax here, so its models cannot be picked and it is
+    // not offered.
+    if (byRoute.minimax?.configured !== false) {
+      throw new Error('a vendor the harness does not route to was offered')
+    }
+    // Reading such a vendor answers "no balance API", which is what the panel
+    // shows.
+    const reading = await vendorService.read('acme-ai', { force: true })
+    if (reading.status !== 'unsupported') {
+      throw new Error(
+        `a vendor with no balance API should read unsupported, got ${JSON.stringify(reading)}`,
+      )
+    }
+    // The second id of a priced vendor reads that vendor's balance.
+    const official = await vendorService.read('deepseek-official', { force: true })
+    if (official.status !== 'ready' || official.amount !== 46.71) {
+      throw new Error(
+        `the second id of a priced vendor did not read its balance: ${JSON.stringify(official)}`,
+      )
+    }
+    console.log('directory: a vendor without a balance API is still offered')
+  }
 } finally {
   globalThis.fetch = originalFetch
 }

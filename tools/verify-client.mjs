@@ -1097,6 +1097,192 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   console.log('client: a vendor without artwork reads as its initial')
 }
 
+// --- A vendor without a balance API is still offered, and still switchable --
+// The card is how models are picked. A vendor this build cannot price must
+// therefore appear in the switcher, say so in the panel, and still offer its
+// models — otherwise the user cannot move to it at all.
+{
+  const pricelessDirectory = [
+    {
+      route: 'deepseek-account',
+      configured: true,
+      name: { zh: 'DeepSeek 账号', en: 'DeepSeek account' },
+      color: '#4d6bfe',
+      iconHint: 'deepseek',
+    },
+    {
+      route: 'qwen-token-plan-cn',
+      configured: true,
+      name: { zh: '通义千问 Token Plan (国内)', en: 'Qwen Token Plan (CN)' },
+      color: '#ff6a00',
+    },
+  ]
+  const readPriceless = (route) => ({
+    ok: true,
+    value:
+      route === 'qwen-token-plan-cn'
+        ? { provider: route, status: 'unsupported', kind: 'quota' }
+        : {
+            provider: route,
+            status: 'ready',
+            kind: 'amount',
+            amount: 46.71,
+            currency: 'CNY',
+            updatedAt: Date.now(),
+          },
+  })
+  const switched = []
+  let pricelessSlot
+  const pricelessCtx = {
+    effect: (fn) => fn(),
+    locale: ctx.locale,
+    remote: { $mount: async () => () => {}, $stream: undefined },
+    get: (key) =>
+      key === 'remote.balance'
+        ? {
+            balance: async (route) => readPriceless(route),
+            refresh: async (route) => readPriceless(route),
+            list: async () => ({ ok: true, value: pricelessDirectory }),
+            status: async (route) => ({ ok: true, value: { provider: route, state: 'unknown' } }),
+            defaultProvider: async () => ({ ok: true, value: { provider: 'deepseek-account' } }),
+          }
+        : key === 'remote.session'
+          ? {
+              selectModel: async (request) => {
+                switched.push(request)
+                return { ok: true }
+              },
+              modelCatalog: async () => ({
+                ok: true,
+                value: {
+                  groups: [
+                    {
+                      id: 'qwen-token-plan-cn',
+                      name: 'Qwen Token Plan CN',
+                      models: [{ id: 'qwen4-max-preview', name: 'Qwen4 Max Preview' }],
+                    },
+                  ],
+                },
+              }),
+            }
+          : undefined,
+    slots: {
+      inject: (_key, callback) => callback(),
+      register: (options, Component) => {
+        pricelessSlot = { options, Component }
+        return () => {}
+      },
+    },
+  }
+  plugin.apply(pricelessCtx)
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  hookState = []
+  hookCursor = 0
+  const pricelessProjection = {
+    lastUsed: { provider: 'qwen-token-plan-cn', model: 'qwen4-max-preview' },
+    next: null,
+  }
+  const renderPriceless = () => {
+    hookCursor = 0
+    return render(
+      pricelessSlot.Component({
+        useProjection: (key) => (key === 'modelSelection' ? pricelessProjection : undefined),
+        sessionId: 'session-1',
+      }),
+    )
+  }
+  renderPriceless()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+
+  // The badge follows the session's vendor and says there is no balance API.
+  const pricelessBadge = renderPriceless()
+  if (!pricelessBadge.includes('通义千问 Token Plan (国内) 目前无余额接口')) {
+    throw new Error(
+      `the badge should say the vendor has no balance API, rendered ${JSON.stringify(pricelessBadge)}`,
+    )
+  }
+
+  // Open the card: the vendor has its own mark, and the panel repeats the
+  // reason next to the vendor it names.
+  hookState[2] = true
+  hookCursor = 0
+  renderPriceless()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  hookCursor = 0
+  const pricelessCard = renderPriceless()
+  if (!pricelessCard.includes('class="dsh-model-allowance-tab-letter">Q<')) {
+    throw new Error(
+      `a vendor without a balance API should still draw its mark, rendered ${JSON.stringify(pricelessCard)}`,
+    )
+  }
+  if (!pricelessCard.includes('通义千问 Token Plan (国内) 目前无余额接口')) {
+    throw new Error('the panel should say the vendor has no balance API')
+  }
+
+  // The model list is what makes the vendor reachable: it opens for this
+  // vendor, and picking a model moves the session to it.
+  /** Expand function components once, so hooks run a single time. */
+  const expand = (node) => {
+    if (node === null || node === undefined || typeof node !== 'object') return node
+    if (Array.isArray(node)) return node.map(expand)
+    if (typeof node.type === 'function') {
+      return expand(node.type({ ...node.props, children: node.children }))
+    }
+    return { ...node, children: (node.children ?? []).map(expand) }
+  }
+  /** Collect every button node in a rendered tree. */
+  const buttonsIn = (node, out = []) => {
+    if (node === null || node === undefined || typeof node !== 'object') return out
+    if (Array.isArray(node)) {
+      for (const child of node) buttonsIn(child, out)
+      return out
+    }
+    if (node.type === 'button') out.push(node)
+    for (const child of node.children ?? []) buttonsIn(child, out)
+    return out
+  }
+  /** The rendered tree for the current state. */
+  const pricelessTree = () => {
+    hookCursor = 0
+    return expand(
+      pricelessSlot.Component({
+        useProjection: (key) => (key === 'modelSelection' ? pricelessProjection : undefined),
+        sessionId: 'session-1',
+      }),
+    )
+  }
+  const switchButton = buttonsIn(pricelessTree()).find(
+    (button) =>
+      button.props.className === 'dsh-model-allowance-icon-button' &&
+      button.props['aria-haspopup'] === 'menu',
+  )
+  if (!switchButton) throw new Error('the model switch button was not rendered')
+  switchButton.props.onClick()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  // The list is read when the menu opens, so the render that opens it starts
+  // the read and the next one carries the models.
+  pricelessTree()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  const openTree = pricelessTree()
+  const modelItem = buttonsIn(openTree).find(
+    (button) => button.props.className === 'dsh-model-allowance-model-item',
+  )
+  if (!modelItem) {
+    throw new Error(
+      `a vendor without a balance API should still offer its models, rendered ${JSON.stringify(render(openTree))}`,
+    )
+  }
+  modelItem.props.onClick()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  if (switched.length !== 1) {
+    throw new Error(`the model switch did not run, recorded ${JSON.stringify(switched)}`)
+  }
+  if (switched[0].provider !== 'qwen-token-plan-cn') {
+    throw new Error(`the switch named the wrong provider: ${JSON.stringify(switched[0])}`)
+  }
+  console.log('switcher: a vendor without a balance API is offered, and its models are pickable')
+}
+
 // --- With nothing exhausted the badge speaks for the shortest window ------
 // A coding plan's 5-hour window is the allowance a turn spends first, so the
 // badge shows it rather than the most-constrained weekly window; a window that

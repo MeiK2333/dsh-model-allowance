@@ -41,6 +41,8 @@ declare module '@deepseek-ai/cordis' {
     /** Optional provider directory used for credential discovery. */
     llm?: {
       listConfigurableProviders(): Array<Record<string, unknown>> | undefined
+      /** The routes this installation has configured, with their names. */
+      listProviders(): Array<{ id: string; name?: string }> | undefined
     }
     /** Registered by this plugin's own service class. */
     modelAllowance: any

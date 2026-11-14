@@ -13,7 +13,7 @@ const { formatAmount, formatDuration } = await import('../src/client/format.js')
 const { scheduleView, formatCountdown } = await import('../src/client/schedule.js')
 const { markOf, providerIcon } = await import('../src/client/icons.js')
 const { windowTitle } = await import('../src/client/windows.js')
-const { statusDisplayState } = await import('../src/client/badge.js')
+const { statusDisplayState, entryCovers } = await import('../src/client/badge.js')
 const { en, statusLabel, zh } = await import('../src/client/locales.js')
 
 const t = (key, params = {}) => {
@@ -132,6 +132,19 @@ test('the card distinguishes loading, no status source, and a failed status read
   assert.equal(statusLabel('unsupported', zhT), '未提供状态服务')
   assert.equal(statusLabel('loading', enT), 'Loading status…')
   assert.equal(statusLabel('unsupported', enT), 'No status service provided')
+})
+
+test('a directory entry answers for every id of its vendor', () => {
+  // The balance route and the route that lists the vendor's models are not
+  // always the same id, and one entry must answer for both.
+  const entry = { route: 'deepseek', aliases: ['deepseek-official'] }
+  assert.equal(entryCovers(entry, 'deepseek'), true)
+  assert.equal(entryCovers(entry, 'deepseek-official'), true)
+  assert.equal(entryCovers(entry, 'qwen-token-plan-cn'), false)
+  // An entry without aliases still answers for its own route.
+  assert.equal(entryCovers({ route: 'zai' }, 'zai'), true)
+  assert.equal(entryCovers({ route: 'zai' }, 'zai-coding-cn'), false)
+  assert.equal(entryCovers(undefined, 'zai'), false)
 })
 
 test('money and duration formatting stay readable at the badge edges', () => {
