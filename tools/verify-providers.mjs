@@ -225,7 +225,16 @@ if (findAdapter('__none__') !== undefined) throw new Error('an unknown route sho
   }
   // Zhipu's rule has no holiday exception.
   if (zhipu.holidays.length !== 0) throw new Error('zhipu should not declare holidays')
-  console.log('schedule: deepseek and zhipu declare their peak windows')
+
+  // MiMo's CN plan discounts credits off-peak, 00:00–08:00 daily, so its peak
+  // window runs to the day's end — `24:00`, not a minute short of midnight.
+  const xiaomi = findAdapter('xiaomi-token-plan-cn')?.schedule
+  if (xiaomi === undefined) throw new Error('xiaomi-token-plan-cn should declare its peak schedule')
+  if (ranges(xiaomi).join(',') !== '08:00-24:00') {
+    throw new Error(`xiaomi windows changed: ${ranges(xiaomi).join(',')}`)
+  }
+  if (xiaomi.days.length !== 7) throw new Error('xiaomi prices its peak window every day')
+  console.log('schedule: deepseek, zhipu, and xiaomi-cn declare their peak windows')
 }
 
 // --- a holiday list must cover the current year ---------------------------

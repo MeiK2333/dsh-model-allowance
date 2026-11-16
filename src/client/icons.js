@@ -112,14 +112,15 @@ export function modelGlyph(size) {
  * The artwork this build can draw, keyed by the hint a route's Host
  * metadata carries.
  *
- * All six are the vendors' own artwork, taken from what each site
+ * All seven are the vendors' own artwork, taken from what each site
  * publishes: DeepSeek serves a standalone square icon SVG, MiniMax and
  * Zhipu serve wordmarks with the mark as the leading path, Kimi publishes a
  * K-only mark in its branding guide, OpenCode publishes its logo on its
- * brand page, and Qwen publishes its six-petal mark on qianwenai.com.
- * DeepSeek, Kimi, OpenCode, and Qwen ship the mark on its own; the two
+ * brand page, Qwen publishes its six-petal mark on qianwenai.com, and
+ * Xiaomi's MiMo wordmark contributes its M glyph.
+ * DeepSeek, Kimi, OpenCode, and Qwen ship the mark on its own; the three
  * wordmarks have the glyph lifted from the lockup.
- * All six are trademarks of their owners and identify the provider here.
+ * All seven are trademarks of their owners and identify the provider here.
  *
  * Routes that share a vendor share a hint; the two DeepSeek entries look
  * alike on purpose, and the difference between the signed-in account and a
@@ -289,6 +290,17 @@ const QWEN_GRADIENT_STOPS = [
 ]
 
 /**
+ * Xiaomi MiMo's M glyph, lifted from the vendor's wordmark and kept in the
+ * vendor's own paint #1F2329, like the other marks that carry their own
+ * colour rather than the label's.
+ */
+const XIAOMI_PATHS = [
+  'M73.7449 15.9987C73.4083 15.998 73.0857 15.8638 72.8479 15.6256C72.6101 15.3873 72.4766 15.0644 72.4766 14.7278V7.165C72.4914 6.83757 72.632 6.52848 72.869 6.30203C73.1059 6.07559 73.4211 5.94922 73.7488 5.94922C74.0766 5.94922 74.3918 6.07559 74.6287 6.30203C74.8657 6.52848 75.0062 6.83757 75.0211 7.165V14.7278C75.0208 14.895 74.9875 15.0606 74.9232 15.215C74.8588 15.3693 74.7647 15.5095 74.6462 15.6276C74.5277 15.7456 74.3871 15.8391 74.2325 15.9028C74.0778 15.9665 73.9122 15.9991 73.7449 15.9987Z',
+  'M87.3607 15.9993C87.0234 15.9993 86.6998 15.8655 86.4611 15.6272C86.2223 15.389 86.0878 15.0657 86.0871 14.7284V4.67881L81.4654 9.45281C81.2304 9.69657 80.9081 9.83697 80.5695 9.84312C80.231 9.84928 79.9038 9.72069 79.6601 9.48563C79.4163 9.25058 79.2759 8.92832 79.2697 8.58976C79.2667 8.42211 79.2967 8.25551 79.358 8.09947C79.4194 7.94342 79.5108 7.80098 79.6272 7.68028L86.4469 0.661082C86.6229 0.478921 86.8494 0.35354 87.0973 0.301033C87.3451 0.248526 87.603 0.271291 87.8378 0.366403C88.0727 0.461516 88.2737 0.624637 88.4151 0.834827C88.5566 1.04502 88.632 1.29268 88.6317 1.54603V14.7284C88.6317 15.0655 88.4978 15.3887 88.2594 15.6271C88.021 15.8654 87.6978 15.9993 87.3607 15.9993Z',
+  'M80.5514 9.82621C80.3824 9.82749 80.2149 9.79518 80.0584 9.73117C79.902 9.66716 79.7599 9.57272 79.6402 9.45332L72.8337 2.4315C72.599 2.18948 72.4701 1.86414 72.4752 1.52705C72.4804 1.18996 72.6193 0.868726 72.8613 0.634023C73.1033 0.399319 73.4287 0.270369 73.7658 0.27554C74.1028 0.280711 74.4241 0.419579 74.6588 0.661595L81.4653 7.66767C81.6389 7.84735 81.7558 8.07413 81.8015 8.31977C81.8472 8.56541 81.8196 8.81906 81.7222 9.04914C81.6248 9.27922 81.4618 9.47557 81.2537 9.61374C81.0455 9.75191 80.8013 9.8258 80.5514 9.82621Z',
+]
+
+/**
  * Each mark's viewBox and the ink it draws, in viewBox units.
  *
  * Every viewBox is cropped to its own glyph, so the ink fills it and the
@@ -310,6 +322,9 @@ const ICON_GEOMETRY = {
   // Qwen's petals draw 0.42..27.58 across and -0.05..28.05 down, so the
   // published 28x28 box would clip a hair of the outer petals.
   qwen: { x: 0.4155, y: -0.048, vbW: 27.169, vbH: 28.0988, inkW: 27.169, inkH: 28.0988 },
+  // MiMo's M draws 72.475..88.632 across and 0.273..16.0 down inside the
+  // wordmark's own space; the box is cropped to the glyph.
+  xiaomi: { x: 72.475, y: 0.2734, vbW: 16.1567, vbH: 15.7259, inkW: 16.1567, inkH: 15.7259 },
 }
 
 /**
@@ -437,6 +452,10 @@ export function providerIcon(route, inkHeight, mark) {
         fill: 'currentColor',
         fillOpacity: path.opacity,
       }),
+    )
+  } else if (mark.icon === 'xiaomi') {
+    content = XIAOMI_PATHS.map((d, index) =>
+      h('path', { key: `xiaomi-${String(index)}`, d, fill: '#1F2329' }),
     )
   } else {
     content = [h('path', { key: 'mark', d: DEEPSEEK_PATH, fill: 'currentColor' })]

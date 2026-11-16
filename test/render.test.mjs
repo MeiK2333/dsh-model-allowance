@@ -70,6 +70,26 @@ test('a holiday renders as an off-peak day without peak blocks', () => {
   assert.doesNotMatch(html, /timeline-peak/)
 })
 
+test('a peak window can run to the day end', () => {
+  // MiMo's CN plan: full-rate credits 08:00–24:00 daily, 0.8x off-peak.
+  const daily = {
+    provider: 'xiaomi-token-plan-cn',
+    timezone: 'Asia/Shanghai',
+    timezoneLabel: { zh: '北京时间', en: 'Beijing time' },
+    days: [0, 1, 2, 3, 4, 5, 6],
+    windows: [{ from: '08:00', to: '24:00' }],
+    holidays: [],
+  }
+  // 23:30 Beijing: still peak, flipping at midnight rather than 23:59.
+  const late = renderToStaticMarkup(scheduleView(daily, Date.parse('2026-11-16T15:30:00Z'), t))
+  assert.match(late, /高峰时段/)
+  assert.match(late, /距低谷开始/)
+  // 03:00 Beijing: off-peak, counting down to the 08:00 window.
+  const early = renderToStaticMarkup(scheduleView(daily, Date.parse('2026-11-16T19:00:00Z'), t))
+  assert.match(early, /低谷时段/)
+  assert.match(early, /距高峰开始/)
+})
+
 test('the provider mark renders a whole-pixel svg', () => {
   const mark = markOf({ color: '#4d6bfe', iconHint: 'deepseek' }, 'deepseek')
   const html = renderToStaticMarkup(providerIcon('deepseek', 14, mark))
@@ -80,11 +100,12 @@ test('the provider mark renders a whole-pixel svg', () => {
   assert.ok(Number.isInteger(height) && height % 2 === 0)
 })
 
-test('Kimi, OpenCode, and Qwen use their official marks instead of a letter', () => {
+test('Kimi, OpenCode, Qwen, and Xiaomi use their official marks instead of a letter', () => {
   for (const [route, hint] of [
     ['kimi-coding', 'kimi'],
     ['opencode-go', 'opencode'],
     ['qwen-token-plan-cn', 'qwen'],
+    ['xiaomi', 'xiaomi'],
   ]) {
     const html = renderToStaticMarkup(
       providerIcon(route, 14, markOf({ color: '#64748b', iconHint: hint }, route)),
@@ -107,6 +128,13 @@ test("Qwen's petals carry the vendor's own paint", () => {
   assert.match(html, /#082DFF/)
   assert.match(html, /#3FD2F9/)
   assert.match(html, /fill="url\(#dsh-balance-qwen-0\)"/)
+})
+
+test("Xiaomi's M carries the vendor's own paint", () => {
+  const html = renderToStaticMarkup(
+    providerIcon('xiaomi', 14, markOf({ color: '#1F2329', iconHint: 'xiaomi' }, 'xiaomi')),
+  )
+  assert.match(html, /fill="#1F2329"/)
 })
 
 test('a vendor label distinguishes windows that share a unit', () => {

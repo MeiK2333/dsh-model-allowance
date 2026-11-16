@@ -22,6 +22,7 @@ of the current conversation, next to the input box.
 - Zhipu Coding Plan
 - Kimi for Coding
 - OpenCode Go
+- Xiaomi MiMo (pay-as-you-go balance and Token Plan)
 
 ### Not supported
 
@@ -30,7 +31,6 @@ they still appear in the card: the panel says there is no balance API, and
 their models stay switchable.
 
 - Qwen Token Plan: the vendor publishes no balance API
-- Mimo Token Plan：the vendor publishes no balance API
 
 ## Installation
 

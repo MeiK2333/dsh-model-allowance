@@ -34,6 +34,10 @@ const credentials = {
   DEEPSEEK_API_KEY: 'sk-test',
   KIMI_API_KEY: 'kimi-test',
   OPENCODE_API_KEY: 'opencode-test',
+  XIAOMI_API_KEY: 'sk-test',
+  XIAOMI_TOKEN_PLAN_CN_API_KEY: 'tp-cn-test',
+  XIAOMI_TOKEN_PLAN_AMS_API_KEY: 'tp-ams-test',
+  XIAOMI_TOKEN_PLAN_SGP_API_KEY: 'tp-sgp-test',
 }
 
 const ctx = strictContext({
@@ -59,6 +63,11 @@ const service = new BalanceService({
 })
 
 // One recorded shape per adapter, so no case depends on the network.
+// The three MiMo clusters answer the same plan shape on their own host.
+const mimoPlan = {
+  period: { start_at: '2026-11-16 06:42:34', end_at: '2026-12-16 23:59:59' },
+  quota: { total_credits: 4100000000, used_credits: 4042860, remaining_credits: 4095957140 },
+}
 const responses = {
   'https://api.deepseek.com/user/balance': {
     balance_infos: [{ currency: 'CNY', total_balance: '46.71' }],
@@ -87,6 +96,12 @@ const responses = {
       monthly: { status: 'ok', percent: 35 },
     },
   },
+  'https://api.xiaomimimo.com/v1/platform/balance': {
+    balance_infos: [{ currency: 'CNY', total_available: '5.00' }],
+  },
+  'https://token-plan-cn.xiaomimimo.com/v1/platform/token_plan': mimoPlan,
+  'https://token-plan-ams.xiaomimimo.com/v1/platform/token_plan': mimoPlan,
+  'https://token-plan-sgp.xiaomimimo.com/v1/platform/token_plan': mimoPlan,
 }
 
 const originalFetch = globalThis.fetch

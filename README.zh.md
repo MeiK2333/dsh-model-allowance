@@ -20,6 +20,7 @@
 - 智谱 Coding Plan
 - Kimi for Coding
 - OpenCode Go
+- Xiaomi MiMo（按量付费余额与 Token Plan）
 
 ### 不支持
 
@@ -27,7 +28,6 @@
 面板会提示“目前无余额接口”，模型列表照常可以切换。
 
 - 千问 Token Plan：官方未提供余额接口
-- Mimo Token Plan：官方未提供余额接口
 
 ## 安装
 
