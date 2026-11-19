@@ -12,31 +12,7 @@
 import { holidayCoverage } from '../lib/providers/schedule.js'
 import { readEndpointAdapter } from '../lib/providers/shared.js'
 import { findAdapter, PROVIDER_ADAPTERS } from '../lib/providers.js'
-
-/**
- * Stub fetch with one recorded response, and record the request it answered.
- * @param {object} fixture Recorded fixture.
- * @param {() => Promise<object>} run The read to perform.
- * @returns {Promise<{result: object, seen: Array<{url: string, init: object}>}>}
- *   The reading and the requests it made.
- */
-async function withFetch(fixture, run) {
-  const original = globalThis.fetch
-  const seen = []
-  globalThis.fetch = async (url, init) => {
-    seen.push({ url, init })
-    return {
-      ok: (fixture.httpStatus ?? 200) < 400,
-      status: fixture.httpStatus ?? 200,
-      json: async () => fixture.response ?? {},
-    }
-  }
-  try {
-    return { result: await run(), seen }
-  } finally {
-    globalThis.fetch = original
-  }
-}
+import { withFetch } from './fixture-fetch.mjs'
 
 /**
  * Assert that every expected field is present and equal.
@@ -113,15 +89,19 @@ for (const adapter of PROVIDER_ADAPTERS) {
     let result
 
     if (adapter.readWithEnv) {
-      // A host-service adapter reads through services rather than the network.
+      // A `readWithEnv` adapter may read through host services, the network,
+      // or both; the recorded transport answers whichever it performs.
       const services = fixture.services ?? {}
-      result = await adapter.readWithEnv({
-        route,
-        apiKey: undefined,
-        ctx: { get: (key) => services[key] },
-        signal: AbortSignal.timeout(5000),
-        model: fixture.model,
-      })
+      const { result: read } = await withFetch(fixture, () =>
+        adapter.readWithEnv({
+          route,
+          apiKey: undefined,
+          ctx: { get: (key) => services[key] },
+          signal: AbortSignal.timeout(5000),
+          model: fixture.model,
+        }),
+      )
+      result = read
     } else {
       const apiKey = fixture.apiKey ?? 'test-key'
       const { result: read, seen } = await withFetch(fixture, () =>

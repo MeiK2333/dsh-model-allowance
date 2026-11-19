@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 import * as z from 'zod'
 import { readEndpointAdapter } from '../lib/providers/shared.js'
 import { findAdapter, PROVIDER_ADAPTERS } from '../lib/providers.js'
+import { withFetch } from '../tools/fixture-fetch.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(join(here, '..', 'client.js'), 'utf8')
@@ -89,31 +90,24 @@ function descriptor(endpoint) {
 /** Read one adapter fixture's view exactly as the Host would. */
 async function readFixture(adapter, fixture) {
   const route = fixture.route ?? adapter.routes[0]
-  if (adapter.readWithEnv) {
-    return await adapter.readWithEnv({
-      route,
-      apiKey: undefined,
-      ctx: { get: (key) => fixture.services?.[key] },
-      signal: AbortSignal.timeout(5000),
-      model: fixture.model,
-    })
-  }
-  const original = globalThis.fetch
-  globalThis.fetch = async () => ({
-    ok: (fixture.httpStatus ?? 200) < 400,
-    status: fixture.httpStatus ?? 200,
-    json: async () => fixture.response ?? {},
-  })
-  try {
+  const { result } = await withFetch(fixture, async () => {
+    if (adapter.readWithEnv) {
+      return await adapter.readWithEnv({
+        route,
+        apiKey: undefined,
+        ctx: { get: (key) => fixture.services?.[key] },
+        signal: AbortSignal.timeout(5000),
+        model: fixture.model,
+      })
+    }
     return await readEndpointAdapter(adapter, {
       route,
       apiKey: fixture.apiKey ?? 'test-key',
       signal: AbortSignal.timeout(5000),
       model: fixture.model,
     })
-  } finally {
-    globalThis.fetch = original
-  }
+  })
+  return result
 }
 
 test('the balance result schema keeps the movement the badge renders', () => {

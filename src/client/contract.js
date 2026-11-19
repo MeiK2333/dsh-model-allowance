@@ -48,6 +48,9 @@ export function createBalanceContribution() {
       })
       .optional(),
     consoleUrl: z.string().optional(),
+    // The setup guide rides an unconfigured reading: the card links it so the
+    // user lands on the walkthrough for this provider's credentials.
+    setupUrl: z.string().optional(),
     updatedAt: z.number().optional(),
     error: z.string().optional(),
   })
@@ -155,6 +158,38 @@ export function createBalanceContribution() {
           z.object({ provider: z.string().optional() }),
           'The default provider.',
           'dsh-model-allowance#defaultProvider',
+        ),
+      },
+      'balance/testCredentials': {
+        service: 'balanceController',
+        description: "Walk a provider's credential chain against the live endpoints.",
+        invocation: { kind: 'direct' },
+        parameters: [
+          {
+            name: 'accessKeyId',
+            wire: 'accessKeyId',
+            source: 'json',
+            codec: strict(
+              z.string().min(1),
+              'AccessKey ID candidate.',
+              'dsh-model-allowance#accessKeyId',
+            ),
+          },
+          {
+            name: 'secretAccessKey',
+            wire: 'secretAccessKey',
+            source: 'json',
+            codec: strict(
+              z.string().min(1),
+              'AccessKey secret candidate.',
+              'dsh-model-allowance#secretAccessKey',
+            ),
+          },
+        ],
+        result: strict(
+          z.object({ ok: z.boolean(), error: z.string().optional() }),
+          'The outcome.',
+          'dsh-model-allowance#testOutcome',
         ),
       },
       'balance/refresh': {

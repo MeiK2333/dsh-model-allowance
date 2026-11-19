@@ -38,6 +38,8 @@ const credentials = {
   XIAOMI_TOKEN_PLAN_CN_API_KEY: 'tp-cn-test',
   XIAOMI_TOKEN_PLAN_AMS_API_KEY: 'tp-ams-test',
   XIAOMI_TOKEN_PLAN_SGP_API_KEY: 'tp-sgp-test',
+  ALIBABA_CLOUD_ACCESS_KEY_ID: 'LTAIverify',
+  ALIBABA_CLOUD_ACCESS_KEY_SECRET: 'verify-secret',
 }
 
 const ctx = strictContext({
@@ -68,6 +70,18 @@ const mimoPlan = {
   period: { start_at: '2026-11-16 06:42:34', end_at: '2026-12-16 23:59:59' },
   quota: { total_credits: 4100000000, used_credits: 4042860, remaining_credits: 4095957140 },
 }
+// The Qwen Token Plan adapter walks a console token and then the gateway
+// APIs, each on its own URL.
+const qwenGateway = (api) =>
+  `https://bailian-cs.console.aliyun.com/cli/api.json?action=BroadScopeAspnGateway` +
+  `&product=sfm_bailian&api=${encodeURIComponent(api)}`
+const qwenEnvelope = (data) => ({
+  code: '200',
+  data: {
+    DataV2: { data: { msg: 'Success.', code: 'SUCCESS', data, success: true } },
+    success: true,
+  },
+})
 const responses = {
   'https://api.deepseek.com/user/balance': {
     balance_infos: [{ currency: 'CNY', total_balance: '46.71' }],
@@ -102,6 +116,21 @@ const responses = {
   'https://token-plan-cn.xiaomimimo.com/v1/platform/token_plan': mimoPlan,
   'https://token-plan-ams.xiaomimimo.com/v1/platform/token_plan': mimoPlan,
   'https://token-plan-sgp.xiaomimimo.com/v1/platform/token_plan': mimoPlan,
+  'https://modelstudio.cn-beijing.aliyuncs.com/modelstudio/cli/generateAccessToken': {
+    cliAccessToken: 'verify-console-token',
+  },
+  [qwenGateway('zeldaHttp.apikeyMgr./tokenplan/personal/api/v2/usage')]: qwenEnvelope({
+    per1MonthPercentage: 0.5,
+    per1MonthResetTime: 1796572800000,
+  }),
+  [qwenGateway('zeldaHttp.apikeyMgr./tokenplan/personal/api/v2/subscription')]: qwenEnvelope({
+    instanceCode: 'verify',
+    specCode: 'lite',
+    status: 'VALID',
+  }),
+  [qwenGateway('zeldaHttp.apikeyMgr./tokenplan/personal/api/v2/quota-config')]: qwenEnvelope({
+    lite: { five_hour: 700, monthly: 20000 },
+  }),
 }
 
 const originalFetch = globalThis.fetch
@@ -261,8 +290,9 @@ try {
     const directory = await vendorService.available()
     const byRoute = Object.fromEntries(directory.map((entry) => [entry.route, entry]))
 
-    // A vendor with a placeholder adapter: no balance API, but the harness
-    // serves it, so this installation has it configured.
+    // A vendor the harness serves is offered even when this build's adapter
+    // for it needs credentials this scenario does not store: the card lists
+    // the route, and its reading says the credentials are missing.
     if (byRoute['qwen-token-plan-cn']?.configured !== true) {
       throw new Error('a served vendor with no balance API was not offered')
     }

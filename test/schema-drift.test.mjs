@@ -14,6 +14,7 @@ import test from 'node:test'
 import { DEEPSEEK_HOLIDAYS } from '../lib/providers/holidays.js'
 import { PROVIDER_ADAPTERS } from '../lib/providers.js'
 import { createBalanceContribution } from '../src/client/contract.js'
+import { withFetch } from '../tools/fixture-fetch.mjs'
 
 const methods = createBalanceContribution().methods
 
@@ -27,23 +28,26 @@ async function fixtureViews(adapter) {
   const views = []
   for (const fixture of adapter.fixtures) {
     const route = fixture.route ?? adapter.routes[0]
-    if (adapter.read) {
-      views.push(
-        adapter.read({ route, apiKey: fixture.apiKey ?? 'test-key', body: fixture.response ?? {} }),
-      )
-    } else if (adapter.readWithEnv) {
-      views.push(
-        await adapter.readWithEnv({
+    const { result } = await withFetch(fixture, async () => {
+      if (adapter.read) {
+        return await adapter.read({
+          route,
+          apiKey: fixture.apiKey ?? 'test-key',
+          body: fixture.response ?? {},
+        })
+      }
+      if (adapter.readWithEnv) {
+        return await adapter.readWithEnv({
           route,
           apiKey: undefined,
           ctx: { get: (key) => fixture.services?.[key] },
           signal: AbortSignal.timeout(5000),
           model: fixture.model,
-        }),
-      )
-    } else {
+        })
+      }
       throw new Error(`adapter ${adapter.id} has neither read nor readWithEnv`)
-    }
+    })
+    views.push(result)
   }
   return views
 }

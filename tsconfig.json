@@ -17,6 +17,7 @@
     "types/**/*.d.ts",
     "index.js",
     "lib/**/*.js",
+    "src/client/credential-groups.js",
     "src/client/format.js",
     "src/client/windows.js",
     "src/client/schedule.js",

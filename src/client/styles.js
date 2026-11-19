@@ -199,6 +199,10 @@ const STYLES = [
   '.dsh-model-allowance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}',
   '.dsh-model-allowance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);',
   'font-size:11px;word-break:break-word}',
+  '.dsh-model-allowance-setup-link{margin-left:6px;color:var(--dsw-alias-state-business-primary);',
+  'text-decoration:none;white-space:nowrap}',
+  '.dsh-model-allowance-setup-link:hover,.dsh-model-allowance-setup-link:focus-visible',
+  '{text-decoration:underline}',
   // The footer is one right-aligned cluster: the reading time sits directly
   // left of the two icon buttons.
   '.dsh-model-allowance-actions{display:flex;align-items:center;',

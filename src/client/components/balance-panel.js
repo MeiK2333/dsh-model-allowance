@@ -219,7 +219,25 @@ export function BalancePanel({
         )
       : null,
     view?.status === 'unconfigured'
-      ? h('div', { className: 'dsh-model-allowance-reason' }, t('badge.unconfigured'))
+      ? h(
+          'div',
+          { className: 'dsh-model-allowance-reason' },
+          t('badge.setupHint'),
+          // The reading carries the provider's setup guide; it is the walk
+          // from "no credential" to a stored pair, so it is one click away.
+          view.setupUrl
+            ? h(
+                'a',
+                {
+                  className: 'dsh-model-allowance-setup-link',
+                  href: view.setupUrl,
+                  target: '_blank',
+                  rel: 'noreferrer noopener',
+                },
+                `${t('badge.setupDoc')} ↗`,
+              )
+            : null,
+        )
       : null,
     // A vendor that prices by the wall clock gets its phase and
     // countdown here, above the footer.

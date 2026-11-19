@@ -13,6 +13,15 @@
 
 卡片显示厂商的余额或剩余额度，以及当前会话所用的模型，位于输入框旁。
 
+## 配置凭据
+
+打开 **设置 → Model Allowance**，即可录入余额查询所需的厂商凭据（例如千问
+Token Plan 用量查询用的阿里云 AccessKey ID/Secret）。可测试的凭据在保存前会
+先经过厂商自己的接口验证，通过后才会落库；已保存的凭据支持修改和删除。密钥
+保存在 DSH 的凭据存储中：不写入配置文件、不会回显，也不会发往除厂商查询接口
+外的任何地方。获取 AccessKey 的步骤见
+[配置指南](docs/qwen-token-plen-cn/README.md)。
+
 ## 支持
 
 - DeepSeek
@@ -21,13 +30,12 @@
 - Kimi for Coding
 - OpenCode Go
 - Xiaomi MiMo（按量付费余额与 Token Plan）
+- 千问 Token Plan（国内个人版；需在 **设置 → Model Allowance** 配置阿里云 AccessKey）
 
 ### 不支持
 
 以下厂商没有余额接口，但只要本地配置了它们，它们依然会出现在卡片里：
 面板会提示“目前无余额接口”，模型列表照常可以切换。
-
-- 千问 Token Plan：官方未提供余额接口
 
 ## 安装
 

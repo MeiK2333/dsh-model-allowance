@@ -42,7 +42,7 @@ __export(index_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(index_exports);
-var import_react8 = require("react");
+var import_react9 = require("react");
 
 // src/client/badge.js
 var React6 = __toESM(require("react"), 1);
@@ -484,7 +484,28 @@ var zh = {
   "duration.daysHours": "{days} \u5929 {hours} \u5C0F\u65F6",
   "duration.hoursMinutes": "{hours} \u5C0F\u65F6 {minutes} \u5206",
   "duration.minutes": "{minutes} \u5206\u949F",
-  "duration.lessThanMinute": "\u4E0D\u5230 1 \u5206\u949F"
+  "duration.lessThanMinute": "\u4E0D\u5230 1 \u5206\u949F",
+  "settings.nav": "Model Allowance",
+  "settings.title": "Model Allowance",
+  "settings.loading": "\u8BFB\u53D6\u51ED\u636E\u72B6\u6001\u2026",
+  "settings.unavailable": "\u672C\u673A\u672A\u63D0\u4F9B\u51ED\u636E\u670D\u52A1\uFF0C\u65E0\u6CD5\u4FDD\u5B58\u51ED\u636E\u3002",
+  "settings.edit": "\u4FEE\u6539",
+  "settings.delete": "\u5220\u9664",
+  "settings.cancel": "\u53D6\u6D88",
+  "settings.save": "\u4FDD\u5B58",
+  "settings.testing": "\u9A8C\u8BC1\u4E2D\u2026",
+  "settings.fillAll": "\u8BF7\u586B\u5199\u5B8C\u6574\u7684\u51ED\u636E\u540E\u518D\u4FDD\u5B58",
+  "settings.testFailed": "\u51ED\u636E\u9A8C\u8BC1\u672A\u901A\u8FC7\uFF0C\u672A\u4FDD\u5B58",
+  "settings.testRejected": "\u5382\u5546\u62D2\u7EDD\u4E86\u8FD9\u5BF9\u51ED\u636E",
+  "settings.doc": "\u5982\u4F55\u83B7\u53D6\u51ED\u636E\uFF1F",
+  "settings.saved": "\u5DF2\u4FDD\u5B58",
+  "settings.configured": "\u5DF2\u914D\u7F6E",
+  "settings.deleted": "\u5DF2\u5220\u9664",
+  "settings.saveFailed": "\u4FDD\u5B58\u5931\u8D25",
+  "settings.deleteFailed": "\u5220\u9664\u5931\u8D25",
+  "settings.loadFailed": "\u8BFB\u53D6\u51ED\u636E\u72B6\u6001\u5931\u8D25",
+  "badge.setupHint": "\u5C1A\u672A\u914D\u7F6E\u8BE5\u5382\u5546\u7684\u67E5\u8BE2\u51ED\u636E\u3002\u6253\u5F00 \u8BBE\u7F6E \u2192 Model Allowance \u5F55\u5165\u3002",
+  "badge.setupDoc": "\u67E5\u770B\u914D\u7F6E\u6307\u5357"
 };
 var en = {
   "badge.loading": "Loading\u2026",
@@ -548,7 +569,28 @@ var en = {
   "duration.daysHours": "{days}d {hours}h",
   "duration.hoursMinutes": "{hours}h {minutes}m",
   "duration.minutes": "{minutes}m",
-  "duration.lessThanMinute": "under a minute"
+  "duration.lessThanMinute": "under a minute",
+  "settings.nav": "Model Allowance",
+  "settings.title": "Model Allowance",
+  "settings.loading": "Reading credential status\u2026",
+  "settings.unavailable": "This host provides no credential store, so credentials cannot be saved.",
+  "settings.edit": "Edit",
+  "settings.delete": "Delete",
+  "settings.cancel": "Cancel",
+  "settings.save": "Save",
+  "settings.testing": "Verifying\u2026",
+  "settings.fillAll": "Fill in every field before saving",
+  "settings.testFailed": "The credentials were rejected and were not saved",
+  "settings.testRejected": "the vendor refused this credential pair",
+  "settings.doc": "How do I get the credentials?",
+  "settings.saved": "Saved",
+  "settings.configured": "Configured",
+  "settings.deleted": "Deleted",
+  "settings.saveFailed": "Save failed",
+  "settings.deleteFailed": "Delete failed",
+  "settings.loadFailed": "Could not read credential status",
+  "badge.setupHint": "No credentials are stored for this provider yet. Open Settings \u2192 Model Allowance to add them.",
+  "badge.setupDoc": "Open the setup guide"
 };
 function activeLanguage() {
   const tag = typeof document !== "undefined" ? document.documentElement?.lang : void 0;
@@ -1410,7 +1452,23 @@ function BalancePanel({
       { className: "dsh-model-allowance-reason" },
       t("badge.unsupportedWithName", { name: nameOf(activeProvider) })
     ) : null,
-    view?.status === "unconfigured" ? (0, import_react6.createElement)("div", { className: "dsh-model-allowance-reason" }, t("badge.unconfigured")) : null,
+    view?.status === "unconfigured" ? (0, import_react6.createElement)(
+      "div",
+      { className: "dsh-model-allowance-reason" },
+      t("badge.setupHint"),
+      // The reading carries the provider's setup guide; it is the walk
+      // from "no credential" to a stored pair, so it is one click away.
+      view.setupUrl ? (0, import_react6.createElement)(
+        "a",
+        {
+          className: "dsh-model-allowance-setup-link",
+          href: view.setupUrl,
+          target: "_blank",
+          rel: "noreferrer noopener"
+        },
+        `${t("badge.setupDoc")} \u2197`
+      ) : null
+    ) : null,
     // A vendor that prices by the wall clock gets its phase and
     // countdown here, above the footer.
     schedule && schedule.provider === activeProvider ? scheduleView(schedule, now, t) : null,
@@ -2069,6 +2127,10 @@ var STYLES = [
   ".dsh-model-allowance-error{padding:4px 0;color:var(--dsw-alias-state-error-primary)}",
   ".dsh-model-allowance-reason{padding:2px 0;color:var(--dsw-alias-label-secondary);",
   "font-size:11px;word-break:break-word}",
+  ".dsh-model-allowance-setup-link{margin-left:6px;color:var(--dsw-alias-state-business-primary);",
+  "text-decoration:none;white-space:nowrap}",
+  ".dsh-model-allowance-setup-link:hover,.dsh-model-allowance-setup-link:focus-visible",
+  "{text-decoration:underline}",
   // The footer is one right-aligned cluster: the reading time sits directly
   // left of the two icon buttons.
   ".dsh-model-allowance-actions{display:flex;align-items:center;",
@@ -2455,6 +2517,9 @@ function createBalanceContribution() {
       at: z.number()
     }).optional(),
     consoleUrl: z.string().optional(),
+    // The setup guide rides an unconfigured reading: the card links it so the
+    // user lands on the walkthrough for this provider's credentials.
+    setupUrl: z.string().optional(),
     updatedAt: z.number().optional(),
     error: z.string().optional()
   });
@@ -2556,6 +2621,38 @@ function createBalanceContribution() {
           "dsh-model-allowance#defaultProvider"
         )
       },
+      "balance/testCredentials": {
+        service: "balanceController",
+        description: "Walk a provider's credential chain against the live endpoints.",
+        invocation: { kind: "direct" },
+        parameters: [
+          {
+            name: "accessKeyId",
+            wire: "accessKeyId",
+            source: "json",
+            codec: strict(
+              z.string().min(1),
+              "AccessKey ID candidate.",
+              "dsh-model-allowance#accessKeyId"
+            )
+          },
+          {
+            name: "secretAccessKey",
+            wire: "secretAccessKey",
+            source: "json",
+            codec: strict(
+              z.string().min(1),
+              "AccessKey secret candidate.",
+              "dsh-model-allowance#secretAccessKey"
+            )
+          }
+        ],
+        result: strict(
+          z.object({ ok: z.boolean(), error: z.string().optional() }),
+          "The outcome.",
+          "dsh-model-allowance#testOutcome"
+        )
+      },
       "balance/refresh": {
         service: "balanceController",
         description: "Force a fresh reading for one provider, bypassing the cache.",
@@ -2592,6 +2689,334 @@ function createBalanceContribution() {
       }
     }
   };
+}
+
+// src/client/credentials-page.js
+var React7 = __toESM(require("react"), 1);
+var import_react8 = require("react");
+
+// src/client/credential-groups.js
+var CREDENTIAL_GROUPS = Object.freeze([
+  {
+    id: "aliyun",
+    name: {
+      zh: "\u963F\u91CC\u4E91\uFF08\u5343\u95EE Token Plan\uFF09",
+      en: "Alibaba Cloud (Qwen Token Plan)"
+    },
+    docLabel: {
+      zh: "\u5982\u4F55\u83B7\u53D6 AccessKey\uFF1F",
+      en: "How do I get an AccessKey?"
+    },
+    docUrl: "https://github.com/MeiK2333/dsh-model-allowance/blob/master/docs/qwen-token-plen-cn/README.md",
+    test: "qwen",
+    fields: [
+      {
+        ref: "ALIBABA_CLOUD_ACCESS_KEY_ID",
+        label: { zh: "AccessKey ID", en: "AccessKey ID" }
+      },
+      {
+        ref: "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+        label: { zh: "AccessKey Secret", en: "AccessKey Secret" }
+      }
+    ]
+  }
+]);
+var CREDENTIAL_REFS = Object.freeze(
+  CREDENTIAL_GROUPS.flatMap((group) => group.fields.map((field) => field.ref))
+);
+
+// src/client/credentials-page.js
+var STYLES2 = [
+  ".dsh-allowance-cfg{display:flex;flex-direction:column;gap:12px;max-width:720px;",
+  "color:var(--dsw-alias-label-primary)}",
+  ".dsh-allowance-cfg-title{margin:0;font-size:16px;line-height:24px;font-weight:500;",
+  "color:var(--dsw-alias-label-primary)}",
+  ".dsh-allowance-cfg-card{display:flex;flex-direction:column;gap:12px;padding:12px 14px;",
+  "border:0.5px solid var(--dsw-alias-settings-card-stroke);",
+  "background:var(--dsw-alias-settings-card-fill);border-radius:var(--dsw-radius-xl)}",
+  ".dsh-allowance-cfg-card-title{margin:0;font-size:14px;line-height:22px;font-weight:500;",
+  "color:var(--dsw-alias-label-primary)}",
+  ".dsh-allowance-cfg-card-head{display:flex;align-items:center;gap:8px}",
+  ".dsh-allowance-cfg-field{display:flex;flex-direction:column;gap:6px}",
+  ".dsh-allowance-cfg-field-label{font-size:12px;line-height:18px;font-weight:500;",
+  "color:var(--dsw-alias-label-secondary)}",
+  ".dsh-allowance-cfg-text{font-size:14px;line-height:22px;",
+  "color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}",
+  ".dsh-allowance-cfg-status{display:inline-flex;align-items:center;height:22px;",
+  "padding:0 8px;border-radius:var(--dsw-radius-sm);font-size:12px;line-height:18px;",
+  "border:0.5px solid var(--dsw-alias-state-success-primary);",
+  "color:var(--dsw-alias-state-success-primary)}",
+  ".dsh-allowance-cfg-input{box-sizing:border-box;width:100%;height:32px;padding:0 10px;",
+  "border:0.5px solid var(--dsw-alias-border-l4);border-radius:var(--dsw-radius-md);",
+  "font:inherit;font-size:14px;line-height:22px;background:var(--dsw-alias-bg-layer-1);",
+  "color:var(--dsw-alias-label-primary)}",
+  ".dsh-allowance-cfg-input:focus{outline:none;",
+  "border-color:var(--dsw-alias-state-business-primary)}",
+  ".dsh-allowance-cfg-input:disabled{opacity:.6;cursor:default}",
+  ".dsh-allowance-cfg-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}",
+  ".dsh-allowance-cfg-button{box-sizing:border-box;display:inline-flex;align-items:center;",
+  "justify-content:center;height:32px;padding:0 14px;border:none;",
+  "border-radius:var(--dsw-radius-md);font:inherit;font-size:14px;line-height:22px;",
+  "cursor:pointer}",
+  '.dsh-allowance-cfg-button[data-tone="primary"]{',
+  "background:var(--dsw-alias-button-primary-fill);",
+  "color:var(--dsw-alias-label-primary-foreground)}",
+  '.dsh-allowance-cfg-button[data-tone="primary"]:hover:not(:disabled){',
+  "background:var(--dsw-alias-button-primary-hover)}",
+  '.dsh-allowance-cfg-button[data-tone="secondary"]{',
+  "border:0.5px solid var(--dsw-alias-border-l3);background:transparent;",
+  "color:var(--dsw-alias-label-primary)}",
+  '.dsh-allowance-cfg-button[data-tone="secondary"]:hover:not(:disabled){',
+  "background:var(--dsw-alias-interactive-bg-hover-solid)}",
+  ".dsh-allowance-cfg-button:disabled{opacity:.5;cursor:default}",
+  ".dsh-allowance-cfg-link{font-size:12px;line-height:18px;",
+  "color:var(--dsw-alias-state-business-primary);text-decoration:none}",
+  ".dsh-allowance-cfg-link:hover{text-decoration:underline}",
+  ".dsh-allowance-cfg-saved{margin:0;font-size:12px;line-height:18px;",
+  "color:var(--dsw-alias-state-success-primary)}",
+  ".dsh-allowance-cfg-error{margin:0;font-size:12px;line-height:18px;",
+  "color:var(--dsw-alias-state-error-primary)}",
+  ".dsh-allowance-cfg-hint{margin:0;font-size:12px;line-height:18px;",
+  "color:var(--dsh-alias-label-tertiary)}"
+].join("");
+function pick(bilingual) {
+  return bilingual[activeLanguage()] ?? bilingual.en ?? bilingual.zh;
+}
+function errorText(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+async function testGroup(group, drafts, refId, refSecret, t) {
+  if (group.test !== "qwen") return { ok: true };
+  try {
+    const api = await getBalanceApi();
+    if (!api || typeof api.testCredentials !== "function") return { ok: true };
+    const result = await api.testCredentials(drafts[refId] ?? "", drafts[refSecret] ?? "");
+    if (result.ok && result.value?.ok === true) return { ok: true };
+    if (result.ok && result.value?.ok === false) {
+      return { ok: false, error: result.value.error ?? t("settings.testRejected") };
+    }
+    return { ok: false, error: errorText(result.error ?? t("settings.testRejected")) };
+  } catch (error) {
+    return { ok: false, error: errorText(error) };
+  }
+}
+function unwrap(response) {
+  if (response?.ok) return response.value;
+  const detail = response?.error;
+  throw new Error(
+    detail instanceof Error ? detail.message : typeof detail?.message === "string" ? detail.message : typeof detail === "string" ? detail : "the Host refused the call"
+  );
+}
+function CredentialsSection({ ctx, t }) {
+  const credentials = ctx.get("remote.credentials");
+  const [infos, setInfos] = React7.useState(void 0);
+  const [drafts, setDrafts] = React7.useState({});
+  const [editing, setEditing] = React7.useState({});
+  const [busy, setBusy] = React7.useState(false);
+  const [notice, setNotice] = React7.useState(void 0);
+  const load = React7.useCallback(async () => {
+    if (credentials === void 0) return;
+    try {
+      setInfos(unwrap(await credentials.describe([...CREDENTIAL_REFS])));
+    } catch (error) {
+      setInfos({});
+      setNotice({ tone: "error", text: `${t("settings.loadFailed")}: ${errorText(error)}` });
+    }
+  }, [credentials, t]);
+  React7.useEffect(() => {
+    void load();
+  }, [load]);
+  const resetGroup = (group) => {
+    setDrafts((previous) => {
+      const next = { ...previous };
+      for (const field of group.fields) delete next[field.ref];
+      return next;
+    });
+    setEditing((previous) => ({ ...previous, [group.id]: false }));
+  };
+  const saveGroup = async (group) => {
+    const values = group.fields.map((field) => (drafts[field.ref] ?? "").trim());
+    if (values.some((value) => value === "")) {
+      setNotice({ tone: "error", text: t("settings.fillAll") });
+      return;
+    }
+    setBusy(true);
+    setNotice(void 0);
+    try {
+      const [idField, secretField] = group.fields;
+      const tested = await testGroup(
+        group,
+        Object.fromEntries(
+          group.fields.map((field) => [field.ref, (drafts[field.ref] ?? "").trim()])
+        ),
+        idField.ref,
+        secretField.ref,
+        t
+      );
+      if (!tested.ok) {
+        setNotice({ tone: "error", text: `${t("settings.testFailed")}: ${tested.error}` });
+        return;
+      }
+      for (const field of group.fields) {
+        unwrap(await credentials.set(field.ref, (drafts[field.ref] ?? "").trim()));
+      }
+      resetGroup(group);
+      setNotice({ tone: "ok", text: t("settings.saved") });
+    } catch (error) {
+      setNotice({ tone: "error", text: `${t("settings.saveFailed")}: ${errorText(error)}` });
+    } finally {
+      setBusy(false);
+      await load();
+    }
+  };
+  const deleteGroup = async (group) => {
+    setBusy(true);
+    setNotice(void 0);
+    try {
+      for (const field of group.fields) {
+        unwrap(await credentials.unset(field.ref));
+      }
+      resetGroup(group);
+      setNotice({ tone: "ok", text: t("settings.deleted") });
+    } catch (error) {
+      setNotice({ tone: "error", text: `${t("settings.deleteFailed")}: ${errorText(error)}` });
+    } finally {
+      setBusy(false);
+      await load();
+    }
+  };
+  const renderField = (field, editMode) => {
+    const info = infos?.[field.ref];
+    return (0, import_react8.createElement)(
+      "div",
+      { key: field.ref, className: "dsh-allowance-cfg-field" },
+      (0, import_react8.createElement)(
+        editMode ? "label" : "div",
+        {
+          className: "dsh-allowance-cfg-field-label",
+          htmlFor: editMode ? `dsh-allowance-cfg-${field.ref}` : void 0
+        },
+        pick(field.label)
+      ),
+      editMode ? (0, import_react8.createElement)("input", {
+        id: `dsh-allowance-cfg-${field.ref}`,
+        className: "dsh-allowance-cfg-input",
+        type: "password",
+        autoComplete: "off",
+        spellCheck: false,
+        disabled: busy || info?.writable === false,
+        value: drafts[field.ref] ?? "",
+        onChange: (event) => setDrafts((previous) => ({ ...previous, [field.ref]: event.target.value }))
+      }) : (
+        // A stored record reads as text, not as a box that mimics the
+        // entry form: the two states must be told apart at a glance.
+        (0, import_react8.createElement)(
+          "span",
+          { className: "dsh-allowance-cfg-text" },
+          typeof info?.masked === "string" && info.masked !== "" ? info.masked : "********"
+        )
+      )
+    );
+  };
+  const renderGroup = (group) => {
+    const allStored = group.fields.every((field) => infos?.[field.ref]?.configured === true);
+    const editMode = !allStored || editing[group.id] === true;
+    return (0, import_react8.createElement)(
+      "section",
+      { key: group.id, className: "dsh-allowance-cfg-card" },
+      (0, import_react8.createElement)(
+        "div",
+        { className: "dsh-allowance-cfg-card-head" },
+        (0, import_react8.createElement)("h3", { className: "dsh-allowance-cfg-card-title" }, pick(group.name)),
+        // The stored state names itself, so the card reads as configured or
+        // as a form to fill without reading any field.
+        allStored ? (0, import_react8.createElement)("span", { className: "dsh-allowance-cfg-status" }, t("settings.configured")) : null
+      ),
+      group.docUrl ? (0, import_react8.createElement)(
+        "a",
+        {
+          className: "dsh-allowance-cfg-link",
+          href: group.docUrl,
+          target: "_blank",
+          rel: "noreferrer noopener"
+        },
+        `${group.docLabel ? pick(group.docLabel) : t("settings.doc")} \u2197`
+      ) : null,
+      group.fields.map((field) => renderField(field, editMode)),
+      (0, import_react8.createElement)(
+        "div",
+        { className: "dsh-allowance-cfg-actions" },
+        editMode ? (0, import_react8.createElement)(
+          "button",
+          {
+            type: "button",
+            className: "dsh-allowance-cfg-button",
+            "data-tone": "primary",
+            disabled: busy,
+            onClick: () => void saveGroup(group)
+          },
+          busy ? t("settings.testing") : t("settings.save")
+        ) : [
+          (0, import_react8.createElement)(
+            "button",
+            {
+              type: "button",
+              key: "edit",
+              className: "dsh-allowance-cfg-button",
+              "data-tone": "secondary",
+              disabled: busy,
+              onClick: () => setEditing((previous) => ({ ...previous, [group.id]: true }))
+            },
+            t("settings.edit")
+          ),
+          (0, import_react8.createElement)(
+            "button",
+            {
+              type: "button",
+              key: "delete",
+              className: "dsh-allowance-cfg-button",
+              "data-tone": "secondary",
+              disabled: busy,
+              onClick: () => void deleteGroup(group)
+            },
+            t("settings.delete")
+          )
+        ],
+        allStored && editMode ? (0, import_react8.createElement)(
+          "button",
+          {
+            type: "button",
+            className: "dsh-allowance-cfg-button",
+            "data-tone": "secondary",
+            disabled: busy,
+            onClick: () => resetGroup(group)
+          },
+          t("settings.cancel")
+        ) : null
+      )
+    );
+  };
+  return (0, import_react8.createElement)(
+    React7.Fragment,
+    null,
+    // Component-local styles: React removes them with the component.
+    (0, import_react8.createElement)("style", { key: "styles" }, STYLES2),
+    (0, import_react8.createElement)(
+      "div",
+      { className: "dsh-allowance-cfg" },
+      (0, import_react8.createElement)("h2", { className: "dsh-allowance-cfg-title" }, t("settings.title")),
+      credentials === void 0 ? (0, import_react8.createElement)("p", { className: "dsh-allowance-cfg-error" }, t("settings.unavailable")) : infos === void 0 ? (0, import_react8.createElement)("p", { className: "dsh-allowance-cfg-hint" }, t("settings.loading")) : CREDENTIAL_GROUPS.map((group) => renderGroup(group)),
+      notice === void 0 ? null : (0, import_react8.createElement)(
+        "p",
+        {
+          key: "notice",
+          role: "status",
+          className: notice.tone === "error" ? "dsh-allowance-cfg-error" : "dsh-allowance-cfg-saved"
+        },
+        notice.text
+      )
+    )
+  );
 }
 
 // src/client/index.js
@@ -2658,7 +3083,20 @@ function apply(ctx) {
         id: "model-allowance",
         order: 10
       },
-      (props) => (0, import_react8.createElement)(BalanceBadge, { ...props, ctx, t })
+      (props) => (0, import_react9.createElement)(BalanceBadge, { ...props, ctx, t })
+    )
+  );
+  const SECTION = "settings.section";
+  ctx.slots.inject(
+    SECTION,
+    () => ctx.slots.register(
+      {
+        name: SECTION,
+        id: "model-allowance",
+        order: 30,
+        label: () => t("settings.nav")
+      },
+      (props) => (0, import_react9.createElement)(CredentialsSection, { ...props, ctx, t })
     )
   );
 }

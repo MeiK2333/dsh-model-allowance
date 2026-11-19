@@ -15,6 +15,18 @@ lists the provider's models and moves the conversation to the one you pick.
 The card shows the provider's remaining balance or allowance and the model
 of the current conversation, next to the input box.
 
+## Configure credentials
+
+Open **Settings → Model Allowance** to store the vendor credentials the
+balance queries need, such as the Alibaba Cloud AccessKey ID/Secret behind
+Qwen Token Plan readings. A testable pair is verified against the vendor's
+own endpoints before it is saved; stored values can be edited or removed
+later. Values live in DSH's credential store: they are never written into
+configuration, never shown back, and reach nothing but the vendor's own
+query endpoint. The guide under
+[docs/qwen-token-plen-cn](docs/qwen-token-plen-cn/README.md) walks obtaining
+the AccessKey pair.
+
 ## Supported
 
 - DeepSeek
@@ -23,14 +35,14 @@ of the current conversation, next to the input box.
 - Kimi for Coding
 - OpenCode Go
 - Xiaomi MiMo (pay-as-you-go balance and Token Plan)
+- Qwen Token Plan (CN personal plan; needs the Alibaba Cloud AccessKey pair
+  from **Settings → Model Allowance**)
 
 ### Not supported
 
 These vendors publish no balance API. As long as they are configured here,
 they still appear in the card: the panel says there is no balance API, and
 their models stay switchable.
-
-- Qwen Token Plan: the vendor publishes no balance API
 
 ## Installation
 

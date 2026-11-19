@@ -14,6 +14,7 @@
 import { createElement as h } from 'react'
 import { BalanceBadge } from './badge.js'
 import { createBalanceContribution } from './contract.js'
+import { CredentialsSection } from './credentials-page.js'
 import { en, NS, zh } from './locales.js'
 import { lookupBalanceNamespace, resetBalanceNamespace, setBalanceNamespace } from './namespace.js'
 
@@ -93,6 +94,23 @@ export function apply(ctx) {
         order: 10,
       },
       (props) => h(BalanceBadge, { ...props, ctx, t }),
+    ),
+  )
+
+  // The credential page lives in the Settings shell's section ledger. The
+  // shell declares the slot, so this registration rides `slots.inject` and
+  // needs no activation ordering against the settings packages. The label is
+  // a thunk: the shell resolves it per render and per locale revision.
+  const SECTION = 'settings.section'
+  ctx.slots.inject(SECTION, () =>
+    ctx.slots.register(
+      {
+        name: SECTION,
+        id: 'model-allowance',
+        order: 30,
+        label: () => t('settings.nav'),
+      },
+      (props) => h(CredentialsSection, { ...props, ctx, t }),
     ),
   )
 }

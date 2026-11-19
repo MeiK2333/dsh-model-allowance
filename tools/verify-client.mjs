@@ -20,6 +20,8 @@ let hookCursor = 0
 
 const React = {
   createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+  // The settings section wraps its output in a Fragment; render() flattens it.
+  Fragment: 'fragment',
   useState(initial) {
     const index = hookCursor++
     if (!(index in hookState))
@@ -265,6 +267,8 @@ function render(node) {
     if (props[name] !== undefined) extra.push(`${name}="${String(props[name])}"`)
   }
   if (props.title !== undefined) extra.push(`title="${String(props.title)}"`)
+  // The settings card's guide link carries its destination on the anchor.
+  if (props.href !== undefined) extra.push(`href="${String(props.href)}"`)
   // An icon's box size decides whether it lands on a whole pixel inside its
   // chip, so the assertions need to see it.
   if (type === 'svg') {
@@ -473,7 +477,8 @@ const streamCtx = {
       return effect
     },
     register: (options, Component) => {
-      streamSlot = { options, Component }
+      // The plugin registers its settings page too; this scenario reads the badge.
+      if (options.name === 'conversation.input.right') streamSlot = { options, Component }
       return () => {}
     },
   },
@@ -640,7 +645,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     slots: {
       inject: (_key, callback) => callback(),
       register: (options, Component) => {
-        planSlot = { options, Component }
+        if (options.name === 'conversation.input.right') planSlot = { options, Component }
         return () => {}
       },
     },
@@ -1055,7 +1060,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     slots: {
       inject: (_key, callback) => callback(),
       register: (options, Component) => {
-        letterSlot = { options, Component }
+        if (options.name === 'conversation.input.right') letterSlot = { options, Component }
         return () => {}
       },
     },
@@ -1169,7 +1174,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     slots: {
       inject: (_key, callback) => callback(),
       register: (options, Component) => {
-        pricelessSlot = { options, Component }
+        if (options.name === 'conversation.input.right') pricelessSlot = { options, Component }
         return () => {}
       },
     },
@@ -1323,7 +1328,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     slots: {
       inject: (_key, callback) => callback(),
       register: (options, Component) => {
-        shortestSlot = { options, Component }
+        if (options.name === 'conversation.input.right') shortestSlot = { options, Component }
         return () => {}
       },
     },
@@ -1413,7 +1418,7 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
     slots: {
       inject: (_key, callback) => callback(),
       register: (options, Component) => {
-        clockSlot = { options, Component }
+        if (options.name === 'conversation.input.right') clockSlot = { options, Component }
         return () => {}
       },
     },
@@ -1495,6 +1500,138 @@ if (!streamed.includes('剩余 82%')) throw new Error('stream reading did not re
   } finally {
     Date.now = realNow
   }
+}
+
+// --- The settings page shows a stored credential ----------------------------
+{
+  const sectionEntry = registeredSlots.find((entry) => entry.options.name === 'settings.section')
+  if (!sectionEntry) throw new Error('the settings section was not registered')
+
+  /** The remote namespace answers through the `{ok, value}` wrapper. */
+  let describeAnswer
+  const wrote = []
+  const credentialsApi = {
+    describe: async (refs) => describeAnswer(refs),
+    set: async (ref, value) => {
+      wrote.push(['set', ref, value])
+      return { ok: true, value: undefined }
+    },
+    unset: async (ref) => {
+      wrote.push(['unset', ref])
+      return { ok: true, value: undefined }
+    },
+  }
+  const sectionCtx = ctx
+  // The slot registration closes over the apply-scope ctx, so the credential
+  // namespace is offered by swapping the ctx's own lookup for this scenario.
+  const realGet = ctx.get
+  ctx.get = (key) => (key === 'remote.credentials' ? credentialsApi : realGet(key))
+  const renderSection = () => {
+    hookCursor = 0
+    return render(sectionEntry.Component({ ctx: sectionCtx }))
+  }
+
+  /** Every configured reference reports a masked preview, the way the Host does. */
+  const configuredRefs = (refs) => ({
+    ok: true,
+    value: Object.fromEntries(
+      refs.map((ref) => [
+        ref,
+        { configured: true, writable: true, masked: `${ref.slice(0, 4)}***` },
+      ]),
+    ),
+  })
+
+  // --- stored: masked values plus edit and delete, no entry form ------------
+  describeAnswer = configuredRefs
+  // Earlier scenarios leave async reads that settle into the shared hook
+  // slots; let them drain before this component claims the slots.
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  hookState = []
+  renderSection()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  const configured = renderSection()
+  console.log('settings card:', configured.slice(configured.indexOf('dsh-allowance-cfg"')))
+  for (const expected of [
+    'ALIB***',
+    '修改',
+    '删除',
+    '已配置',
+    'github.com/MeiK2333/dsh-model-allowance',
+  ]) {
+    if (!configured.includes(expected)) {
+      throw new Error(`the stored credential card is missing ${JSON.stringify(expected)}`)
+    }
+  }
+  // A stored record reads as text: no entry input and no input-shaped box.
+  if (configured.includes('<input')) {
+    throw new Error('a stored credential should render as text, not an entry form')
+  }
+  if (configured.includes('dsh-allowance-cfg-value')) {
+    throw new Error('a stored credential should not render in an input-shaped box')
+  }
+  console.log('settings: a stored credential renders masked with edit and delete')
+
+  // --- absent: the entry form with its save button --------------------------
+  describeAnswer = async (refs) => ({
+    ok: true,
+    value: Object.fromEntries(refs.map((ref) => [ref, { configured: false, writable: true }])),
+  })
+  hookState = []
+  renderSection()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  const empty = renderSection()
+  if (!empty.includes('<input')) throw new Error('an absent credential should offer the entry form')
+  if (!empty.includes('保存')) throw new Error('the entry form is missing its save button')
+
+  // --- saving: the pair is tested, then written field by field --------------
+  hookState[1] = {
+    ALIBABA_CLOUD_ACCESS_KEY_ID: 'LTAI5test',
+    ALIBABA_CLOUD_ACCESS_KEY_SECRET: 'test-secret',
+  }
+  hookCursor = 0
+  /** Expand function components so the tree's buttons are reachable. */
+  const expand = (node) => {
+    if (node === null || node === undefined || typeof node !== 'object') return node
+    if (Array.isArray(node)) return node.flatMap(expand)
+    if (typeof node.type === 'function')
+      return expand(node.type({ ...node.props, children: node.children }))
+    return { ...node, children: (node.children ?? []).map(expand) }
+  }
+  const withDrafts = expand(sectionEntry.Component({ ctx: sectionCtx }))
+  /** Walk the element tree for the button whose label is `label`. */
+  const buttonOf = (node, label) => {
+    if (node === null || node === undefined || typeof node !== 'object') return undefined
+    if (Array.isArray(node)) {
+      for (const child of node) {
+        const found = buttonOf(child, label)
+        if (found) return found
+      }
+      return undefined
+    }
+    const labelHere = (node.children ?? []).some(
+      (child) => typeof child === 'string' && child.includes(label),
+    )
+    if (node.type === 'button' && labelHere && node.props.onClick) return node
+    return buttonOf(node.children, label)
+  }
+  const save = buttonOf(withDrafts, '保存')
+  if (!save) throw new Error('no clickable save button for the drafted credential')
+  save.props.onClick()
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  const saved = renderSection()
+  if (!saved.includes('已保存')) throw new Error('a successful save should report itself')
+  const sets = wrote.filter(([kind]) => kind === 'set')
+  if (sets.length !== 2) {
+    throw new Error(`saving should write both fields, wrote ${JSON.stringify(wrote)}`)
+  }
+
+  // --- the wrapper is not the result: a raw answer must not pass as configured
+  // A page that read the `{ok, value}` wrapper as the table would see no row
+  // for any reference and fall back to the entry form; the masked render above
+  // is the regression guard.
+  ctx.get = realGet
+  console.log('settings: a drafted credential saves through the wrapped namespace answers')
 }
 
 console.log('OK: client bundle loads, applies, mounts the namespace, and renders')
