@@ -52,10 +52,10 @@ their models stay switchable.
 2. Choose **Install** and enter:
 
    ```
-   dsh-model-allowance@1.1.0
+   dsh-model-allowance@1.1.1
    ```
 
-   Use the latest published version instead of `1.1.0` when a newer one
+   Use the latest published version instead of `1.1.1` when a newer one
    exists.
 3. Confirm the installation. If DSH reports **restart required**, restart
    DSH; otherwise refresh the page.
@@ -65,7 +65,7 @@ The npm installation is eligible for the Plugin Manager's **Update** action.
 ### Install from GitHub
 
 ```
-git+https://github.com/MeiK2333/dsh-model-allowance.git#v1.1.0
+git+https://github.com/MeiK2333/dsh-model-allowance.git#v1.1.1
 ```
 
 Git installations are not covered by the Plugin Manager's **Update** action;
